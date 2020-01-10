@@ -36,6 +36,7 @@ def rw_kg(inst,df=None,testing=True):
         acc  = cfg["instances"][inst]["sources"][kg]["connection"]["acc" ]
         db   = cfg["instances"][inst]["sources"][kg]["connection"]["db"  ]
         app  = cfg["instances"][inst]["sources"][kg]["connection"]["app" ]
+        key  = cfg["instances"][inst]["sources"][kg]["connection"]["key"]
         sec  = cfg["instances"][inst]["sources"][kg]["connection"]["sec" ]
         con  = cfg["instances"][inst]["sources"][kg]["connection"]["con" ]
         dirn = cfg["instances"][inst]["sources"][kg]["connection"]["dirn"]
@@ -49,7 +50,7 @@ def rw_kg(inst,df=None,testing=True):
                 con  == None or
                 dirn == None or
                 tbl  == None):
-            url  = "https://" + host + ":" + port,
+            url  = "https://" + host + ":" + port
             if not testing:
                 # Write configuration
                 wc = {
@@ -146,6 +147,7 @@ def rw_warehouse(inst,df=None,testing=True):
         acc  = cfg["instances"][inst]["sources"][wh]["connection"]["acc" ]
         db   = cfg["instances"][inst]["sources"][wh]["connection"]["db"  ]
         app  = cfg["instances"][inst]["sources"][wh]["connection"]["app" ]
+        key  = cfg["instances"][inst]["sources"][wh]["connection"]["key"]
         sec  = cfg["instances"][inst]["sources"][wh]["connection"]["sec" ]
         con  = cfg["instances"][inst]["sources"][wh]["connection"]["con" ]
         dirn = cfg["instances"][inst]["sources"][wh]["connection"]["dirn"]

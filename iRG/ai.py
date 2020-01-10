@@ -14,14 +14,22 @@
 ##
 ############################################################################
 
-from joblib import Parallel, delayed
-from itertools import combinations
+from joblib       import Parallel, delayed
+from itertools    import combinations
 from keras.utils  import to_categorical
+
+from pdf2image    import convert_from_bytes,convert_from_path
+from PIL          import Image
+
+import requests
+import io
 
 import numpy as np
 
 import multiprocessing as mp
 import os
+
+import config
 
 from nn import dbn
 
@@ -48,7 +56,7 @@ def store(dat=[]):
 ############################################################################
 def prefix(i=BVAL):
     ret  = BVAL
-    if not (i == BVAL):
+    if not (i <= BVAL):
         ret  = i + 1
     return ret
 
@@ -193,6 +201,71 @@ def thought(inst=BVAL,lbl=None):
                 break
     return ret
 
+############################################################################
+##
+## Purpose:   Convert Python image library (PIL) image to an array
+##
+############################################################################
+def pil2array(pil=None):
+    ret  = None
+    if not (pil == None):
+        # get addressable memory for writing the image
+        imgb = io.BytesIO()
+        # save the passed image to the addressable memory
+        pil.save(imgb,format='PNG')
+        # get a reference to the addressable memory for the return
+        ret  = imgb.getvalue()
+    return ret
+
+############################################################################
+##
+## Purpose:   Convert Python image library (PIL) image data to text
+##
+############################################################################
+def img2txt(img=[],inst=BVAL,testing=True):
+    ret  = []
+    if not (len(img) == 0 or inst <= BVAL):
+        # get the default configuration
+        cfg  = config.cfg()
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["src"]["index"]
+        typ  = cfg["instances"][inst]["src"]["types"]["ocr"]
+        # azure subscription key
+        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
+        # azure vision api
+        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+        # directory
+        drct = cfg["instances"][inst]["sources"][src][typ]["connection"]["dir"]
+        # version
+        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
+        # app
+        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
+        # url
+        url  = "https://" + host + "/" + drct + "/" + ver + "/" + app
+        # request headers. Important: content should be bytestream as we are sending an image from local
+        hdrs = {"Ocp-Apim-Subscription-Key":key,"Content-Type":"application/octet-stream"}
+        # request parameters: language is unknown, and we do detect orientation
+        parms= {"language":"unk","detectOrientation":"true"}
+        if not testing:
+            # get response from the server
+            resp = requests.post(url,headers=hdrs,params=parms,data=img)
+            resp.raise_for_status()
+            # get json data to parse it later
+            json = resp.json()
+            # all the line from a page, including noise
+            ftext= []
+            for reg in json["regions"]:
+                line = reg["lines"]
+                for elem in line:
+                    ltext = " ".join([word["text"] for word in elem["words"]])
+                    ftext.append(ltext.lower())
+            # clean array containing only important data
+            for line in ftext:
+                ret.append(line)
+        else:
+            ret  = [src,typ,key,host,url,hdrs,parms]
+    return ret
+
 # *************** TESTING *****************
 
 def ai_testing(M=500,N=2):
@@ -201,6 +274,18 @@ def ai_testing(M=500,N=2):
     ivals= np.random.sample(size=(M,N))
     print(permute(range(0,len(ivals[0]))))
     print(brain(ivals))
+    imgs = convert_from_path("files/kg.pdf")
+    print(imgs)
+    for img in imgs:
+        print(pil2array(img))
+    src,typ,key,host,url,hdrs,parms = img2txt(imgs,0)
+    print(src)
+    print(typ)
+    print(key)
+    print(host)
+    print(url)
+    print(hdrs)
+    print(parms)
     # number of data points, properties and splits
     m    = np.size(ivals,0)
     p    = np.size(ivals,1)

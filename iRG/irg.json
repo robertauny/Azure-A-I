@@ -7,8 +7,9 @@
 				"index" : 2,
 				"types" : {
 					"mysql" : 0,
-					"stream" : 1,
-					"glove" : 2
+					"mysql" : 1,
+					"ocr" : 2,
+					"glove" : 3
 				}
 			},
 			"sources" : [
@@ -42,16 +43,16 @@
 				},
 				{
 					"connection" : {
-						"host" : "rammansqlserver.sqlserver.database.azure.com",
-						"port" : "8081",
-						"db" : "kgdb",
-						"acc" : "account-name",
+						"host" : "rammanmysql.mysql.database.azure.com",
+						"port" : "3306",
+						"db" : "costcodb",
+						"acc" : "costco@rammanmysql",
 						"key" : "account-key",
 						"app" : "iRG",
 						"sec" : "true",
 						"con" : "container-name",
 						"dirn" : "directory-name",
-						"tbl" : "KG"
+						"tbl" : "PCTCOUPONS"
 					},
 					"features" : [
 						{
@@ -359,7 +360,23 @@
 							}
 						],
 						"special" : "custom"
- 					}
+ 					},
+					{
+						"connection" : {
+							"host" : "westus2.api.cognitive.microsoft.com",
+							"dir" : "vision",
+							"ver" : "v2.0",
+							"key" : "account-key",
+							"app" : "ocr"
+						}
+					},
+					{
+						"connection" : {
+							"host" : "localhost",
+							"key" : "account-key",
+							"app" : "glove"
+						}
+					}
 				]
 			]
 		}
