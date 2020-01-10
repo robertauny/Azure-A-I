@@ -364,7 +364,7 @@
 					{
 						"connection" : {
 							"host" : "westus2.api.cognitive.microsoft.com",
-							"dir" : "vision",
+							"api" : "vision",
 							"ver" : "v2.0",
 							"key" : "account-key",
 							"app" : "ocr"

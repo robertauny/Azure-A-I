@@ -234,14 +234,14 @@ def img2txt(img=[],inst=BVAL,testing=True):
         key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
         # azure vision api
         host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
-        # directory
-        drct = cfg["instances"][inst]["sources"][src][typ]["connection"]["dir"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
         # version
         ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
         # app
         app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
         # url
-        url  = "https://" + host + "/" + drct + "/" + ver + "/" + app
+        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
         # request headers. Important: content should be bytestream as we are sending an image from local
         hdrs = {"Ocp-Apim-Subscription-Key":key,"Content-Type":"application/octet-stream"}
         # request parameters: language is unknown, and we do detect orientation

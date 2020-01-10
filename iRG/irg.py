@@ -19,6 +19,9 @@ from keras.utils  import to_categorical
 from keras.models import load_model
 from joblib       import Parallel, delayed
 
+from pdf2image    import convert_from_bytes,convert_from_path
+from PIL          import Image
+
 import nn
 import ai
 import data
@@ -221,6 +224,40 @@ def correction(dat=[]):
             ret[ind] = np.full(len(ind),mdat)
     return ret
 
+############################################################################
+##
+## Purpose:  Read data from an array of PDF files
+##
+############################################################################
+def ocre(imgs=[]):
+    ret  = None
+    if not (len(imgs) == 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # converted images
+        ret  = Parallel(n_jobs=nc)(delayed(ai.pil2array)(imgs[i]) for i in range(0,len(imgs)))
+    return ret
+
+############################################################################
+##
+## Purpose:  Read data from an array of PDF files
+##
+############################################################################
+def ocr(pdfs=[],inst=ai.BVAL,testing=True):
+    ret  = None
+    if not (len(pdfs) == 0 or inst <= ai.BVAL):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # converted images
+        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)( pdfs[i]             ) for i in range(0,len(pdfs )))
+        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )( imgs[i]             ) for i in range(0,len(imgs )))
+        oimgs=     Parallel(n_jobs=nc)(delayed(ai.img2txt       )(pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+        if not (len(oimgs) <= 1):
+            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]             ) for i in range(1,len(oimgs)))
+        else:
+            ret  = oimgs
+    return ret
+
 # *************** TESTING *****************
 
 def irg_testing(M=500,N=2):
@@ -230,6 +267,9 @@ def irg_testing(M=500,N=2):
     # create the data for the sample knowledge graph
     kg   = create_kg(0,ivals)
     print(kg["edges"])
+    # test ocr
+    o    = ocr(["files/kg.pdf"],0)
+    print(o)
     # number of data points, properties and splits
     m    = np.size(ivals,0)
     p    = np.size(ivals,1)
