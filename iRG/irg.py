@@ -109,33 +109,88 @@ def create_kg_ve(dat=[],lbls=[],lbl=None,ve=None):
 
 ############################################################################
 ##
+## Purpose:   Heavy lift of creating a knowledge graph
+##
+############################################################################
+def build_kg(inst,dat=[],brn={},splits=2):
+    ret  = {"vertices":[],"edges":[]}
+    if not (inst == None  or
+            inst < 0      or
+            len(dat) == 0 or
+            brn == {}     or
+            splits < 2):
+        # get the nn model for this brain
+        mdl  = brn["model"]
+        # get the nn label for this brain
+        lbl  = brn["label"]
+        # make the predictions using this model
+        model= load_model(mdl)
+        preds= model.predict(dat)
+        # generate the labels for the data
+        lbls = ai.label(preds)
+        # create the vertices
+        v    = create_kg_ve(dat,lbls,lbl,"v")
+        # create the edges
+        e    = create_kg_ve(dat,lbls,lbl,"e")
+        ret["vertices"] = v
+        ret["edges"   ] = e
+    return ret 
+
+############################################################################
+##
+## Purpose:   Append vertices and edges to a knowledge graph
+##
+############################################################################
+def append_kg(ret={},dat={}):
+    v    = []
+    e    = []
+    if not (ret == {} or dat == {} or len(dat["vertices"]) == 0 or len(dat["edges"]) == 0):
+        # vertices
+        rv   = ret["vertices"]
+        dv   = dat["vertices"]
+        if not (len(rv) == 0):
+            v    = extend(rv,dv)
+        else:
+            v    = dv
+        # edges
+        re   = ret["edges"   ]
+        de   = dat["edges"   ]
+        if not (len(re) == 0):
+            e    = extend(re,de)
+        else:
+            e    = de
+    return {"vertices":v,"edges":e}
+
+############################################################################
+##
 ## Purpose:   Create a knowledge graph
 ##
 ############################################################################
 def create_kg(inst,dat=[],splits=2):
-    ret  = None
+    ret  = {"vertices":[],"edges":[]}
     if not (inst == None or inst < 0 or len(dat) == 0 or splits < 2):
-        # vertices and edges
-        v    = []
-        e    = []
+        # number of cpu cores
+        nc   = mp.cpu_count()
         # generate the brains
         brns = ai.brain(dat)
-        for brn in brns:
-            # get the nn model for this brain
-            mdl  = brn["model"]
-            # get the nn label for this brain
-            lbl  = brn["label"]
-            # make the predictions using this model
-            model= load_model(mdl)
-            preds= model.predict(dat)
-            # generate the labels for the data
-            lbls = ai.label(preds)
-            # create the vertices
-            v.append(create_kg_ve(dat,lbls,lbl,"v"))
-            # create the edges
-            e.append(create_kg_ve(dat,lbls,lbl,"e"))
-        ret  = {"vertices":v,"edges":e}
-    return ret 
+        # generate the vertices and edges
+        bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
+        rret = ret
+        ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
+    return ret[0]
+
+############################################################################
+##
+## Purpose:   Convert a list of strings into their ordinal representation
+##
+############################################################################
+def chars(dat=[],pre=0):
+    ret  = []
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        e    = dat.rjust(pre)
+        ret.extend(e)
+    return ret
 
 ############################################################################
 ##
@@ -145,23 +200,41 @@ def create_kg(inst,dat=[],splits=2):
 def numbers(dat=[],pre=0):
     ret  = None
     sz   = len(dat)
-    if not (sz == 0):
-        d    = []
-        e    = dat.rjust(pre)
-        d.extend(e)
+    if not (sz == 0 or pre < 0):
+        d    = chars(dat,pre)
         ret  = [ord(x) for i, x in enumerate(d)]
     return ret
 
 ############################################################################
 ##
-## Purpose:   Which string in a list appears most
+## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
-def most(dat=[]):
+def almost(dat=[]):
     ret  = None
     sz   = len(dat)
     if not (sz == 0):
         ret  = max(set(dat),key=dat.count)
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by character)
+##
+############################################################################
+def most(dat=[],pre=0):
+    ret  = None
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # character-wise append of most frequent characters in each feature of the list of strings
+        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
+        cdat = np.asarray(cdat)
+        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+        ret  = "".join(mdat).lstrip()
+        if not (ret in dat):
+            ret  = almost(dat)
     return ret
 
 ############################################################################
@@ -220,7 +293,7 @@ def correction(dat=[]):
         for i in range(0,len(ucls)):
             ind      = [j for j, x in enumerate(clus) if x == ucls[i]]
             idat     = [dat[x] for j, x in enumerate(ind)]
-            mdat     = most(idat)
+            mdat     = most(idat,ssz)
             ret[ind] = np.full(len(ind),mdat)
     return ret
 
