@@ -8,7 +8,7 @@
 				"types" : {
 					"mysql" : 0,
 					"mysql" : 1,
-					"ocr" : 2,
+					"ocr"   : 2,
 					"glove" : 3
 				}
 			},
@@ -17,56 +17,56 @@
 					"connection" : {
 						"host" : "rammancosmos.gremlin.cosmosdb.azure.com",
 						"port" : "443",
-						"db" : "kgdb",
-						"acc" : "account-name",
-						"key" : "account-key",
-						"app" : "iRG",
-						"sec" : "true",
-						"con" : "container-name",
+						"db"   : "kgdb",
+						"acc"  : "account-name",
+						"key"  : "account-key",
+						"app"  : "iRG",
+						"sec"  : "true",
+						"con"  : "container-name",
 						"dirn" : "directory-name",
-						"tbl" : "KG"
+						"tbl"  : "KG"
 					},
 					"features" : [
 						{
 							"column" : "REDEMPTIONAMOUNT",
-							"type" : "double",
+							"type"   : "double",
 							"length" : null
 						},
 						{
 							"column" : "PCTNONBILLABLE",
-							"type" : "double",
+							"type"   : "double",
 							"length" : null
 						}
 					],
-					"joins" : null, 
+					"joins"   : null, 
 					"special" : null
 				},
 				{
 					"connection" : {
 						"host" : "rammanmysql.mysql.database.azure.com",
 						"port" : "3306",
-						"db" : "costcodb",
-						"acc" : "costco@rammanmysql",
-						"key" : "account-key",
-						"app" : "iRG",
-						"sec" : "true",
-						"con" : "container-name",
+						"db"   : "costcodb",
+						"acc"  : "costco@rammanmysql",
+						"key"  : "account-key",
+						"app"  : "iRG",
+						"sec"  : "true",
+						"con"  : "container-name",
 						"dirn" : "directory-name",
-						"tbl" : "PCTCOUPONS"
+						"tbl"  : "PCTCOUPONS"
 					},
 					"features" : [
 						{
 							"column" : "REDEMPTIONAMOUNT",
-							"type" : "double",
+							"type"   : "double",
 							"length" : null
 						},
 						{
 							"column" : "PCTNONBILLABLE",
-							"type" : "double",
+							"type"   : "double",
 							"length" : null
 						}
 					],
-					"joins" : null, 
+					"joins"   : null, 
 					"special" : null
 				},
 				[
@@ -74,19 +74,21 @@
 						"connection" : {
 							"host" : "localhost",
 							"port" : "3306",
-							"db" : "cosco",
-							"tbl" : "PCTCOUPONS"
+							"db"   : "cosco",
+							"tbl"  : "PCTCOUPONS"
 						},
 						"features" : [
 							{
 								"column" : "REDEMPTIONAMOUNT",
-								"type" : "double",
-								"length" : null
+								"type"   : "double",
+								"length" : null,
+								"model"  : 1
 							},
 							{
 								"column" : "PCTNONBILLABLE",
-								"type" : "double",
-								"length" : null
+								"type"   : "double",
+								"length" : null,
+								"model"  : 1
 							}
 						],
 						"joins" : [ 
@@ -94,13 +96,13 @@
 								"connection" : {
 									"host" : "localhost",
 									"port" : "3306",
-									"db" : "cosco",
-									"tbl" : "PCTCOUPONS"
+									"db"   : "cosco",
+									"tbl"  : "PCTCOUPONS"
 								},
 								"features" : [
 									{
 										"column" : "REDEMPTIONAMOUNT",
-										"type" : "double",
+										"type"   : "double",
 										"length" : null
 									}
 								]
@@ -109,13 +111,13 @@
 								"connection" : {
 									"host" : "localhost",
 									"port" : "3306",
-									"db" : "cosco",
-									"tbl" : "COUPONS"
+									"db"   : "cosco",
+									"tbl"  : "COUPONS"
 								},
 								"features" : [
 									{
 										"column" : "REDEMPTIONAMOUNT",
-										"type" : "double",
+										"type"   : "double",
 										"length" : null
 									}
 								]
@@ -127,204 +129,243 @@
 						"connection" : {
 							"host" : "localhost",
 							"port" : "3306",
-							"db" : "cosco",
-							"tbl" : "COUPONS"
+							"db"   : "cosco",
+							"tbl"  : "COUPONS"
 						},
 						"features" : [
 							{
 								"column" : "TRACKINGID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "LOCATIONNUMBER",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "SALESDATE",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 1
 							},
 							{
 								"column" : "DEPARTMENTNUMBER",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "COUPONID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "UPCNUMBER",
-								"type" : "double",
-								"length" : null
+								"type"   : "double",
+								"length" : null,
+								"model"  : 1
 							},
 							{
 								"column" : "REGISTERNUMBER",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "REGISTERTRANSACTIONNUMBER",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "REDEMPTIONUNIT",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "REDEMPTIONAMOUNT",
-								"type" : "double",
-								"length" : null
+								"type"   : "double",
+								"length" : null,
+								"model"  : 1
 							},
 							{
 								"column" : "REDEMPTIONCURRENCYID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "SOURCECODE",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "ISRAINCHECK",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "ISREFUND",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "ISVOID",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "TAXCODE",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "ISRESALE",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "MEMBERSHIPNUMBER",
-								"type" : "double",
-								"length" : null
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "MEMBERSHIPTYPE",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "TRANSACTIONID",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "JOURNALTRANSACTIONID",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "CREATE_TIMESTAMP",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "CREATE_USER",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "COUPON_TRACKING_STATUS_ID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "DSS_UPDATE_TIME",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "COUPONREDEMPTIONDETAILID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "R_TRACKINGID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "CONTRACTID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "COUPONBILLINGCODEID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "COUPONBILLINGSUMMARYID",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "R_REDEMPTIONUNIT",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							},
 							{
 								"column" : "R_REDEMPTIONAMOUNT",
-								"type" : "double",
-								"length" : null
+								"type"   : "double",
+								"length" : 17,
+								"model"  : 1
 							},
 							{
 								"column" : "R_REDEMPTIONCURRENCYID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 17,
+								"model"  : 1
 							},
 							{
 								"column" : "STATUSCODEID",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 0
 							},
 							{
 								"column" : "R_CREATE_TIMESTAMP",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "R_CREATE_USER",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "R_DSS_UPDATE_TIME",
-								"type" : "varchar",
-								"length" : 255
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "Right_MEMBERSHIPNUMBER",
-								"type" : "double",
-								"length" : null
+								"type"   : "varchar",
+								"length" : 255,
+								"model"  : 0
 							},
 							{
 								"column" : "Count",
-								"type" : "int",
-								"length" : 11
+								"type"   : "int",
+								"length" : 11,
+								"model"  : 1
 							}
 						],
 						"joins" : [ 
@@ -332,13 +373,13 @@
 								"connection" : {
 									"host" : "localhost",
 									"port" : "3306",
-									"db" : "cosco",
-									"tbl" : "COUPONS"
+									"db"   : "cosco",
+									"tbl"  : "COUPONS"
 								},
 								"features" : [
 									{
 										"column" : "REDEMPTIONAMOUNT",
-										"type" : "double",
+										"type"   : "double",
 										"length" : null
 									}
 								]
@@ -347,13 +388,13 @@
 								"connection" : {
 									"host" : "localhost",
 									"port" : "3306",
-									"db" : "cosco",
-									"tbl" : "PCTCOUPONS"
+									"db"   : "cosco",
+									"tbl"  : "PCTCOUPONS"
 								},
 								"features" : [
 									{
 										"column" : "REDEMPTIONAMOUNT",
-										"type" : "double",
+										"type"   : "double",
 										"length" : null
 									}
 								]
@@ -363,18 +404,20 @@
  					},
 					{
 						"connection" : {
+							"app"  : "ocr",
 							"host" : "westus2.api.cognitive.microsoft.com",
-							"api" : "vision",
-							"ver" : "v2.0",
-							"key" : "account-key",
-							"app" : "ocr"
+							"api"  : "vision",
+							"ver"  : "v2.0",
+							"key"  : "account-key"
 						}
 					},
 					{
 						"connection" : {
+							"app"  : "glove",
 							"host" : "localhost",
-							"key" : "account-key",
-							"app" : "glove"
+							"dir"  : "dir",
+							"file" : "file",
+							"key"  : "account-key"
 						}
 					}
 				]

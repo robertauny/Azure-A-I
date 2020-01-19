@@ -14,12 +14,14 @@
 ##
 ############################################################################
 
-from keras.layers import Dense, Dropout, Input
+from keras.layers import Dense, Dropout, Input, Embedding
 from keras.models import Sequential
 from keras.utils  import to_categorical
 
 import numpy as np
 import os
+
+import constants as const
 
 ############################################################################
 ##
@@ -36,6 +38,7 @@ def dbn(inputs
        ,dbnact=None
        ,dbnout=0
        ,epochs=100
+       ,embed=True
        ,verbose=1):
     model= None
     if inputs.any() and outputs.any():
@@ -62,6 +65,17 @@ def dbn(inputs
         enc  = Dense(M,input_shape=(M,),activation='relu')
         # add the input layer to the model
         model.add(enc)
+        # if M > const.MAX_FEATURES, then we will embed the inputs in a lower dimensional space of dimension const.MAX_FEATURES
+        #
+        # embed the inputs into a lower dimensional space if M > const.MAX_FEATURES
+        if embed:
+            if M > const.MAX_FEATURES:
+                enc  = Dense(const.MAX_FEATURES,input_shape=(M,),activation='selu')
+                model.add(enc)
+                props= const.MAX_FEATURES
+                M    = props
+            if S > const.MAX_SPLITS:
+                S    = const.MAX_SPLITS
         # add the rest of the layers according to the writings
         #
         # output dimension (odim) is initially S (number of splits in first level of hierarchy)
@@ -122,14 +136,16 @@ def dbn(inputs
 # *************** TESTING *****************
 
 def nn_testing(M=500,N=2):
-    # uniformly sample values between 0 and 1
-    #ivals= np.random.sample(size=(500,3))
-    ivals= np.random.sample(size=(M,N))
     # number of data points, properties and splits
-    m    = np.size(ivals,0)
-    p    = np.size(ivals,1)
+    m    = M
+    p    = N
+    if p > const.MAX_FEATURES:
+        p    = const.MAX_FEATURES
     #s    = p + 1
     s    = p
+    # uniformly sample values between 0 and 1
+    #ivals= np.random.sample(size=(500,3))
+    ivals= np.random.sample(size=(m,p))
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
     nc   = s**(2*p)
@@ -149,7 +165,7 @@ def nn_testing(M=500,N=2):
         print(pvals)
     else:
         print("Model 1 is null.")
-    ovals= np.random.sample(size=(M,1))
+    ovals= np.random.sample(size=(m,1))
     # generate the regression model for using the test values for training
     #model = dbn(ivals
                 #,ovals
@@ -169,6 +185,28 @@ def nn_testing(M=500,N=2):
                ,rbmact='tanh'
                ,dbnact='linear'
                ,dbnout=1)
+    if not (model == None):
+        # generate some test data for predicting using the model
+        ovals= np.random.sample(size=(m/10,p))
+        # encode and decode values
+        pvals= model.predict(ovals)
+        # look at the original values and the predicted values
+        print(ovals)
+        print(pvals)
+    else:
+        print("Model 2 is null.")
+    # generate the clustering model for using the test values for training
+    # testing models of dimensions > 3
+    p     = 5
+    ivals= np.random.sample(size=(m,p))
+    # we need values to turn into labels when training
+    # one-hot encode the integer labels as its required for the softmax
+    nc   = s**(2*const.MAX_FEATURES)
+    ovals= []
+    for i in range(0,M):
+        ovals.append(np.random.randint(1,nc))
+    ovals= to_categorical(ovals,num_classes=nc)
+    model = dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):
         # generate some test data for predicting using the model
         ovals= np.random.sample(size=(m/10,p))

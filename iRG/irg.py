@@ -25,6 +25,8 @@ from PIL          import Image
 import nn
 import ai
 import data
+import constants as const
+
 import multiprocessing as mp
 
 import numpy  as np
@@ -125,7 +127,11 @@ def build_kg(inst,dat=[],brn={},splits=2):
         lbl  = brn["label"]
         # make the predictions using this model
         model= load_model(mdl)
-        preds= model.predict(dat)
+        # make sure to get the right subset of the data
+        l    = list(map(int,lbl.split("-")))
+        d    = dat[:,l]
+        # make the predictions
+        preds= model.predict(d)
         # generate the labels for the data
         lbls = ai.label(preds)
         # create the vertices
@@ -179,175 +185,22 @@ def create_kg(inst,dat=[],splits=2):
         ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
     return ret[0]
 
-############################################################################
-##
-## Purpose:   Convert a list of strings into their ordinal representation
-##
-############################################################################
-def chars(dat=[],pre=0):
-    ret  = []
-    sz   = len(dat)
-    if not (sz == 0 or pre < 0):
-        e    = dat.rjust(pre)
-        ret.extend(e)
-    return ret
-
-############################################################################
-##
-## Purpose:   Convert a list of strings into their ordinal representation
-##
-############################################################################
-def numbers(dat=[],pre=0):
-    ret  = None
-    sz   = len(dat)
-    if not (sz == 0 or pre < 0):
-        d    = chars(dat,pre)
-        ret  = [ord(x) for i, x in enumerate(d)]
-    return ret
-
-############################################################################
-##
-## Purpose:   Which string in a list appears most (by whole words)
-##
-############################################################################
-def almost(dat=[]):
-    ret  = None
-    sz   = len(dat)
-    if not (sz == 0):
-        ret  = max(set(dat),key=dat.count)
-    return ret
-
-############################################################################
-##
-## Purpose:   Which string in a list appears most (by character)
-##
-############################################################################
-def most(dat=[],pre=0):
-    ret  = None
-    sz   = len(dat)
-    if not (sz == 0 or pre < 0):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # character-wise append of most frequent characters in each feature of the list of strings
-        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
-        cdat = np.asarray(cdat)
-        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-        ret  = "".join(mdat).lstrip()
-        if not (ret in dat):
-            ret  = almost(dat)
-    return ret
-
-############################################################################
-##
-## Purpose:   Use DBN to correct a list of corrupt or misclassified strings
-##
-############################################################################
-def correction(dat=[]):
-    ret  = []
-    sz   = len(dat)
-    if not (sz == 0):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # length of longest string in the list
-        ssz  = max([len(x) for i, x in enumerate(dat)])
-        # numeric representations of the strings in the list
-        ndat = Parallel(n_jobs=nc)(delayed(numbers)(dat[i],ssz) for i in range(0,sz))
-        # we need values to turn into labels when training
-        # one-hot encode the numeric data as its required for the softmax
-        #
-        # properties
-        p    = len(ndat[0])
-        #
-        # splits
-        s    = 2
-        #
-        # number of classes, one-hot encodings
-        ncls = s**(2*p)
-        #
-        # compute the values
-        #
-        # the outputs force the hierarchical classification model to 
-        # produce regressors to segregate the data that amount to
-        # auto-encoders, as we are using all of the input data elements
-        # in the definition of the outputs
-        #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
-        tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
-        odat = to_categorical(tdat,num_classes=ncls)
-        ndat = np.asarray(ndat)
-        # generate the model of the data
-        model= nn.dbn(ndat,odat,splits=s,props=p)
-        # predict the same data to get the labels
-        preds= model.predict(ndat)
-        # get the labels
-        lbls = ai.label(preds)
-        # split the labels to know the available clusters
-        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)("-") for i in range(0,len(lbls)))
-        slbl = np.asarray(slbl)
-        # cluster labels
-        clus = slbl[:,0]
-        ucls = np.unique(clus)
-        # row numbers
-        rows = slbl[:,1]
-        # collect all data for each cluster and assign most numerously appearing value
-        ret  = np.empty(sz,dtype=object)
-        for i in range(0,len(ucls)):
-            ind      = [j for j, x in enumerate(clus) if x == ucls[i]]
-            idat     = [dat[x] for j, x in enumerate(ind)]
-            mdat     = most(idat,ssz)
-            ret[ind] = np.full(len(ind),mdat)
-    return ret
-
-############################################################################
-##
-## Purpose:  Read data from an array of PDF files
-##
-############################################################################
-def ocre(imgs=[]):
-    ret  = None
-    if not (len(imgs) == 0):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # converted images
-        ret  = Parallel(n_jobs=nc)(delayed(ai.pil2array)(imgs[i]) for i in range(0,len(imgs)))
-    return ret
-
-############################################################################
-##
-## Purpose:  Read data from an array of PDF files
-##
-############################################################################
-def ocr(pdfs=[],inst=ai.BVAL,testing=True):
-    ret  = None
-    if not (len(pdfs) == 0 or inst <= ai.BVAL):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # converted images
-        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)( pdfs[i]             ) for i in range(0,len(pdfs )))
-        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )( imgs[i]             ) for i in range(0,len(imgs )))
-        oimgs=     Parallel(n_jobs=nc)(delayed(ai.img2txt       )(pimgs[i],inst,testing) for i in range(0,len(pimgs)))
-        if not (len(oimgs) <= 1):
-            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]             ) for i in range(1,len(oimgs)))
-        else:
-            ret  = oimgs
-    return ret
-
 # *************** TESTING *****************
 
 def irg_testing(M=500,N=2):
-    # uniformly sample values between 0 and 1
-    #ivals= np.random.sample(size=(500,3))
-    ivals= np.random.sample(size=(M,N))
-    # create the data for the sample knowledge graph
-    kg   = create_kg(0,ivals)
-    print(kg["edges"])
-    # test ocr
-    o    = ocr(["files/kg.pdf"],0)
-    print(o)
     # number of data points, properties and splits
-    m    = np.size(ivals,0)
-    p    = np.size(ivals,1)
+    m    = M
+    p    = N
+    if p > const.MAX_FEATURES:
+        p    = const.MAX_FEATURES
     #s    = p + 1
     s    = p
+    # uniformly sample values between 0 and 1
+    #ivals= np.random.sample(size=(500,3))
+    ivals= np.random.sample(size=(m,p))
+    # create the data for the sample knowledge graph
+    kg   = create_kg(0,ivals,s)
+    print(kg["edges"])
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
     nc   = s**(2*p)
@@ -365,11 +218,6 @@ def irg_testing(M=500,N=2):
         # look at the original values and the predicted values
     else:
         print("iRG model is null.")
-    # test the data correction neural network function
-    # output should be "robert", overwriting corrupt data and misclassifications
-    bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy']
-    corr = correction(bdat)
-    print(corr)
     # spark sqlContext should be used to create the data frame
     # of edges and vertices in the following format
     #

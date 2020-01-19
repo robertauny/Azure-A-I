@@ -17,6 +17,7 @@
 from joblib       import Parallel, delayed
 from itertools    import combinations
 from keras.utils  import to_categorical
+from keras.models import load_model
 
 from pdf2image    import convert_from_bytes,convert_from_path
 from PIL          import Image
@@ -24,16 +25,18 @@ from PIL          import Image
 import requests
 import io
 
-import numpy as np
+import numpy  as np
+import pandas as pd
 
 import multiprocessing as mp
 import os
 
 import config
+import constants as const
+import nn
+import data
 
 from nn import dbn
-
-BVAL = -1
 
 ############################################################################
 ##
@@ -54,9 +57,9 @@ def store(dat=[]):
 ## Purpose:   Cluster number
 ##
 ############################################################################
-def prefix(i=BVAL):
-    ret  = BVAL
-    if not (i <= BVAL):
+def prefix(i=const.BVAL):
+    ret  = const.BVAL
+    if not (i <= const.BVAL):
         ret  = i + 1
     return ret
 
@@ -65,9 +68,9 @@ def prefix(i=BVAL):
 ## Purpose:   Cluster label and row number appended together
 ##
 ############################################################################
-def append(i=BVAL,n=BVAL,m=BVAL):
+def append(i=const.BVAL,n=const.BVAL,m=const.BVAL):
     ret  = None
-    if not (i <= BVAL or n <= BVAL or m <= BVAL):
+    if not (i <= const.BVAL or n <= const.BVAL or m <= const.BVAL):
         n   += 1 # note that this modifies the passed in value for all to see
         m   += (i+1) # note that this modifies the passed in value for all to see
         ret  = str(n) + "-" + str(m)
@@ -185,9 +188,9 @@ def brain(dat=[],splits=2):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=BVAL,lbl=None):
+def thought(inst=const.BVAL,lbl=None):
     ret  = []
-    if not (inst <= BVAL or lbl == None):
+    if not (inst <= const.BVAL or lbl == None):
         # assume that models are built so we will search the models
         # in the DB and return the one corresponding to the label 
         #
@@ -222,9 +225,9 @@ def pil2array(pil=None):
 ## Purpose:   Convert Python image library (PIL) image data to text
 ##
 ############################################################################
-def img2txt(img=[],inst=BVAL,testing=True):
+def img2txt(img=[],inst=const.BVAL,testing=True):
     ret  = []
-    if not (len(img) == 0 or inst <= BVAL):
+    if not (len(img) == 0 or inst <= const.BVAL):
         # get the default configuration
         cfg  = config.cfg()
         # ordering of the data elements in the JSON file
@@ -266,12 +269,174 @@ def img2txt(img=[],inst=BVAL,testing=True):
             ret  = [src,typ,key,host,url,hdrs,parms]
     return ret
 
+############################################################################
+##
+## Purpose:   Convert a list of strings into their ordinal representation
+##
+############################################################################
+def chars(dat=[],pre=0):
+    ret  = []
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        e    = dat.rjust(pre)
+        ret.extend(e)
+    return ret
+
+############################################################################
+##
+## Purpose:   Convert a list of strings into their ordinal representation
+##
+############################################################################
+def numbers(dat=[],pre=0):
+    ret  = None
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        d    = chars(dat,pre)
+        ret  = [ord(x) for i, x in enumerate(d)]
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by whole words)
+##
+############################################################################
+def almost(dat=[]):
+    ret  = None
+    sz   = len(dat)
+    if not (sz == 0):
+        ret  = max(set(dat),key=dat.count)
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by character)
+##
+############################################################################
+def most(dat=[],pre=0):
+    ret  = None
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # character-wise append of most frequent characters in each feature of the list of strings
+        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
+        cdat = np.asarray(cdat)
+        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+        ret  = "".join(mdat).lstrip()
+        if not (ret in dat):
+            ret  = almost(dat)
+    return ret
+
+############################################################################
+##
+## Purpose:   Use DBN to correct a list of corrupt or misclassified strings
+##
+############################################################################
+def correction(dat=[]):
+    ret  = []
+    sz   = len(dat)
+    if not (sz == 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # length of longest string in the list
+        ssz  = max([len(x) for i, x in enumerate(dat)])
+        # numeric representations of the strings in the list
+        ndat = Parallel(n_jobs=nc)(delayed(numbers)(dat[i],ssz) for i in range(0,sz))
+        # we need values to turn into labels when training
+        # one-hot encode the numeric data as its required for the softmax
+        #
+        # properties
+        p    = len(ndat[0])
+        #
+        # splits
+        s    = 2
+        #
+        # number of classes, one-hot encodings
+        ncls = s**(2*p)
+        #
+        # compute the values
+        #
+        # the outputs force the hierarchical classification model to 
+        # produce regressors to segregate the data that amount to
+        # auto-encoders, as we are using all of the input data elements
+        # in the definition of the outputs
+        #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
+        tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
+        odat = to_categorical(tdat,num_classes=ncls)
+        ndat = np.asarray(ndat)
+        # generate the model of the data
+        model= nn.dbn(ndat,odat,splits=s,props=p,embed=False)
+        # predict the same data to get the labels
+        preds= model.predict(ndat)
+        # get the labels
+        lbls = label(preds)
+        # split the labels to know the available clusters
+        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)("-") for i in range(0,len(lbls)))
+        slbl = np.asarray(slbl)
+        # cluster labels
+        clus = slbl[:,0]
+        ucls = np.unique(clus)
+        # row numbers
+        rows = slbl[:,1]
+        # collect all data for each cluster and assign most numerously appearing value
+        ret  = np.empty(sz,dtype=object)
+        for i in range(0,len(ucls)):
+            ind      = [j for j, x in enumerate(clus) if x == ucls[i]]
+            idat     = [dat[x] for j, x in enumerate(ind)]
+            mdat     = most(idat,ssz)
+            ret[ind] = np.full(len(ind),mdat)
+    return ret
+
+############################################################################
+##
+## Purpose:  Read data from an array of PDF files
+##
+############################################################################
+def ocre(imgs=[]):
+    ret  = None
+    if not (len(imgs) == 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # converted images
+        ret  = Parallel(n_jobs=nc)(delayed(pil2array)(imgs[i]) for i in range(0,len(imgs)))
+    return ret
+
+############################################################################
+##
+## Purpose:  Read data from an array of PDF files
+##
+############################################################################
+def ocr(pdfs=[],inst=const.BVAL,testing=True):
+    ret  = None
+    if not (len(pdfs) == 0 or inst <= const.BVAL):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # converted images
+        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)( pdfs[i]             ) for i in range(0,len(pdfs )))
+        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )( imgs[i]             ) for i in range(0,len(imgs )))
+        oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+        if not (len(oimgs) <= 1):
+            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]             ) for i in range(1,len(oimgs)))
+        else:
+            ret  = oimgs
+    return ret
+
 # *************** TESTING *****************
 
 def ai_testing(M=500,N=2):
+    # number of data points, properties and splits
+    m    = M
+    p    = N
+    if p > const.MAX_FEATURES:
+        p    = const.MAX_FEATURES
+    #s    = p + 1
+    s    = p
     # uniformly sample values between 0 and 1
     #ivals= np.random.sample(size=(500,3))
-    ivals= np.random.sample(size=(M,N))
+    ivals= np.random.sample(size=(m,p))
+    # test ocr
+    o    = ocr(["files/kg.pdf"],0)
+    print(o)
     print(permute(range(0,len(ivals[0]))))
     print(brain(ivals))
     imgs = convert_from_path("files/kg.pdf")
@@ -286,11 +451,6 @@ def ai_testing(M=500,N=2):
     print(url)
     print(hdrs)
     print(parms)
-    # number of data points, properties and splits
-    m    = np.size(ivals,0)
-    p    = np.size(ivals,1)
-    #s    = p + 1
-    s    = p
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
     nc   = s**(2*p)
@@ -311,3 +471,8 @@ def ai_testing(M=500,N=2):
         print(label(pvals))
     else:
         print("Label model is null.")
+    # test the data correction neural network function
+    # output should be "robert", overwriting corrupt data and misclassifications
+    bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy']
+    corr = correction(bdat)
+    print(corr)
