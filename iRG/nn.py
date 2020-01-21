@@ -133,6 +133,23 @@ def dbn(inputs
     # return the model to the caller
     return model
 
+############################################################################
+##
+## Purpose:   Define the outputs for a classification
+##
+############################################################################
+def categoricals(rows=0,splits=2,props=2):
+    ret  = []
+    if not (rows < 0 or splits < 2 or props < 2):
+        # we need values to turn into labels when training
+        # one-hot encode the integer labels as its required for the softmax
+        s    = splits
+        p    = props
+        nc   = s**(2*p)
+        ret  = [np.random.randint(1,nc) for i in range(0,rows)]
+        ret  = to_categorical(ret,num_classes=nc)
+    return ret
+
 # *************** TESTING *****************
 
 def nn_testing(M=500,N=2):
@@ -146,13 +163,7 @@ def nn_testing(M=500,N=2):
     # uniformly sample values between 0 and 1
     #ivals= np.random.sample(size=(500,3))
     ivals= np.random.sample(size=(m,p))
-    # we need values to turn into labels when training
-    # one-hot encode the integer labels as its required for the softmax
-    nc   = s**(2*p)
-    ovals= []
-    for i in range(0,M):
-        ovals.append(np.random.randint(1,nc))
-    ovals= to_categorical(ovals,num_classes=nc)
+    ovals= categoricals(M,s,p)
     # generate the clustering model for using the test values for training
     model = dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):
@@ -201,11 +212,7 @@ def nn_testing(M=500,N=2):
     ivals= np.random.sample(size=(m,p))
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
-    nc   = s**(2*const.MAX_FEATURES)
-    ovals= []
-    for i in range(0,M):
-        ovals.append(np.random.randint(1,nc))
-    ovals= to_categorical(ovals,num_classes=nc)
+    ovals= categoricals(M,s,const.MAX_FEATURES)
     model = dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):
         # generate some test data for predicting using the model

@@ -135,9 +135,9 @@ def build_kg(inst,dat=[],brn={},splits=2):
         # generate the labels for the data
         lbls = ai.label(preds)
         # create the vertices
-        v    = create_kg_ve(dat,lbls,lbl,"v")
+        v    = create_kg_ve(d,lbls,lbl,"v")
         # create the edges
-        e    = create_kg_ve(dat,lbls,lbl,"e")
+        e    = create_kg_ve(d,lbls,lbl,"e")
         ret["vertices"] = v
         ret["edges"   ] = e
     return ret 
@@ -203,11 +203,7 @@ def irg_testing(M=500,N=2):
     print(kg["edges"])
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
-    nc   = s**(2*p)
-    ovals= []
-    for i in range(0,M):
-        ovals.append(np.random.randint(1,nc))
-    ovals= to_categorical(ovals,num_classes=nc)
+    ovals= nn.categoricals(M,s,p)
     # generate the model for using the test values for training
     model = nn.dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):

@@ -408,16 +408,14 @@
 							"host" : "westus2.api.cognitive.microsoft.com",
 							"api"  : "vision",
 							"ver"  : "v2.0",
-							"key"  : "account-key"
+							"key"  : "account-key",
+							"dir"  : "dir"
 						}
 					},
 					{
 						"connection" : {
 							"app"  : "glove",
-							"host" : "localhost",
-							"dir"  : "dir",
-							"file" : "file",
-							"key"  : "account-key"
+							"file" : "file"
 						}
 					}
 				]

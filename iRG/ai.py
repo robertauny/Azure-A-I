@@ -14,13 +14,16 @@
 ##
 ############################################################################
 
-from joblib       import Parallel, delayed
-from itertools    import combinations
-from keras.utils  import to_categorical
-from keras.models import load_model
+from joblib                       import Parallel, delayed
+from itertools                    import combinations
+from keras.utils                  import to_categorical
+from keras.models                 import load_model
 
-from pdf2image    import convert_from_bytes,convert_from_path
-from PIL          import Image
+from keras.preprocessing.text     import Tokenizer
+from keras.preprocessing.sequence import pad_sequences
+
+from pdf2image                    import convert_from_bytes,convert_from_path
+from PIL                          import Image
 
 import requests
 import io
@@ -36,7 +39,7 @@ import constants as const
 import nn
 import data
 
-from nn import dbn
+from nn import dbn,categoricals
 
 ############################################################################
 ##
@@ -255,7 +258,7 @@ def img2txt(img=[],inst=const.BVAL,testing=True):
             resp.raise_for_status()
             # get json data to parse it later
             json = resp.json()
-            # all the line from a page, including noise
+            # all the lines from a page, including noise
             ftext= []
             for reg in json["regions"]:
                 line = reg["lines"]
@@ -365,7 +368,7 @@ def correction(dat=[]):
         odat = to_categorical(tdat,num_classes=ncls)
         ndat = np.asarray(ndat)
         # generate the model of the data
-        model= nn.dbn(ndat,odat,splits=s,props=p,embed=False)
+        model= dbn(ndat,odat,splits=s,props=p,embed=False)
         # predict the same data to get the labels
         preds= model.predict(ndat)
         # get the labels
@@ -421,6 +424,99 @@ def ocr(pdfs=[],inst=const.BVAL,testing=True):
             ret  = oimgs
     return ret
 
+############################################################################
+##
+## Purpose:  Append together the text of a doc to an array
+##
+############################################################################
+def dappend(ret=[],doc=None):
+    if not (ret == None or doc == None):
+        if os.path.exists(doc) and os.path.getsize(doc) > 0:
+            f    = open(doc)
+            # should just be a line of text
+            ret.append(f.read())
+            f.close()
+
+############################################################################
+##
+## Purpose:  Get the data from a pretrained GloVe model
+##
+############################################################################
+def wvec(ret={},line=None):
+    if not (ret == None or line == None):
+        vals = line.split()
+        word = vals[0]
+        coefs= np.asarray(vals[1:],dtype='float32')
+        ret[word] = coefs
+
+############################################################################
+##
+## Purpose:  Aid in expansion of the data from a pretrained GloVe model
+##
+############################################################################
+def expand(seqi=[],seqo=None,inds=[]):
+    ret  = None
+    if not (seqo == None):
+        ret  = seqo
+    else:
+        if not (len(seqi) == 0 or len(inds) == 0):
+            arr             = {j:seqi[x] for j,x in enumerate(inds) if not (x == None)}
+            ret             = np.zeros(len(inds))
+            ret[arr.keys()] = arr.values()
+    return ret
+
+############################################################################
+##
+## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+##           that will be used to extend a sparse data set of words
+##
+############################################################################
+def glove(docs=[],gdoc=None,splits=2,props=2):
+    model= None
+    if not (len(docs) == 0 or gdoc == None):
+        if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
+            # number of cpu cores
+            nc   = mp.cpu_count()
+            # append the text of all docs together into an array, one line per file
+            txt  = []
+            txts = Parallel(n_jobs=nc)(delayed(dappend)(txt,docs[i]) for i in range(0,len(docs)))
+            # tokenize the lines in the array and convert to sequences of integers
+            #
+            # instantiate a default Tokenizer object without limiting the number of tokens
+            tok  = Tokenizer()
+            # tokenize the data
+            toks = tok.fit_on_texts(txts)
+            # generate sequences of integers from the texts
+            seqs = tok.texts_to_sequences(txts)
+            # the sequences will be of different lengths because the original docs
+            # were almost surely of different lengths ... so pad the sequences
+            pdat = pad_sequences(seqs)
+            # get the data from the pretrained GloVe word vectors
+            # the data will consist of a word in the first position
+            # which is followed by a sequence of integers
+            gd   = {}
+            f    = open(gdoc)
+            gdat = Parallel(n_jobs=nc)(delayed(wvec)(gd,line) for i,line in f.read())
+            f.close()
+            # we will pad the original sequences in a certain way so as to make them align with
+            # the expanded set of words from the passed in GloVe data set
+            #
+            # the set of indices that align with the GloVe data set will dictate how to pad
+            # the word index consisting of each unique word and the integer to which it is mapped
+            # inds will look something like [1, 0, 0, 4, 2, 3, 3, None, 3, 2, 0, None, 0, ...]
+            # where the length of inds matches the number of words in the expanded data set
+            tmp  = {word:i for i,word in enumerate(tok.word_index.items())}
+            inds = [tmp.get(word) for word in gdat.keys()]
+            # use the word index to embed the document data into the pretrained GloVe word vectors
+            gmat = Parallel(n_jobs=nc)(delayed(expand)(pdat[i],gdat.get(word),inds) for i,word in tok.word_index.items())
+            # we need values to turn into labels when training
+            # one-hot encode the integer labels as its required for the softmax
+            ovals= categoricals(inds,splits,props)
+            # for all of the indices in inds that are not None, we should have a corresponding seq of ints in gmat
+            # we will substitute those values into the gdat array
+            model= dbn(gmat,ovals,splits=splits,props=props)
+    return model
+
 # *************** TESTING *****************
 
 def ai_testing(M=500,N=2):
@@ -453,11 +549,7 @@ def ai_testing(M=500,N=2):
     print(parms)
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
-    nc   = s**(2*p)
-    ovals= []
-    for i in range(0,M):
-        ovals.append(np.random.randint(1,nc))
-    ovals= to_categorical(ovals,num_classes=nc)
+    ovals= nn.categoricals(M,s,p)
     # generate the model for using the test values for training
     model = dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):
