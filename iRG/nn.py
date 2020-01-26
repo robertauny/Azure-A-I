@@ -37,8 +37,9 @@ def dbn(inputs
        ,rbmact='softmax'
        ,dbnact=None
        ,dbnout=0
-       ,epochs=100
+       ,epochs=10
        ,embed=True
+       ,encs=None
        ,verbose=1):
     model= None
     if inputs.any() and outputs.any():
@@ -57,7 +58,8 @@ def dbn(inputs
         # this follows the writings in "Auto-encoding a Knowledge Graph Using a Deep Belief Network"
         #
         # if all possible levels, then M  = len(inputs[0])
-        M    = min(len(inputs[0]),props)
+        #M    = min(len(inputs[0]),props)
+        M    = len(inputs[0])
         S    = splits
         # inputs have M columns and any number of rows, while output has M columns and any number of rows
         #
@@ -65,14 +67,20 @@ def dbn(inputs
         enc  = Dense(M,input_shape=(M,),activation='relu')
         # add the input layer to the model
         model.add(enc)
+        # add other encodings that are being passed in the encs array
+        if not (encs == None):
+            if not (len(encs) == 0):
+                for enc in encs:
+                    model.add(enc)
         # if M > const.MAX_FEATURES, then we will embed the inputs in a lower dimensional space of dimension const.MAX_FEATURES
         #
-        # embed the inputs into a lower dimensional space if M > const.MAX_FEATURES
+        # embed the inputs into a lower dimensional space if M > min(const.MAX_FEATURES,props)
         if embed:
-            if M > const.MAX_FEATURES:
+            p    = min(const.MAX_FEATURES,props)
+            if M > p:
                 enc  = Dense(const.MAX_FEATURES,input_shape=(M,),activation='selu')
                 model.add(enc)
-                props= const.MAX_FEATURES
+                props= p
                 M    = props
             if S > const.MAX_SPLITS:
                 S    = const.MAX_SPLITS
@@ -115,7 +123,13 @@ def dbn(inputs
             # and closed to give rise to the correct cluster structure in the hidden layers defined above
             # so that the tuning through back propagation leads to the equilibrium distribution that can be color
             # coded into distinct regions of connected clusters ... see the writings for an example
-            enc  = Dense(odim,input_shape=(dim,),activation=rbmact)
+            if not (J == M - 1):
+                enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
+            else:
+                if not (dbnact == None or dbnout <= 0):
+                    enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
+                else:
+                    enc  = Dense(odim,input_shape=(dim,),activation=rbmact)
             # add the layer to the model
             model.add(enc)
         # add another layer for a different kind of model, such as a regression model
