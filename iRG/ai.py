@@ -17,7 +17,8 @@
 from joblib                       import Parallel, delayed
 from itertools                    import combinations
 from string                       import punctuation
-from math                         import ceil
+from math                         import ceil, log
+
 from keras.utils                  import to_categorical
 from keras.models                 import load_model
 
@@ -300,7 +301,7 @@ def numbers(dat=[],pre=0):
     sz   = len(dat)
     if not (sz == 0 or pre < 0):
         d    = chars(dat,pre)
-        ret  = [ord(x) for i, x in enumerate(d)]
+        ret  = [1.0/float(ord(x)) for i, x in enumerate(d)]
     return ret
 
 ############################################################################
@@ -310,8 +311,7 @@ def numbers(dat=[],pre=0):
 ############################################################################
 def almost(dat=[]):
     ret  = None
-    sz   = len(dat)
-    if not (sz == 0):
+    if not (len(dat) == 0):
         ret  = max(set(dat),key=dat.count)
     return ret
 
@@ -320,14 +320,16 @@ def almost(dat=[]):
 ## Purpose:   Which string in a list appears most (by character)
 ##
 ############################################################################
-def most(dat=[],pre=0):
+def most(dat=[],ind=[],pre=0):
     ret  = None
     sz   = len(dat)
-    if not (sz == 0 or pre < 0):
+    ssz  = len(ind)
+    if not (sz == 0 or ssz == 0 or pre < 0):
+        ndat = list(np.asarray(dat)[np.asarray(ind)])
         # number of cpu cores
         nc   = mp.cpu_count()
         # character-wise append of most frequent characters in each feature of the list of strings
-        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
+        cdat = Parallel(n_jobs=nc)(delayed(chars)(ndat[i],pre) for i in range(0,ssz))
         cdat = np.asarray(cdat)
         mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
         ret  = "".join(mdat).lstrip()
@@ -341,7 +343,7 @@ def most(dat=[],pre=0):
 ##
 ############################################################################
 def correction(dat=[]):
-    ret  = []
+    ret  = None
     sz   = len(dat)
     if not (sz == 0):
         # number of cpu cores
@@ -350,18 +352,6 @@ def correction(dat=[]):
         ssz  = max([len(x) for i,x in enumerate(dat)])
         # numeric representations of the strings in the list
         ndat = Parallel(n_jobs=nc)(delayed(numbers)(str(dat[i]).lower(),ssz) for i in range(0,sz))
-        # we need values to turn into labels when training
-        # one-hot encode the numeric data as its required for the softmax
-        #
-        # properties
-        #p    = len(ndat[0])
-        p    = 2
-        #
-        # splits
-        s    = 2
-        #
-        # number of classes, one-hot encodings
-        ncls = s**(2*p)
         #
         # compute the values
         #
@@ -371,14 +361,28 @@ def correction(dat=[]):
         # in the definition of the outputs
         #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
         #tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
-        tdat = [max(x) for i,x in enumerate(ndat)]
+        #tdat = [max(x) for i,x in enumerate(ndat)]
+        tdat = [sum(x[0:1]) for i,x in enumerate(ndat)]
         udat = {x:i for i,x in enumerate(unique(tdat))}
+        # we need values to turn into labels when training
+        # one-hot encode the numeric data as its required for the softmax
+        #
+        # splits
+        s    = 2
+        #
+        # properties
+        #p    = len(ndat[0])
+        p    = int(ceil(log(len(udat),s)/2.0))
+        #
+        # number of classes, one-hot encodings
+        ncls = s**(2*p)
         cdat = [to_categorical(udat.get(x),num_classes=ncls) for x in tdat]
         odat = np.asarray(cdat)
         ndat = np.asarray(ndat)
         # generate the model of the data
-        ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
-        model= dbn(ndat[ind],odat[ind],splits=s,props=p)
+        #ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
+        #model= dbn(ndat[ind],odat[ind],splits=s,props=p)
+        model= dbn(ndat,odat,splits=s,props=p)
         # predict the same data to get the labels
         preds= model.predict(ndat)
         # get the labels
@@ -392,12 +396,14 @@ def correction(dat=[]):
         # row numbers
         rows = slbl[:,1]
         # collect all data for each cluster and assign most numerously appearing value
-        ret  = np.empty(sz,dtype=object)
+        ret  = np.asarray([" "*ssz]*sz)
         for cls in ucls:
             ind      = [j for j,x in enumerate(clus) if x == cls]
             idat     = [dat[x] for j,x in enumerate(ind)]
-            mdat     = most(idat,ssz)
-            ret[ind] = np.full(len(ind),mdat)
+            for x in unique(np.asarray(cdat)[ind,0]):
+                inds                       = [i for i,y in enumerate(np.asarray(cdat)[ind,0]) if y == x]
+                ms                         = most(idat,inds,ssz)
+                ret[np.asarray(ind)[inds]] = ms
     return ret
 
 ############################################################################
@@ -579,10 +585,10 @@ def ai_testing(M=500,N=2):
     corr = correction(unique(bdat))
     print(corr)
     # generate some random errors in my name to test the correction function
-    bdat = ['robert' for i in range(0,100)]
+    bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']
     punc = [i for i in punctuation]
-    for i in range(0,100):
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -591,8 +597,8 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
-    punc = ['q','w','e','r','t','y','u','i','o','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,100):
+    punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -604,11 +610,12 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    for i in range(0,100):
-        bdat.append('andre')
+    #for i in range(0,m):
+        #bdat.append('andre')
+    bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
     punc = [i for i in punctuation]
-    for i in range(0,100):
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -617,8 +624,8 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
-    punc = ['q','w','e','r','t','y','u','i','o','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,100):
+    punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -630,11 +637,12 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    for i in range(0,100):
-        bdat.append('murphy')
+    #for i in range(0,m):
+        #bdat.append('murphy')
+    bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']
     punc = [i for i in punctuation]
-    for i in range(0,100):
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -643,8 +651,8 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
-    punc = ['q','w','e','r','t','y','u','i','o','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,100):
+    punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
+    for i in range(0,m/20):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
