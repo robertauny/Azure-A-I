@@ -76,9 +76,9 @@ def dbn(inputs
         #
         # embed the inputs into a lower dimensional space if M > min(const.MAX_FEATURES,props)
         if embed:
-            p    = min(const.MAX_FEATURES,props)
+            p    = min(const.MAX_FEATURES,min(props,outputs.shape[len(outputs.shape)-1]))
             if M > p:
-                enc  = Dense(const.MAX_FEATURES,input_shape=(M,),activation='selu')
+                enc  = Dense(p,input_shape=(M,),activation='selu')
                 model.add(enc)
                 props= p
                 M    = props

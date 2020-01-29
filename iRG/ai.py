@@ -353,7 +353,7 @@ def mostly(dat=[],pre=0):
         rret = [" "] * pre
         for i in range(0,pre):
             udat    = "".join(unique(cdat[:,i]))
-            ndat    = numbers(udat,pre)
+            ndat    = numbers(udat,len(udat))
             mmn     = abs(ndat-np.full(len(ndat),mn[i]))
             j       = [k for k,x in enumerate(mmn) if x == min(mmn)][0]
             rret[i] = udat[j]
@@ -642,7 +642,7 @@ def ai_testing(M=500,N=2):
     bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']
     punc = [i for i in punctuation]
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -652,7 +652,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -669,7 +669,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
     punc = [i for i in punctuation]
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -679,7 +679,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -696,7 +696,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']
     punc = [i for i in punctuation]
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -706,7 +706,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/10):
+    for i in range(0,min(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
