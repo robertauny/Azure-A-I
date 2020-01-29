@@ -309,6 +309,62 @@ def numbers(dat=[],pre=0):
 ## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
+def mostly(dat=[],pre=0):
+    ret  = None
+    sz   = len(dat)
+    if not (sz == 0 or pre < 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # numeric representations of the strings in the list
+        rdat = Parallel(n_jobs=nc)(delayed(numbers)(dat[i].lower(),pre) for i in range(0,sz))
+        # character-wise append of most frequent characters in each feature of the list of strings
+        # the data are strings that have been converted into character arrays
+        # with each character further being converted into its inverted ordinal representation
+        #
+        # since the data are clusters that should consist of related elements, then we can
+        # create a model to find constants such that a combination of the converted chars
+        # should all be the same value ... i.e. if the words are all 3 chars, then
+        # for each related (possibly equal) word, ax + by + cz = 1 for each word in the
+        # cluster where the characters of the word are [x,y,z] and the modeling constants
+        # are [a,b,c] ... this can be done because the words in the cluster are all equal
+        # or close in some statistical sense (probably differing only by some randomly
+        # misplaced char)
+        #
+        # we predict the same data that is used to create the model and take the mean
+        # of each column if there are more than one data row that gives the closest
+        # prediction to 1 ... we do this because the goal is to denoise the inputs
+        # and take the averaged rows of data coming closest to the expected output 1
+        rdat = np.asarray(rdat)
+        model= dbn(rdat
+                  ,np.full(len(rdat),1.0)
+                  ,loss='mean_squared_error'
+                  ,optimizer='sgd'
+                  ,rbmact='sigmoid'
+                  ,dbnact='sigmoid'
+                  ,dbnout=1)
+        preds= model.predict(rdat)
+        inds = [j for j,x in enumerate(preds) if x == max(preds)]
+        # mean of all rows giving predictions close to the plane with bias 1
+        mn   = np.mean(rdat[inds],axis=0)
+        # character-wise append of characters in each feature of the list of strings
+        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
+        cdat = np.asarray(cdat)
+        # for the final return, take the characters closest to the mean
+        rret = [" "] * pre
+        for i in range(0,pre):
+            udat    = "".join(unique(cdat[:,i]))
+            ndat    = numbers(udat,pre)
+            mmn     = abs(ndat-np.full(len(ndat),mn[i]))
+            j       = [k for k,x in enumerate(mmn) if x == min(mmn)][0]
+            rret[i] = udat[j]
+        ret  = "".join(rret).lstrip()
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by whole words)
+##
+############################################################################
 def almost(dat=[]):
     ret  = None
     if not (len(dat) == 0):
@@ -320,21 +376,22 @@ def almost(dat=[]):
 ## Purpose:   Which string in a list appears most (by character)
 ##
 ############################################################################
-def most(dat=[],ind=[],pre=0):
+def most(dat=[],pre=0):
     ret  = None
     sz   = len(dat)
-    ssz  = len(ind)
-    if not (sz == 0 or ssz == 0 or pre < 0):
-        ndat = list(np.asarray(dat)[np.asarray(ind)])
+    if not (sz == 0 or pre < 0):
         # number of cpu cores
         nc   = mp.cpu_count()
         # character-wise append of most frequent characters in each feature of the list of strings
-        cdat = Parallel(n_jobs=nc)(delayed(chars)(ndat[i],pre) for i in range(0,ssz))
+        cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
         ret  = "".join(mdat).lstrip()
         if not (ret in dat):
-            ret  = almost(dat)
+            mdat = mostly(dat,pre)
+            ret  = "".join(mdat).lstrip()
+            if not (ret in dat):
+                ret  = almost(dat)
     return ret
 
 ############################################################################
@@ -400,10 +457,7 @@ def correction(dat=[]):
         for cls in ucls:
             ind      = [j for j,x in enumerate(clus) if x == cls]
             idat     = [dat[x] for j,x in enumerate(ind)]
-            for x in unique(np.asarray(cdat)[ind,0]):
-                inds                       = [i for i,y in enumerate(np.asarray(cdat)[ind,0]) if y == x]
-                ms                         = most(idat,inds,ssz)
-                ret[np.asarray(ind)[inds]] = ms
+            ret[ind] = most(idat,ssz)
     return ret
 
 ############################################################################
@@ -588,7 +642,7 @@ def ai_testing(M=500,N=2):
     bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']
     punc = [i for i in punctuation]
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -598,7 +652,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -610,12 +664,12 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    #for i in range(0,m):
-        #bdat.append('andre')
-    bdat = ['andre' for i in range(0,m)]
+    for i in range(0,m):
+        bdat.append('andre')
+    #bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
     punc = [i for i in punctuation]
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -625,7 +679,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -637,12 +691,12 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    #for i in range(0,m):
-        #bdat.append('murphy')
-    bdat = ['murphy' for i in range(0,m)]
+    for i in range(0,m):
+        bdat.append('murphy')
+    #bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']
     punc = [i for i in punctuation]
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -652,7 +706,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,m/20):
+    for i in range(0,m/10):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
