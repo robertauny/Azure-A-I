@@ -417,9 +417,10 @@ def correction(dat=[]):
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
         #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
-        tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
+        #tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
         #tdat = [max(x) for i,x in enumerate(ndat)]
         #tdat = [sum(x[0:1]) for i,x in enumerate(ndat)]
+        tdat = [x[0]+x[len(x)-1] for i,x in enumerate(ndat)]
         udat = {x:i for i,x in enumerate(unique(tdat))}
         # we need values to turn into labels when training
         # one-hot encode the numeric data as its required for the softmax
@@ -441,8 +442,8 @@ def correction(dat=[]):
         #model= dbn(ndat[ind],odat[ind],splits=s,props=p)
         model= dbn(ndat,odat,splits=s,props=p)
         # predict the same data to get the labels
-        preds= model.predict(ndat)
-        preds= to_categorical(np.sum(preds,axis=1),num_classes=ncls)
+        prds = model.predict(ndat)
+        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=ncls) for i in range(0,len(prds)))
         # get the labels
         lbls = label(preds)
         # split the labels to know the available clusters

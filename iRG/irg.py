@@ -130,9 +130,12 @@ def build_kg(inst,dat=[],brn={},splits=2):
         # make sure to get the right subset of the data
         l    = list(map(int,lbl.split("-")))
         d    = dat[:,l]
+        # number of cpu cores
+        nc   = mp.cpu_count()
         # make the predictions
-        preds= model.predict(d)
-        preds= to_categorical(np.sum(preds,axis=1),num_classes=splits**(2*len(l)))
+        prds = model.predict(d)
+        #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
+        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*len(l))) for i in range(0,len(prds)))
         # generate the labels for the data
         lbls = ai.label(preds)
         # create the vertices
