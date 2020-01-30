@@ -417,9 +417,9 @@ def correction(dat=[]):
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
         #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
-        #tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
+        tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
         #tdat = [max(x) for i,x in enumerate(ndat)]
-        tdat = [sum(x[0:1]) for i,x in enumerate(ndat)]
+        #tdat = [sum(x[0:1]) for i,x in enumerate(ndat)]
         udat = {x:i for i,x in enumerate(unique(tdat))}
         # we need values to turn into labels when training
         # one-hot encode the numeric data as its required for the softmax
@@ -442,6 +442,7 @@ def correction(dat=[]):
         model= dbn(ndat,odat,splits=s,props=p)
         # predict the same data to get the labels
         preds= model.predict(ndat)
+        preds= to_categorical(np.sum(preds,axis=1),num_classes=ncls)
         # get the labels
         lbls = label(preds)
         # split the labels to know the available clusters
@@ -664,7 +665,7 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    for i in range(0,m):
+    for i in range(0,m*2):
         bdat.append('andre')
     #bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
@@ -691,7 +692,7 @@ def ai_testing(M=500,N=2):
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
-    for i in range(0,m):
+    for i in range(0,m*4):
         bdat.append('murphy')
     #bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']

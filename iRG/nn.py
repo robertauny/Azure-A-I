@@ -124,7 +124,8 @@ def dbn(inputs
             # so that the tuning through back propagation leads to the equilibrium distribution that can be color
             # coded into distinct regions of connected clusters ... see the writings for an example
             if not (J == M - 1):
-                enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
+                #enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
+                enc  = Dense(odim,input_shape=(dim,),activation=rbmact)
             else:
                 if not (dbnact == None or dbnout <= 0):
                     enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')

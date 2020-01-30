@@ -132,6 +132,7 @@ def build_kg(inst,dat=[],brn={},splits=2):
         d    = dat[:,l]
         # make the predictions
         preds= model.predict(d)
+        preds= to_categorical(np.sum(preds,axis=1),num_classes=splits**(2*len(l)))
         # generate the labels for the data
         lbls = ai.label(preds)
         # create the vertices
