@@ -421,32 +421,38 @@ def correction(dat=[]):
         ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
         perms= permute(range(0,ssz))
         lmax = sys.maxint
-        for perm in [perms[0]]:
-            pdat = ndat[:,perm]
-            ptdat= [sum(x)/(len(x)*max(x)) for i,x in enumerate(pdat)]
-            pydat= np.asarray(ptdat)
-            # generate the model of the data for smoothing errors
-            #
-            # the idea is to smooth out the errors in the data set
-            # and use the data set that generates the model
-            # that does the best job of smoothing, resulting in
-            # fewer unique values, as fewer unique values are the result
-            # of the values with erroneous characters being classified with
-            # their correct counterparts
-            model= dbn(pdat[ind]
-                      ,pydat[ind]
-                      ,loss='mean_squared_error'
-                      ,optimizer='sgd'
-                      ,rbmact='sigmoid'
-                      ,dbnact='sigmoid'
-                      ,dbnout=1)
-            psdat= model.predict(pdat)
-            updat= unique(psdat)
-            lup  = len(updat)
-            if lup < lmax:
-                lmax = lup
-                tdat = psdat
-                udat = {max(x):i for i,x in enumerate(updat)}
+        cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
+        cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
+        lo   = len(np.unique(cdat))
+        for perm in perms:
+            beg  = perm[0]
+            end  = perm[len(perm)-1]
+            if (beg < end and np.array_equal(range(beg,end+1),perm)):
+                pdat = ndat[:,perm]
+                ptdat= [sum(x)/(len(x)*max(x)) for i,x in enumerate(pdat)]
+                pydat= np.asarray(ptdat)
+                # generate the model of the data for smoothing errors
+                #
+                # the idea is to smooth out the errors in the data set
+                # and use the data set that generates the model
+                # that does the best job of smoothing, resulting in
+                # fewer unique values, as fewer unique values are the result
+                # of the values with erroneous characters being classified with
+                # their correct counterparts
+                model= dbn(pdat[ind]
+                          ,pydat[ind]
+                          ,loss='mean_squared_error'
+                          ,optimizer='sgd'
+                          ,rbmact='sigmoid'
+                          ,dbnact='sigmoid'
+                          ,dbnout=1)
+                psdat= model.predict(pdat)
+                updat= unique(psdat)
+                hi   = len(updat)
+                if (lo <= hi and hi < lmax):
+                    lmax = hi
+                    tdat = psdat
+                    udat = {max(x):i for i,x in enumerate(updat)}
         # we need values to turn into labels when training
         # one-hot encode the numeric data as its required for the softmax
         #
