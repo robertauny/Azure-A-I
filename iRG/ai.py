@@ -36,6 +36,7 @@ import pandas as pd
 
 import multiprocessing as mp
 import os
+import sys
 
 import config
 import constants as const
@@ -409,6 +410,7 @@ def correction(dat=[]):
         ssz  = max([len(x) for i,x in enumerate(dat)])
         # numeric representations of the strings in the list
         ndat = Parallel(n_jobs=nc)(delayed(numbers)(str(dat[i]).lower(),ssz) for i in range(0,sz))
+        ndat = np.asarray(ndat)
         #
         # compute the values
         #
@@ -416,12 +418,35 @@ def correction(dat=[]):
         # produce regressors to segregate the data that amount to
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
-        #tdat = [x[len(x)-1]/max(x) for i, x in enumerate(ndat)]
-        #tdat = [sum(x)/(len(x)*max(x)) for i, x in enumerate(ndat)]
-        #tdat = [max(x) for i,x in enumerate(ndat)]
-        #tdat = [sum(x[0:1]) for i,x in enumerate(ndat)]
-        tdat = [x[0]+x[len(x)-1] for i,x in enumerate(ndat)]
-        udat = {x:i for i,x in enumerate(unique(tdat))}
+        ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
+        perms= permute(range(0,ssz))
+        lmax = sys.maxint
+        for perm in [perms[0]]:
+            pdat = ndat[:,perm]
+            ptdat= [sum(x)/(len(x)*max(x)) for i,x in enumerate(pdat)]
+            pydat= np.asarray(ptdat)
+            # generate the model of the data for smoothing errors
+            #
+            # the idea is to smooth out the errors in the data set
+            # and use the data set that generates the model
+            # that does the best job of smoothing, resulting in
+            # fewer unique values, as fewer unique values are the result
+            # of the values with erroneous characters being classified with
+            # their correct counterparts
+            model= dbn(pdat[ind]
+                      ,pydat[ind]
+                      ,loss='mean_squared_error'
+                      ,optimizer='sgd'
+                      ,rbmact='sigmoid'
+                      ,dbnact='sigmoid'
+                      ,dbnout=1)
+            psdat= model.predict(pdat)
+            updat= unique(psdat)
+            lup  = len(updat)
+            if lup < lmax:
+                lmax = lup
+                tdat = psdat
+                udat = {max(x):i for i,x in enumerate(updat)}
         # we need values to turn into labels when training
         # one-hot encode the numeric data as its required for the softmax
         #
@@ -429,23 +454,14 @@ def correction(dat=[]):
         s    = 2
         #
         # properties
-        #p    = len(ndat[0])
         p    = int(ceil(log(len(udat),s)/2.0))
         #
         # number of classes, one-hot encodings
         ncls = s**(2*p)
-        cdat = [to_categorical(udat.get(x),num_classes=ncls) for x in tdat]
+        cdat = [to_categorical(udat.get(max(x)),num_classes=ncls) for x in tdat]
         odat = np.asarray(cdat)
-        ndat = np.asarray(ndat)
-        # generate the model of the data
-        #ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
-        #model= dbn(ndat[ind],odat[ind],splits=s,props=p)
-        model= dbn(ndat,odat,splits=s,props=p)
-        # predict the same data to get the labels
-        prds = model.predict(ndat)
-        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=ncls) for i in range(0,len(prds)))
         # get the labels
-        lbls = label(preds)
+        lbls = label(odat)
         # split the labels to know the available clusters
         slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)("-") for i in range(0,len(lbls)))
         slbl = np.asarray(slbl)
@@ -638,13 +654,13 @@ def ai_testing(M=500,N=2):
     # test the data correction neural network function
     # output should be "robert", overwriting corrupt data and misclassifications
     bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy','Robert','R0bert','R0b3rt']
-    corr = correction(unique(bdat))
+    corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
     bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']
     punc = [i for i in punctuation]
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -654,7 +670,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -671,7 +687,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
     punc = [i for i in punctuation]
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -681,7 +697,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -698,7 +714,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']
     punc = [i for i in punctuation]
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -708,7 +724,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,min(m/10,5)):
+    for i in range(0,max(m/10,5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):

@@ -40,7 +40,7 @@ def dbn(inputs
        ,epochs=10
        ,embed=True
        ,encs=None
-       ,verbose=1):
+       ,verbose=0):
     model= None
     if inputs.any() and outputs.any():
         # linear stack of layers in the neural network (NN)
