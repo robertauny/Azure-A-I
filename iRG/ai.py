@@ -310,14 +310,14 @@ def numbers(dat=[],pre=0):
 ## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
-def mostly(dat=[],pre=0):
+def mostly(dat=[],rdat=[],preds=[],pre=0):
     ret  = None
     sz   = len(dat)
-    if not (sz == 0 or pre < 0):
+    rsz  = len(rdat)
+    psz  = len(preds)
+    if not (sz == 0 or rsz == 0 or psz == 0 or pre <= 0):
         # number of cpu cores
         nc   = mp.cpu_count()
-        # numeric representations of the strings in the list
-        rdat = Parallel(n_jobs=nc)(delayed(numbers)(dat[i].lower(),pre) for i in range(0,sz))
         # character-wise append of most frequent characters in each feature of the list of strings
         # the data are strings that have been converted into character arrays
         # with each character further being converted into its inverted ordinal representation
@@ -335,18 +335,9 @@ def mostly(dat=[],pre=0):
         # of each column if there are more than one data row that gives the closest
         # prediction to 1 ... we do this because the goal is to denoise the inputs
         # and take the averaged rows of data coming closest to the expected output 1
-        rdat = np.asarray(rdat)
-        model= dbn(rdat
-                  ,np.full(len(rdat),1.0)
-                  ,loss='mean_squared_error'
-                  ,optimizer='sgd'
-                  ,rbmact='sigmoid'
-                  ,dbnact='sigmoid'
-                  ,dbnout=1)
-        preds= model.predict(rdat)
         inds = [j for j,x in enumerate(preds) if x == max(preds)]
         # mean of all rows giving predictions close to the plane with bias 1
-        mn   = np.mean(rdat[inds],axis=0)
+        mn   = np.mean(np.asarray(rdat)[inds],axis=0)
         # character-wise append of characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
@@ -377,7 +368,7 @@ def almost(dat=[]):
 ## Purpose:   Which string in a list appears most (by character)
 ##
 ############################################################################
-def most(dat=[],pre=0):
+def most(dat=[],rdat=[],preds=[],pre=0):
     ret  = None
     sz   = len(dat)
     if not (sz == 0 or pre < 0):
@@ -386,10 +377,11 @@ def most(dat=[],pre=0):
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
+        # change this to use all 3 predictions combined someway
         mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
         ret  = "".join(mdat).lstrip()
         if not (ret in dat):
-            mdat = mostly(dat,pre)
+            mdat = mostly(dat,rdat,preds,pre)
             ret  = "".join(mdat).lstrip()
             if not (ret in dat):
                 ret  = almost(dat)
@@ -418,12 +410,14 @@ def correction(dat=[]):
         # produce regressors to segregate the data that amount to
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
-        ind  = [np.random.randint(0,len(ndat)) for i in range(0,int(ceil(0.1*len(ndat))))]
         perms= permute(range(0,ssz))
         lmax = sys.maxint
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
         cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
+        # lower bound on the number of clusters to seek
         lo   = len(np.unique(cdat))
+        # we should sample at least as many data elements as there are clusters
+        ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
         for perm in perms:
             beg  = perm[0]
             end  = perm[len(perm)-1]
@@ -439,8 +433,8 @@ def correction(dat=[]):
                 # fewer unique values, as fewer unique values are the result
                 # of the values with erroneous characters being classified with
                 # their correct counterparts
-                model= dbn(pdat[ind]
-                          ,pydat[ind]
+                model= dbn(pdat#[ind]
+                          ,pydat#[ind]
                           ,loss='mean_squared_error'
                           ,optimizer='sgd'
                           ,rbmact='sigmoid'
@@ -460,11 +454,14 @@ def correction(dat=[]):
         s    = 2
         #
         # properties
+        #
+        # we want to find the value p such that s**(2*p) gives the same number
+        # of potential clusters as there are found in udat
         p    = int(ceil(log(len(udat),s)/2.0))
         #
         # number of classes, one-hot encodings
         ncls = s**(2*p)
-        cdat = [to_categorical(udat.get(max(x)),num_classes=ncls) for x in tdat]
+        cdat = [to_categorical(udat.get(x[0]),num_classes=ncls) for x in tdat]
         odat = np.asarray(cdat)
         # get the labels
         lbls = label(odat)
@@ -479,9 +476,14 @@ def correction(dat=[]):
         # collect all data for each cluster and assign most numerously appearing value
         ret  = np.asarray([" "*ssz]*sz)
         for cls in ucls:
+            # all row indices associated with the current cluster
             ind      = [j for j,x in enumerate(clus) if x == cls]
-            idat     = [dat[x] for j,x in enumerate(ind)]
-            ret[ind] = most(idat,ssz)
+            # all data elements associated with the current cluster
+            idat     = [ dat[x] for j,x in enumerate(ind)]
+            ipdat    = [pdat[x] for j,x in enumerate(ind)]
+            itdat    = [tdat[x] for j,x in enumerate(ind)]
+            # select the label (data element) that appears most in this cluster
+            ret[ind] = most(idat,ipdat,itdat,ssz)
     return ret
 
 ############################################################################
