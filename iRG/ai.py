@@ -378,10 +378,10 @@ def most(dat=[],rdat=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # change this to use all 3 predictions combined someway
-        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+        mdat = mostly(dat,rdat,preds,pre)
         ret  = "".join(mdat).lstrip()
         if not (ret in dat):
-            mdat = mostly(dat,rdat,preds,pre)
+            mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
             ret  = "".join(mdat).lstrip()
             if not (ret in dat):
                 ret  = almost(dat)
@@ -662,6 +662,11 @@ def ai_testing(M=500,N=2):
     # test the data correction neural network function
     # output should be "robert", overwriting corrupt data and misclassifications
     bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy','Robert','R0bert','R0b3rt']
+    rnd  = [np.random.randint(0,len(bdat))]
+    for i in range(0,len(bdat)-1):
+        rnd.append(np.random.randint(0,len(bdat)))
+    bdat = np.asarray(bdat)[rnd]
+    print(bdat)
     corr = correction(bdat)
     print(corr)
     # generate some random errors in my name to test the correction function
@@ -687,8 +692,14 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
+    rnd  = [np.random.randint(0,len(bdat))]
+    for i in range(0,len(bdat)-1):
+        rnd.append(np.random.randint(0,len(bdat)))
+    bdat = np.asarray(bdat)[rnd]
+    print(bdat)
     corr = correction(bdat)
     print(corr)
+    bdat = bdat.tolist()
     # generate some random errors in my name to test the correction function
     for i in range(0,m*2):
         bdat.append('andre')
@@ -714,8 +725,14 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
+    rnd  = [np.random.randint(0,len(bdat))]
+    for i in range(0,len(bdat)-1):
+        rnd.append(np.random.randint(0,len(bdat)))
+    bdat = np.asarray(bdat)[rnd]
+    print(bdat)
     corr = correction(bdat)
     print(corr)
+    bdat = bdat.tolist()
     # generate some random errors in my name to test the correction function
     for i in range(0,m*4):
         bdat.append('murphy')
@@ -741,5 +758,11 @@ def ai_testing(M=500,N=2):
             else:
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
+    rnd  = [np.random.randint(0,len(bdat))]
+    for i in range(0,len(bdat)-1):
+        rnd.append(np.random.randint(0,len(bdat)))
+    bdat = np.asarray(bdat)[rnd]
+    print(bdat)
     corr = correction(bdat)
     print(corr)
+    bdat = bdat.tolist()
