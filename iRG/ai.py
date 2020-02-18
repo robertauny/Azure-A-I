@@ -525,34 +525,38 @@ def ocr(pdfs=[],inst=const.BVAL,testing=True):
 ## Purpose:  Append together the text of a doc to an array
 ##
 ############################################################################
-def dappend(ret=[],doc=None):
-    if not (ret == None or doc == None):
+def dappend(doc=None):
+    ret  = None
+    if not (doc == None):
         if os.path.exists(doc) and os.path.getsize(doc) > 0:
             f    = open(doc)
             # should just be a line of text
-            ret.append(f.read())
+            ret  = f.read()
             f.close()
+    return ret
 
 ############################################################################
 ##
 ## Purpose:  Get the data from a pretrained GloVe model
 ##
 ############################################################################
-def wvec(ret={},line=None):
-    if not (ret == None or line == None):
-        vals = line.split()
-        word = vals[0]
-        coefs= np.asarray(vals[1:],dtype='float32')
+def wvec(line=None):
+    ret  = {}
+    if not (line == None):
+        vals      = line.split()
+        word      = vals[0]
+        coefs     = np.asarray(vals[1:],dtype=np.dtype(float))
         ret[word] = coefs
+    return ret
 
 ############################################################################
 ##
 ## Purpose:  Aid in expansion of the data from a pretrained GloVe model
 ##
 ############################################################################
-def expand(seqi=[],seqo=None,inds=[]):
+def expand(seqi=[],seqo=[],inds=[]):
     ret  = None
-    if not (seqo == None):
+    if not (len(seqo) == 0):
         ret  = seqo
     else:
         if not (len(seqi) == 0 or len(inds) == 0):
@@ -573,26 +577,31 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
         if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
             # number of cpu cores
             nc   = mp.cpu_count()
-            # append the text of all docs together into an array, one line per file
-            txt  = []
-            txts = Parallel(n_jobs=nc)(delayed(dappend)(txt,docs[i]) for i in range(0,len(docs)))
+            # append the text of all docs together into a string
+            txts = None
+            for d in docs:
+                if txts == None:
+                    txts = dappend(d)
+                else:
+                    txts = txts + " " + dappend(d)
+            txts = [txts]
             # tokenize the lines in the array and convert to sequences of integers
             #
             # instantiate a default Tokenizer object without limiting the number of tokens
             tok  = Tokenizer()
             # tokenize the data
-            toks = tok.fit_on_texts(txts)
+            tok.fit_on_texts(txts)
             # generate sequences of integers from the texts
             seqs = tok.texts_to_sequences(txts)
             # the sequences will be of different lengths because the original docs
             # were almost surely of different lengths ... so pad the sequences
-            pdat = pad_sequences(seqs)
+            pdat = pad_sequences(seqs)[0]
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
             gd   = {}
             f    = open(gdoc)
-            gdat = Parallel(n_jobs=nc)(delayed(wvec)(gd,line) for i,line in f.read())
+            gdat = {wvec(line).keys()[0]:wvec(line).values()[0] for line in f.readlines()}
             f.close()
             # we will pad the original sequences in a certain way so as to make them align with
             # the expanded set of words from the passed in GloVe data set
@@ -604,13 +613,48 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             tmp  = {word:i for i,word in enumerate(tok.word_index.items())}
             inds = [tmp.get(word) for word in gdat.keys()]
             # use the word index to embed the document data into the pretrained GloVe word vectors
-            gmat = Parallel(n_jobs=nc)(delayed(expand)(pdat[i],gdat.get(word),inds) for i,word in tok.word_index.items())
+            gmat = Parallel(n_jobs=nc)(delayed(expand)(pdat,gdat[word],inds) for word,i in tok.word_index.items() if word in gdat.keys())
+            #
+            s    = splits
+            # we want to find the value p such that s**(2*p) gives the same number
+            # of potential clusters as there are found in glove, as indicated by the number of constants
+            # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
+            p    = int(ceil(log(len(gdat[gdat.keys()[0]])-1,s)/2.0))
             # we need values to turn into labels when training
             # one-hot encode the integer labels as its required for the softmax
-            ovals= categoricals(inds,splits,props)
+            ovals= categoricals(len(gmat),s,p)
+            # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
+            # of a plane ... i.e. each line defines an element of a conditional specification
+            #
+            # recall from the theory of random fields, that given a conditional specification, we seek a realizing
+            # global probability distribution such that each of the global's conditionals, given a word in the glove
+            # data set, is an element in the specification
+            #
+            # the DBN neural network can be used to find the global realizing distribution
+            #
+            # at this point, we have one-hot encoded each of the unique words in the glove data set that matched a word from
+            # our corpus ... we use the constants of the conditional distributions in the glove data set as inputs to the DBN
+            # that will find a distribution that has as its output the set of words that have been one-hot encoded
+            #
+            # the result being that we will have found a set of constants (synaptic weights) of a network that identifies
+            # the word used to define a conditional distribution in the specification of the realizing distribution .. or
+            # more succinctly stated, with the neural network, we can identify if the inputs define
+            # a set of synaptic weights for a distribution in the conditional specification
+            #
+            # after generating the model, we should have a set of constants (weights) that number the same as those
+            # in the glove data file ... since we predict the word when using the constants of a word in the glove
+            # data file, then we only need for the dot product of the constants from the model with those of the
+            # lines in the data file to give us the log of the probability of the word-word co-occurrence
+            #
+            # however, the realizing distribution is a model of all words that gives you one particular word, when
+            # a certain set of constants are used as inputs ... thus we can use the output of the model as the
+            # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
+            # of any arbitrary word in the glove data set with the constants associated to the other word in question, when
+            # the constants of the word in question are dot product with the constants of the global distribution
+            #
             # for all of the indices in inds that are not None, we should have a corresponding seq of ints in gmat
             # we will substitute those values into the gdat array
-            model= dbn(gmat,ovals,splits=splits,props=props)
+            model= dbn(np.asarray(gmat),ovals,splits=s,props=p)
     return model
 
 # *************** TESTING *****************
