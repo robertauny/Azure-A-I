@@ -32,6 +32,7 @@ def dbn(inputs
        ,outputs
        ,splits=2
        ,props=2
+       ,clust=const.BVAL
        ,loss='categorical_crossentropy'
        ,optimizer='rmsprop'
        ,rbmact='softmax'
@@ -130,7 +131,11 @@ def dbn(inputs
                 if not (dbnact == None or dbnout <= 0):
                     enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
                 else:
-                    enc  = Dense(odim,input_shape=(dim,),activation=rbmact)
+                    # add another layer to change the structure of the network if needed based on clusters
+                    if not (clust <= 0):
+                        enc  = Dense(clust,input_shape=(dim,),activation=rbmact)
+                    else:
+                        enc  = Dense(odim ,input_shape=(dim,),activation=rbmact)
             # add the layer to the model
             model.add(enc)
         # add another layer for a different kind of model, such as a regression model
@@ -153,14 +158,17 @@ def dbn(inputs
 ## Purpose:   Define the outputs for a classification
 ##
 ############################################################################
-def categoricals(rows=0,splits=2,props=2):
+def categoricals(rows=0,splits=2,props=2,clust=const.BVAL):
     ret  = []
-    if not (rows < 0 or splits < 2 or props < 2):
+    if not (rows < 0 or ((splits < 2 or props < 2) and clust < 0)):
         # we need values to turn into labels when training
         # one-hot encode the integer labels as its required for the softmax
         s    = splits
         p    = props
-        nc   = s**(2*p)
+        if not (clust < 0):
+            nc   = clust
+        else:
+            nc   = s**(2*p)
         ret  = [np.random.randint(1,nc) for i in range(0,rows)]
         ret  = to_categorical(ret,num_classes=nc)
     return ret

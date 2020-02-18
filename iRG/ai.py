@@ -610,19 +610,21 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             # the word index consisting of each unique word and the integer to which it is mapped
             # inds will look something like [1, 0, 0, 4, 2, 3, 3, None, 3, 2, 0, None, 0, ...]
             # where the length of inds matches the number of words in the expanded data set
-            tmp  = {word:i for i,word in enumerate(tok.word_index.items())}
+            tmp  = {word:i for word,i in enumerate(tok.word_index.items())}
             inds = [tmp.get(word) for word in gdat.keys()]
             # use the word index to embed the document data into the pretrained GloVe word vectors
             gmat = Parallel(n_jobs=nc)(delayed(expand)(pdat,gdat[word],inds) for word,i in tok.word_index.items() if word in gdat.keys())
+            # number of clusters is different than the default defined by the splits and properties
+            clust= len(gdat[gdat.keys()[0]])-1
             #
             s    = splits
             # we want to find the value p such that s**(2*p) gives the same number
             # of potential clusters as there are found in glove, as indicated by the number of constants
             # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
-            p    = int(ceil(log(len(gdat[gdat.keys()[0]])-1,s)/2.0))
+            p    = int(ceil(log(clust,s)/2.0))
             # we need values to turn into labels when training
             # one-hot encode the integer labels as its required for the softmax
-            ovals= categoricals(len(gmat),s,p)
+            ovals= categoricals(len(gmat),clust=clust)
             # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
             # of a plane ... i.e. each line defines an element of a conditional specification
             #
@@ -654,7 +656,7 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             #
             # for all of the indices in inds that are not None, we should have a corresponding seq of ints in gmat
             # we will substitute those values into the gdat array
-            model= dbn(np.asarray(gmat),ovals,splits=s,props=p)
+            model= dbn(np.asarray(gmat),ovals,splits=s,props=p,clust=clust)
     return model
 
 # *************** TESTING *****************
