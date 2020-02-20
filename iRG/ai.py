@@ -652,7 +652,7 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             gmat = {word:gdat[word] for word,i in tok.word_index.items() if word in gdat.keys()}
             if not (gmat == {}):
                 # number of clusters is different than the default defined by the splits and properties
-                clust= len(gdat[gdat.keys()[0]])-1
+                clust= len(gmat[gmat.keys()[0]])-1
                 #
                 s    = splits
                 # we want to find the value p such that s**(2*p) gives the same number
@@ -661,10 +661,20 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
                 p    = int(ceil(log(clust,s)/2.0))
                 # we need values to turn into labels when training
                 # one-hot encode the integer labels as its required for the softmax
-                ovals= categoricals(len(gmat.keys()),clust=clust)
+                #
+                # the goal is to build a model with clust=clust outputs such that when clust inputs are passed in, we get a
+                # word in the glove data set associated to the clust constants ... furthermore, when the model constants are
+                # used in dot product with the constants of any word from the glove data set, we get the average log probability
+                # of the word from glove with any other arbitrary word from glove
+                # 
+                # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
+                # can consist of one unique value for each row of constants
+                ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
                 # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
-                # of a plane ... i.e. each line defines an element of a conditional specification ... when other parameters are
-                # are used in a dot product with the parameters of the plane, then the result is log probability of word-word occurrence
+                # of a plane ... i.e. each row of constants defines an element of a conditional specification
+                #
+                # words are associated with constants that can be dot product with constants of other words to obtain word-word
+                # co-occurrence probabilities
                 #
                 # recall from the theory of random fields, that given a conditional specification, we seek a realizing
                 # global probability distribution such that each of the global's conditionals, given a word in the glove
@@ -676,7 +686,7 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
                 # our corpus ... we use the constants of the conditional distributions in the glove data set as inputs to the DBN
                 # that will find a distribution that has as its output the set of words that have been one-hot encoded ... i.e.
                 # we will have found constants that can be used in dot product with constants of the conditionals to find the
-                # average log probability with the word that is predicted when the same constants are used as inputs to the network
+                # average log probability of co-occurrence with any word appearing in both the corpus and glove data sets
                 #
                 # the result being that we will have found a set of constants (synaptic weights) of a network that identifies
                 # the word used to define a conditional distribution in the specification of the realizing distribution .. or
@@ -684,17 +694,16 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
                 # a set of synaptic weights for a distribution in the conditional specification
                 #
                 # after generating the model, we should have a set of constants (weights) that number the same as those
-                # in the glove data file ... since we predict the word when using the constants of a word in the glove
+                # in the glove data file ... since we predict the word when using the associated constants of a word in the glove
                 # data file, then we only need for the dot product of the constants from the model with those of the
-                # lines in the data file to give us the log of the probability of the word-word co-occurrence
+                # constants in the data files to give us the log of the probability of the word-word co-occurrence
                 #
                 # however, the realizing distribution is a model of all words that gives you one particular word, when
                 # a certain set of constants are used as inputs ... thus we can use the output of the model as the
                 # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
-                # of any arbitrary word in the glove data set with the constants associated to the other word in question, when
-                # the constants of the word in question are dot product with the constants of the global distribution
+                # of any arbitrary word in the glove data set when dot product with the constants associated to another word
                 #
-                # input values to the model are the values associated to the words that appear in both our corpus and the glove data
+                # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
                 ivals= np.asarray(gmat.values())
                 # create the model using the inputs
                 model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
