@@ -115,16 +115,16 @@ def create_kg_ve(dat=[],lbls=[],lbl=None,ve=None):
 ##
 ############################################################################
 def build_kg(inst,dat=[],brn={},splits=2):
-    ret  = {"vertices":[],"edges":[]}
+    ret  = {const.V:[],const.E:[]}
     if not (inst == None  or
             inst < 0      or
             len(dat) == 0 or
             brn == {}     or
             splits < 2):
         # get the nn model for this brain
-        mdl  = brn["model"]
+        mdl  = brn[const.MDL]
         # get the nn label for this brain
-        lbl  = brn["label"]
+        lbl  = brn[const.LBL]
         # make the predictions using this model
         model= load_model(mdl)
         # make sure to get the right subset of the data
@@ -142,8 +142,8 @@ def build_kg(inst,dat=[],brn={},splits=2):
         v    = create_kg_ve(d,lbls,lbl,"v")
         # create the edges
         e    = create_kg_ve(d,lbls,lbl,"e")
-        ret["vertices"] = v
-        ret["edges"   ] = e
+        ret[const.V] = v
+        ret[const.E   ] = e
     return ret 
 
 ############################################################################
@@ -154,22 +154,22 @@ def build_kg(inst,dat=[],brn={},splits=2):
 def append_kg(ret={},dat={}):
     v    = []
     e    = []
-    if not (ret == {} or dat == {} or len(dat["vertices"]) == 0 or len(dat["edges"]) == 0):
+    if not (ret == {} or dat == {} or len(dat[const.V]) == 0 or len(dat[const.E]) == 0):
         # vertices
-        rv   = ret["vertices"]
-        dv   = dat["vertices"]
+        rv   = ret[const.V]
+        dv   = dat[const.V]
         if not (len(rv) == 0):
             v    = extend(rv,dv)
         else:
             v    = dv
         # edges
-        re   = ret["edges"   ]
-        de   = dat["edges"   ]
+        re   = ret[const.E]
+        de   = dat[const.E]
         if not (len(re) == 0):
             e    = extend(re,de)
         else:
             e    = de
-    return {"vertices":v,"edges":e}
+    return {const.V:v,const.E:e}
 
 ############################################################################
 ##
@@ -177,7 +177,7 @@ def append_kg(ret={},dat={}):
 ##
 ############################################################################
 def create_kg(inst,dat=[],splits=2):
-    ret  = {"vertices":[],"edges":[]}
+    ret  = {const.V:[],const.E:[]}
     if not (inst == None or inst < 0 or len(dat) == 0 or splits < 2):
         # number of cpu cores
         nc   = mp.cpu_count()
@@ -204,7 +204,7 @@ def irg_testing(M=500,N=2):
     ivals= np.random.sample(size=(m,p))
     # create the data for the sample knowledge graph
     kg   = create_kg(0,ivals,s)
-    print(kg["edges"])
+    print(kg[const.E])
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
     ovals= nn.categoricals(M,s,p)
