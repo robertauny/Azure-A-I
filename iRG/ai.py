@@ -742,8 +742,9 @@ def ai_testing(M=500,N=2):
     print(brain(ivals))
     imgs = convert_from_path("files/kg.pdf")
     print(imgs)
-    #for img in imgs:
-        #print(pil2array(img))
+    for img in imgs:
+        pil2 = pil2array(img)
+        #print(pil2)
     src,typ,key,host,url,hdrs,parms = img2txt(imgs,0)
     print(src)
     print(typ)
