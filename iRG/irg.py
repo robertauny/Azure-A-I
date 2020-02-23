@@ -27,6 +27,8 @@ import ai
 import data
 import constants as const
 
+import csv
+
 import multiprocessing as mp
 
 import numpy  as np
@@ -218,6 +220,22 @@ def irg_testing(M=500,N=2):
         # look at the original values and the predicted values
     else:
         print("iRG model is null.")
+    # test the corrections function on some kaggle data
+    rows = []
+    with open("data/food-inspections.csv") as f:
+        dat1 = csv.reader(f,delimiter=",")
+        flds = dat1.next()
+        cnt  = 0
+        for row in dat1:
+            rows.append(row)
+            cnt  = cnt + 1
+            if (cnt == M):
+                break
+        dat  = np.asarray(rows)[:,4]
+        print(dat)
+        out  = ai.correction(dat)
+        print(out)
+        f.close()
     # spark sqlContext should be used to create the data frame
     # of edges and vertices in the following format
     #

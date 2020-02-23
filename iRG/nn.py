@@ -28,8 +28,8 @@ import constants as const
 ## Purpose:   Deep belief network for classification or regression
 ##
 ############################################################################
-def dbn(inputs
-       ,outputs
+def dbn(inputs=[]
+       ,outputs=[]
        ,splits=2
        ,props=2
        ,clust=const.BVAL

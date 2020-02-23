@@ -306,11 +306,14 @@ def img2txt(img=[],inst=const.BVAL,testing=True):
 def chars(dat=[],pre=0,just=0):
     ret  = []
     sz   = len(dat)
-    if not (sz == 0 or pre < 0):
-        if not (just == 0):
-            e    = dat.rjust(pre)
+    if not (pre < 0):
+        if not (sz == 0):
+            if not (just == 0):
+                e    = dat.rjust(pre)
+            else:
+                e    = dat.ljust(pre)
         else:
-            e    = dat.ljust(pre)
+            e    = " " * pre
         ret.extend(e)
     return ret
 
@@ -322,8 +325,11 @@ def chars(dat=[],pre=0,just=0):
 def numbers(dat=[],pre=0):
     ret  = None
     sz   = len(dat)
-    if not (sz == 0 or pre < 0):
-        d    = chars(dat,pre)
+    if not (pre < 0):
+        if not (sz == 0):
+            d    = chars(dat,pre)
+        else:
+            d    = [" "] * pre
         ret  = [1.0/float(ord(x)) for i, x in enumerate(d)]
     return ret
 
@@ -332,12 +338,13 @@ def numbers(dat=[],pre=0):
 ## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
-def mostly(dat=[],rdat=[],preds=[],pre=0):
+def mostly(dat=[],rdat=[],cols=[],preds=[],pre=0):
     ret  = None
     sz   = len(dat)
     rsz  = len(rdat)
+    csz  = len(cols)
     psz  = len(preds)
-    if not (sz == 0 or rsz == 0 or psz == 0 or pre <= 0):
+    if not (sz == 0 or rsz == 0 or csz == 0 or psz == 0 or pre <= 0):
         # number of cpu cores
         nc   = mp.cpu_count()
         # character-wise append of most frequent characters in each feature of the list of strings
@@ -364,9 +371,9 @@ def mostly(dat=[],rdat=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # for the final return, take the characters closest to the mean
-        rret = [" "] * pre
-        for i in range(0,pre):
-            udat    = "".join(unique(cdat[:,i]))
+        rret = [" "] * csz
+        for i in range(0,csz):
+            udat    = "".join(unique(cdat[:,cols[i]]))
             ndat    = numbers(udat,len(udat))
             mmn     = abs(ndat-np.full(len(ndat),mn[i]))
             j       = [k for k,x in enumerate(mmn) if x == min(mmn)][0]
@@ -390,7 +397,7 @@ def almost(dat=[]):
 ## Purpose:   Which string in a list appears most (by character)
 ##
 ############################################################################
-def most(dat=[],rdat=[],preds=[],pre=0):
+def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
     ret  = None
     sz   = len(dat)
     if not (sz == 0 or pre < 0):
@@ -400,7 +407,7 @@ def most(dat=[],rdat=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # change this to use all 3 predictions combined someway
-        mdat = mostly(dat,rdat,preds,pre)
+        mdat = mostly(dat,rdat,cols,preds,pre)
         ret  = "".join(mdat).lstrip()
         if not (ret in dat):
             mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
@@ -434,10 +441,12 @@ def correction(dat=[]):
         # in the definition of the outputs
         perms= permute(range(0,ssz))
         lmax = sys.maxint
+        # initial entropy is something higher than otherwise possible
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
         cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
-        # lower bound on the number of clusters to seek
-        lo   = len(np.unique(cdat))
+        # lower bound on the number of clusters to seek has to be >= 2 as at least one error is assumed
+        #lo   = len(np.unique(cdat))
+        lo   = 2
         # we should sample at least as many data elements as there are clusters
         ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
         for perm in perms:
@@ -445,7 +454,7 @@ def correction(dat=[]):
             end  = perm[len(perm)-1]
             if (beg < end and np.array_equal(range(beg,end+1),perm)):
                 pdat = ndat[:,perm]
-                ptdat= [sum(x)/(len(x)*max(x)) for i,x in enumerate(pdat)]
+                ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
                 pydat= np.asarray(ptdat)
                 # generate the model of the data for smoothing errors
                 #
@@ -455,8 +464,8 @@ def correction(dat=[]):
                 # fewer unique values, as fewer unique values are the result
                 # of the values with erroneous characters being classified with
                 # their correct counterparts
-                model= dbn(pdat#[ind]
-                          ,pydat#[ind]
+                model= dbn(pdat[ind]
+                          ,pydat[ind]
                           ,loss='mean_squared_error'
                           ,optimizer='sgd'
                           ,rbmact='sigmoid'
@@ -465,10 +474,18 @@ def correction(dat=[]):
                 psdat= model.predict(pdat)
                 updat= unique(psdat)
                 hi   = len(updat)
-                if (lo <= hi and hi < lmax):
+                if np.array_equal(perm,perms[0]):
+                    cols = perm
                     lmax = hi
                     tdat = psdat
                     udat = {max(x):i for i,x in enumerate(updat)}
+                else:
+                # ********************* compute current entropy somehow and make it a condition
+                    if (lo <= hi and hi < lmax):
+                        cols = perm
+                        lmax = hi
+                        tdat = psdat
+                        udat = {max(x):i for i,x in enumerate(updat)}
         # we need values to turn into labels when training
         # one-hot encode the numeric data as its required for the softmax
         #
@@ -483,7 +500,7 @@ def correction(dat=[]):
         #
         # number of classes, one-hot encodings
         ncls = s**(2*p)
-        cdat = [to_categorical(udat.get(x[0]),num_classes=ncls) for x in tdat]
+        cdat = [to_categorical(udat.get(x[0]),num_classes=min(lmax,ncls)) for x in tdat]
         odat = np.asarray(cdat)
         # get the labels
         lbls = label(odat)
@@ -505,7 +522,7 @@ def correction(dat=[]):
             ipdat    = [pdat[x] for j,x in enumerate(ind)]
             itdat    = [tdat[x] for j,x in enumerate(ind)]
             # select the label (data element) that appears most in this cluster
-            ret[ind] = most(idat,ipdat,itdat,ssz)
+            ret[ind] = most(idat,ipdat,cols,itdat,ssz)
     return ret
 
 ############################################################################
@@ -618,14 +635,14 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             #gdat = Parallel(n_jobs=nc)(delayed(extend1)(gd,wvec(line)) for line in f.readlines())
             f.close()
             # we will pad the original sequences in a certain way so as to make them align with
-            # the expanded set of words from the passed in GloVe data set
+            # the expanded set of words from the passed in GloVe data set then
             # use the word index to embed the document data into the pretrained GloVe word vectors
             #
             # each line in the glove data set is a set of constants such that when one line is dot product with
             # another line, we get the log of the probability that the second word appears in word-word
             # co-occurrence relationship with the first
             #
-            # for our data files, we could compute similar numbers by first computing the probability of word1
+            # for our data files, we could compute similar numbers using pdat by first computing the probability of word1
             # co-occurrence word2 as the product of the number of times word1 appears out of all words times
             # number of times word2 appears out of all words in the corpus ... note that this leads to symmetry
             #
@@ -783,7 +800,7 @@ def ai_testing(M=500,N=2):
     bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']
     punc = [i for i in punctuation]
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/100)),1)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -793,7 +810,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/100)),1)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -816,7 +833,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['andre' for i in range(0,m)]
     name = ['a','n','d','r','e']
     punc = [i for i in punctuation]
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/50)),2)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -826,7 +843,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/50)),2)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -849,7 +866,7 @@ def ai_testing(M=500,N=2):
     #bdat = ['murphy' for i in range(0,m)]
     name = ['m','u','r','p','h','y']
     punc = [i for i in punctuation]
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/25)),5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
@@ -859,7 +876,7 @@ def ai_testing(M=500,N=2):
                 nm   = nm + punc[np.random.randint(0,len(punc))]
         bdat.append(nm)
     punc = ['q','w','e','r','t','y','u','i','o','p','a','s','d','f','g','h','j','k','l','z','x','c','v','b','n','m','1','2','3','4','5','6','7','8','9','0','Q','W','E','R','T','Y','U','I','O','P','A','S','D','F','G','H','J','K','L','Z','X','C','V','B','N','M']
-    for i in range(0,max(m/10,5)):
+    for i in range(0,max(int(ceil(m/25)),5)):
         j    = np.random.randint(0,len(name))
         nm   = ''
         for k in range(0,len(name)):
