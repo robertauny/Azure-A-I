@@ -923,7 +923,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
         # the top uwrd words in the corpus
         wrds = [i for i,item in enumerate(items) if item.values() in range(1,uwrd+1)]
         # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
-        gmat = {word:gdat[word] for word,i in items if word in items[wrds]}
+        gmat = {word:gdat[word] for word,i in items if word in items.keys()[wrds]}
         if not (gmat == {}):
             keys = gmat.keys()
             vals = gmat.values()
