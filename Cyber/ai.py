@@ -1021,7 +1021,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                 # sort the current row in ascending order to get the lowest to highest values
                 srow   = np.sort(prow)
                 # capture those values that correspond to the lowest probability n-gram
-                ret[i] = [vals[j] for j,val in enumerate(prow) if val in srow[0:ngram]]
+                ret[i] = [vals[j] for j,val in enumerate(prow) if val in srow[range(0,ngram)]]
     return ret
 
 # *************** TESTING *****************
