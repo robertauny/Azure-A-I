@@ -618,28 +618,29 @@ def blocks(tok=None):
         # demarcate potential code blocks in the tokenized data sets
         #
         # word counts
-        cnts       = tok.word_counts.values()
+        cnts       = tok.word_counts.items()
+        keys       = cnts.keys()
+        vals       = cnts.values()
         # median of the counts
-        med        = np.median(cnts)
+        med        = np.median(vals)
         # pseudo squared error
-        serr       = [(cnts[i]-med)**2 for i in range(0,len(cnts))]
+        serr       = [(vals[i]-med)**2 for i in range(0,len(keys))]
         # pseudo variance of the counts distribution
-        varn       = sum(serr)/len(cnts)
+        varn       = sum(serr)/len(keys)
         # standard deviation of the counts distribution
         sd         = np.sqrt(varn)
-        # attempt to identify class, interface and package blocks, as they
-        # should appear most infrequently
-        ret["top"] = [word for word,cnt in tok.word_counts.items() if                        cnt <= med - (4*sd)]
-        # attempt to identify method definitions
-        ret["mid"] = [word for word,cnt in tok.word_counts.items() if med - (4*sd) < cnt and cnt <= med - (3*sd)]
-        # attempt to identify conditionals and loop elements
-        ret["bot"] = [word for word,cnt in tok.word_counts.items() if med - (3*sd) < cnt and cnt <= med - (2*sd)]
+        # attempt to identify class, interface, package blocks and
+        # method definitions, as they should appear most infrequently
+        ret["top"] = [word for word,cnt in cnts if                        cnt <= med - (4*sd)]
+        # attempt to identify loops and conditionals
+        ret["mid"] = [word for word,cnt in cnts if med - (4*sd) < cnt and cnt <= med - (3*sd)]
+        # attempt to identify what's inside the blocks
+        ret["bot"] = [word for word,cnt in cnts if med - (3*sd) < cnt and cnt <= med         ]
     return ret
 
 ############################################################################
 ##
 ## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
-##           that will be used to extend a sparse data set of words
 ##
 ############################################################################
 def glove(tok=None,words=0):
@@ -877,12 +878,12 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
 ############################################################################
 ##
 ## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
-##           that will be used to extend a sparse data set of words
+##           that will be used to identify possible vulnerability areas in code
 ##
 ############################################################################
-def cyberglove(docs=[],words=0,splits=2,props=2):
-    model= None
-    if not (len(docs) == 0):
+def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
+    ret  = []
+    if not (len(docs) == 0 and ngrams <= 1):
         # collect the text of all docs together into an array
         #txts = [dappend(d) for d in docs]
         txts = docs
@@ -909,6 +910,8 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
         #
         # tokenize the data
         tok.fit_on_texts(txts)
+        # identify potential code block demarcations in the tokenized corpus
+        blks = blocks(tok)
         # we will make the glove data set a function of the top uwrd words
         uwrd = len(tok.word_index.keys())
         if (0 < words and words < uwrd):
@@ -922,8 +925,10 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
         # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
         gmat = {word:gdat[word] for word,i in items if word in items[wrds]}
         if not (gmat == {}):
+            keys = gmat.keys()
+            vals = gmat.values()
             # number of clusters is different than the default defined by the splits and properties
-            clust= len(gmat[gmat.keys()[0]])-1
+            clust= len(gmat[keys[0]])-1
             #
             s    = splits
             # we want to find the value p such that s**(2*p) gives the same number
@@ -940,7 +945,8 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
             # 
             # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
             # can consist of one unique value for each row of constants
-            ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
+            #ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
+            ovals= to_categorical([i for word,i in items if word in keys],num_classes=clust)
             # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
             # of a plane ... i.e. each row of constants defines an element of a conditional specification
             #
@@ -975,10 +981,48 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
             # of any arbitrary word in the glove data set when dot product with the constants associated to another word
             #
             # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
-            ivals= np.asarray(gmat.values())
+            ivals= np.asarray(vals)
             # create the model using the inputs
             model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
-    return model
+            # we have created the model using the top uwrd values that appear most in the corpus ... now we want to get the blocks
+            # of code that may be hiding the cyber security vulnerability and run the blocks through the predictor
+            #
+            # sequences associated to the identified code blocks that potentially house code vulnerabilities
+            bseq = [[i for word,i in items if word in blks["bot"]]]
+            # pad the sequences so that they are in a form that can be passed to the model, i.e. a number of uwrd rows
+            pseq = pad_sequences(bseq,uwrd)[0]
+            # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
+            # conditional specification whose elements are the marginals defined by the modeling constants in gmat ... the
+            # global is captured in "model" ... if we use model and pass a sequence of constants generated from one of the
+            # marginals, then the output should be a set of constants greatly weighted (almost 1) towards the position of the word
+            # associated to the marginal in question, as indicated by the ordering of gmat.keys() ... otherwise, the
+            # expectation is to have a weighting that is more spread out amongst all positions of gmat.keys(), in which case
+            # our return should be a sequence of n-grams with the lowest probabilities from each row of the padded sequences
+            #
+            # the lowest probability n-grams are the ones with the n lowest weightings in the output rows from the predictor
+            #
+            # idea here ... low probability of occurrence in between blocks is an indicator of an anomaly, something to be observed
+            # especially when we started with the top uwrd appearing words in our corpus
+            #
+            # after forming the n-grams, one for each row of input data from the padded sequences, we can search the original
+            # tokenized corpus for these low probability sequences and note their locations
+            #
+            # predict the sequences in the blocks
+            preds= model.predict(pseq)
+            # n-gram length should not be longer than uwrd
+            ngram= ngrams
+            if ngram > uwrd:
+                ngram= uwrd
+            # obtain the n-grams of words for each row of the padded sequences
+            ret  = np.asarray([[" "]*ngram]*len(preds))
+            for i in range(0,len(preds)):
+                # the current prediction row
+                prow   = preds[i]
+                # sort the current row in ascending order to get the lowest to highest values
+                srow   = np.sort(prow)
+                # capture those values that correspond to the lowest probability n-gram
+                ret[i] = [vals[j] for j,val in enumerate(prow) if val in srow[0:ngram]]
+    return ret
 
 # *************** TESTING *****************
 
