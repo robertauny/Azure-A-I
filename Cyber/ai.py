@@ -602,6 +602,42 @@ def expand(gm=[],pm=[],ind=const.BVAL):
 
 ############################################################################
 ##
+## Purpose:  Identify potential code block identifiers in a tokenized data set
+##
+############################################################################
+def blocks(tok=None):
+    ret  = {}
+    # expecting that the corpus is already tokenized and integers are fit to the text
+    if not (tok == None):
+        # the idea is simple ... we will calculate some pseudo parameters for a
+        # distribution and use them to identify potential code block demarcations
+        #
+        # we will use the median in place of the mean of the distribution of
+        # word frequencies in a calculation of the standard deviation ... then
+        # we will use >=4std, <4std & >=3std, <3std & >=2std, as the ranges to
+        # demarcate potential code blocks in the tokenized data sets
+        #
+        # word counts
+        cnts       = tok.word_counts.values()
+        # median of the counts
+        med        = np.median(cnts)
+        # pseudo squared error
+        serr       = [(cnts[i]-med)**2 for i in range(0,len(cnts))]
+        # pseudo variance of the counts distribution
+        varn       = sum(serr)/len(cnts)
+        # standard deviation of the counts distribution
+        sd         = np.sqrt(varn)
+        # attempt to identify class, interface and package blocks, as they
+        # should appear most infrequently
+        ret["top"] = [word for word,cnt in tok.word_counts.items() if                        cnt <= med - (4*sd)]
+        # attempt to identify method definitions
+        ret["mid"] = [word for word,cnt in tok.word_counts.items() if med - (4*sd) < cnt and cnt <= med - (3*sd)]
+        # attempt to identify conditionals and loop elements
+        ret["bot"] = [word for word,cnt in tok.word_counts.items() if med - (3*sd) < cnt and cnt <= med - (2*sd)]
+    return ret
+
+############################################################################
+##
 ## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
 ##           that will be used to extend a sparse data set of words
 ##
@@ -847,8 +883,6 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
 def cyberglove(docs=[],words=0,splits=2,props=2):
     model= None
     if not (len(docs) == 0):
-        # number of cpu cores
-        nc   = mp.cpu_count()
         # collect the text of all docs together into an array
         #txts = [dappend(d) for d in docs]
         txts = docs
@@ -865,6 +899,14 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
         #
         # or justify why the tokenizer will handle it for us, simply by the counts
         #
+        # so we will run through the data once, appending all data to the output of the tokenizer
+        # then we will look at the frequencies for each word and add the files again, each time
+        # adding less frequently appearing words to the out-of-vocabulary (OOV) list
+        #
+        # the theory is that less frequently appearing words will demarcate blocks, like class, interface, etc.
+        # then as we continually add the txts again and again, we will have added most of the demarcations to
+        # the OOV list and defined our code blocks in an unsupervised fashion
+        #
         # tokenize the data
         tok.fit_on_texts(txts)
         # we will make the glove data set a function of the top uwrd words
@@ -872,7 +914,13 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
         if (0 < words and words < uwrd):
             uwrd = words
         # calculate the constants for each word in the corpus using the GloVe methodology
-        gmat = glove(tok,uwrd)
+        gdat = glove(tok,uwrd)
+        # tokenized items
+        items= tok.word_index.items()
+        # the top uwrd words in the corpus
+        wrds = [i for i,item in enumerate(items) if item.values() in range(1,uwrd+1)]
+        # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
+        gmat = {word:gdat[word] for word,i in items if word in items[wrds]}
         if not (gmat == {}):
             # number of clusters is different than the default defined by the splits and properties
             clust= len(gmat[gmat.keys()[0]])-1
@@ -930,7 +978,7 @@ def cyberglove(docs=[],words=0,splits=2,props=2):
             ivals= np.asarray(gmat.values())
             # create the model using the inputs
             model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
-    return gmat
+    return model
 
 # *************** TESTING *****************
 
