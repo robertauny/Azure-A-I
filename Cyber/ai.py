@@ -928,7 +928,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             keys = gmat.keys()
             vals = gmat.values()
             # number of clusters is different than the default defined by the splits and properties
-            clust= len(gmat[keys])-1
+            clust= len(gmat[keys[0]])-1
             #
             s    = splits
             # we want to find the value p such that s**(2*p) gives the same number
