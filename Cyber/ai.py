@@ -15,7 +15,7 @@
 ############################################################################
 
 from joblib                       import Parallel, delayed
-from itertools                    import combinations
+from itertools                    import combinations,combinations_with_replacement
 from string                       import punctuation
 from math                         import ceil, log
 
@@ -161,19 +161,28 @@ def unique(dat):
 ## Purpose:   Permutations of a list of integers for use in labeling hierarchies
 ##
 ############################################################################
-def permute(dat):
+def permute(dat=[],mine=True,l=3):
     ret  = []
     sz   = len(dat)
     if not (sz == 0):
-        # permute the array of indices beginning with the first element
-        for j in range(0,sz+1):
-            # all permutations of the array of indices
-            jdat = dat[j:] + dat[:j]
-            for i in range(0,sz):
-                # only retain the sub arrays that are length >= 2
-                tmp = [list(x) for x in combinations(jdat,i+2)]
-                if len(tmp) > 0:
-                    ret.extend(tmp)
+        if mine:
+            # permute the array of indices beginning with the first element
+            for j in range(0,sz+1):
+                # all permutations of the array of indices
+                jdat = dat[j:] + dat[:j]
+                for i in range(0,sz):
+                    # only retain the sub arrays that are length >= 2
+                    tmp = [list(x) for x in combinations(jdat,i+2)]
+                    if len(tmp) > 0:
+                        ret.extend(tmp)
+        else:
+            # number of cpu cores
+            nc   = mp.cpu_count()
+            # permute the array of indices beginning with the first element
+            lsz  = l
+            if not (0 < lsz and lsz < min(3,sz)):
+                lsz  = 3
+            ret.extend(list(combinations(dat,lsz)))
     return unique(ret)
 
 ############################################################################
@@ -439,7 +448,7 @@ def correction(dat=[]):
         # produce regressors to segregate the data that amount to
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
-        perms= permute(range(0,ssz))
+        perms= permute(range(0,ssz),False)
         lmax = sys.maxint
         # initial entropy is something higher than otherwise possible
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
@@ -447,40 +456,60 @@ def correction(dat=[]):
         # lower bound on the number of clusters to seek has to be >= 2 as at least one error is assumed
         #lo   = len(np.unique(cdat))
         lo   = 2
+        # calculate the means of each column, as we will use permutations of subsets of all columns
+        # and the mean in those columns that are not included in the permutation to test if entropy
+        # is increased or decreased as a result ... idea is to find the permutation of columns
+        # that leaves us with the fewest errors in the data set (lowest entropic state)
+        mns  = Parallel(n_jobs=nc)(delayed(np.mean)(ndat[:,i]) for i in range(0,len(ndat[0])))
+        # calculate some parameters for the main dbn
+        pdat = ndat
+        ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
+        pydat= np.asarray(ptdat)
         # we should sample at least as many data elements as there are clusters
         ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
+        # generate the model of the data for smoothing errors
+        #
+        # the idea is to smooth out the errors in the data set
+        # and use the data set that generates the model
+        # that does the best job of smoothing, resulting in
+        # fewer unique values, as fewer unique values are the result
+        # of the values with erroneous characters being classified with
+        # their correct counterparts
+        model= dbn(pdat[ind]
+                  ,pydat[ind]
+                  ,loss='mean_squared_error'
+                  ,optimizer='sgd'
+                  ,rbmact='sigmoid'
+                  ,dbnact='sigmoid'
+                  ,dbnout=1)
         for perm in perms:
-            beg  = perm[0]
-            end  = perm[len(perm)-1]
-            if (beg < end and np.array_equal(range(beg,end+1),perm)):
-                pdat = ndat[:,perm]
-                ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
-                pydat= np.asarray(ptdat)
-                # generate the model of the data for smoothing errors
-                #
-                # the idea is to smooth out the errors in the data set
-                # and use the data set that generates the model
-                # that does the best job of smoothing, resulting in
-                # fewer unique values, as fewer unique values are the result
-                # of the values with erroneous characters being classified with
-                # their correct counterparts
-                model= dbn(pdat[ind]
-                          ,pydat[ind]
-                          ,loss='mean_squared_error'
-                          ,optimizer='sgd'
-                          ,rbmact='sigmoid'
-                          ,dbnact='sigmoid'
-                          ,dbnout=1)
+            # we only want permutations of columns that are sorted correctly
+            # as we need to pass the columns to the predictor in the right order
+            if (np.array_equal(perm,np.sort(perm))):
+                # add a column of means if the column is not in the current permutation
+                # otherwise add the data corresponding to the column in the permutation
+                pdat = []
+                for i in range(0,len(ndat[0])):
+                    if not (i in perm):
+                        pdat.append(np.full(len(ndat[:,i]),mns[i]))
+                    else:
+                        pdat.append(ndat[:,i])
+                # columns were added as rows so we need to take the transpose
+                pdat = np.asarray(pdat).transpose()
+                # make the predictions
                 psdat= model.predict(pdat)
+                # record the updated predictions
                 updat= unique(psdat)
                 hi   = len(updat)
+                # is this the first time through the loop of perms
                 if np.array_equal(perm,perms[0]):
                     cols = perm
                     lmax = hi
                     tdat = psdat
                     udat = {max(x):i for i,x in enumerate(updat)}
                 else:
-                # ********************* compute current entropy somehow and make it a condition
+                # is there a reduction in current entropy
+                # if so, then record the current conditions
                     if (lo <= hi and hi < lmax):
                         cols = perm
                         lmax = hi
