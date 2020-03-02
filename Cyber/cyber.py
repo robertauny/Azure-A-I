@@ -231,7 +231,7 @@ def cyber_testing(M=500,N=2):
             cnt  = cnt + 1
             if (cnt == M):
                 break
-        dat  = np.asarray(rows)[:,5]
+        dat  = np.asarray(rows)[:,4]
         print(dat)
         out  = ai.correction(dat)
         print(out)
