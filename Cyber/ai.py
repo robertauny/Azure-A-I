@@ -772,12 +772,11 @@ def glove(tok=None,words=0):
             #
             # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
             cnt  = len(keys)
-            if uwrd < len(tok.word_index.keys()):
-                ncnt = cnt % uwrd
-                if not (ncnt == 0):
-                    cnt  = ncnt
-                else:
-                    cnt  = 1
+            ncnt = cnt % uwrd
+            if not (ncnt == 0):
+                cnt  = ncnt
+            else:
+                cnt  = 1
     return ret
 
 ############################################################################
