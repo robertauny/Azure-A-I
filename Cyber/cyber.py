@@ -236,6 +236,9 @@ def cyber_testing(M=500,N=2):
         out  = ai.correction(dat)
         print(out)
         f.close()
+    # test cyberglove
+    a=ai.cyberglove(["/mnt/code/cyber/cyber.py","/mnt/code/cyber/ai.py","/mnt/code/cyber/nn.py"],20)
+    print(a)
     # spark sqlContext should be used to create the data frame
     # of edges and vertices in the following format
     #

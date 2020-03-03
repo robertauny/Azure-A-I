@@ -648,8 +648,8 @@ def blocks(tok=None):
         #
         # word counts
         cnts       = tok.word_counts.items()
-        keys       = cnts.keys()
-        vals       = cnts.values()
+        keys       = dict(cnts).keys()
+        vals       = dict(cnts).values()
         # median of the counts
         med        = np.median(vals)
         # pseudo squared error
@@ -718,17 +718,13 @@ def glove(tok=None,words=0):
             if ret == {}:
                 ret[word] = list(np.random.sample(uwrd))
             else:
-                # current keys
-                keys      = ret.keys()
-                # current values
-                vals      = ret.values()
-                # current count of words in the dictionary
-                cnt       = len(keys)
                 # randomly generate all but cnt+1 values, as the rest are predetermined
-                ret[word] = list(np.random.sample(uwrd-(cnt+1)))
+                #
+                # note that new entries into the dictionary will be first
+                ret[word] = list(np.random.sample(uwrd-cnt))
                 # extend the list of glove values for word after the random values
                 # with all values in the last column, between the 2nd row and next to current row
-                ret[word].extend(np.asarray(vals)[1:cnt,uwrd-1])
+                ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
                 # append the final value which is determined as such, supposing uwrd = 3, giving a 3x3
                 # matrix of glove constants to be used for the weights of each marginal we have
                 # 
@@ -752,10 +748,10 @@ def glove(tok=None,words=0):
                 # of constants in the previous row together with the current row, not including computed values in the last column
                 # of each row, is subtracted from the log probability of word-word co-occurrence
                 #
-                # previous word
-                pword= keys[len(keys)-1]
-                # previous values
-                pvals= vals[len(keys)-1]
+                # previous word, which will be in the first position, as keys does not contain the present word
+                pword= keys[0]
+                # previous values, which will be in the first position, as values does not contain the present values
+                pvals= vals[0]
                 # count associated to previous word
                 pcnt = d[pword]
                 # count associated to current word
@@ -763,11 +759,25 @@ def glove(tok=None,words=0):
                 # compute log probability of word-word co-occurrence
                 lprob= np.log((pcnt+ccnt)/pcnt)
                 # compute the dot product of values from previous row with what's currently in ret[word] to get final value
-                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-2)],ret[word])
+                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-1)],np.asarray(ret[word])[range(0,len(ret[word]))])
                 # compute the last value in this row of modeling constants for the marginals
                 lval = (lprob-dp)/pvals[len(pvals)-1]
                 # append the last value to the end of what's currently specified for this word
                 ret[word].append(lval)
+            # current keys
+            keys = np.asarray(ret.keys())
+            # current values
+            vals = np.asarray(ret.values())
+            # current count of words in the dictionary
+            #
+            # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
+            cnt  = len(keys)
+            if uwrd < len(tok.word_index.keys()):
+                ncnt = cnt % uwrd
+                if not (ncnt == 0):
+                    cnt  = ncnt
+                else:
+                    cnt  = 1
     return ret
 
 ############################################################################
@@ -914,8 +924,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
     ret  = []
     if not (len(docs) == 0 and ngrams <= 1):
         # collect the text of all docs together into an array
-        #txts = [dappend(d) for d in docs]
-        txts = docs
+        txts = [dappend(d) for d in docs]
         # tokenize the lines in the array and convert to sequences of integers
         #
         # instantiate a default Tokenizer object without limiting the number of tokens
@@ -950,14 +959,14 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
         # tokenized items
         items= tok.word_index.items()
         # the top uwrd words in the corpus
-        wrds = [i for i,item in enumerate(items) if item.values() in range(1,uwrd+1)]
+        wrds = [i for i,item in enumerate(items) if item[1] in range(1,uwrd+1)]
         # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
-        gmat = {word:gdat[word] for word,i in items if word in items.keys()[wrds]}
+        gmat = {word:gdat[word] for word in np.asarray(items)[wrds,0]}
         if not (gmat == {}):
             keys = gmat.keys()
             vals = gmat.values()
             # number of clusters is different than the default defined by the splits and properties
-            clust= len(gmat[keys[0]])-1
+            clust= len(gmat[keys[0]])
             #
             s    = splits
             # we want to find the value p such that s**(2*p) gives the same number
@@ -975,7 +984,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
             # can consist of one unique value for each row of constants
             #ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
-            ovals= to_categorical([i for word,i in items if word in keys],num_classes=clust)
+            ovals= to_categorical([i-1 for word,i in items if word in keys],num_classes=clust)
             # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
             # of a plane ... i.e. each row of constants defines an element of a conditional specification
             #
@@ -1019,7 +1028,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # sequences associated to the identified code blocks that potentially house code vulnerabilities
             bseq = [[i for word,i in items if word in blks["bot"]]]
             # pad the sequences so that they are in a form that can be passed to the model, i.e. a number of uwrd rows
-            pseq = pad_sequences(bseq,uwrd)[0]
+            pseq = np.asarray(pad_sequences(bseq,uwrd)[0]).reshape((1,uwrd))
             # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
             # conditional specification whose elements are the marginals defined by the modeling constants in gmat ... the
             # global is captured in "model" ... if we use model and pass a sequence of constants generated from one of the
@@ -1043,14 +1052,15 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             if ngram > uwrd:
                 ngram= uwrd
             # obtain the n-grams of words for each row of the padded sequences
-            ret  = np.asarray([[" "]*ngram]*len(preds))
+            #ret  = np.asarray([[" "]*ngram]*len(preds))
+            ret  = [list()] * len(preds)
             for i in range(0,len(preds)):
                 # the current prediction row
                 prow   = preds[i]
                 # sort the current row in ascending order to get the lowest to highest values
                 srow   = np.sort(prow)
                 # capture those values that correspond to the lowest probability n-gram
-                ret[i] = [vals[j] for j,val in enumerate(prow) if val in srow[range(0,ngram)]]
+                ret[i] = [keys[j] for j in range(0,len(prow)) if prow[j] in srow[range(0,ngram)]]
     return ret
 
 # *************** TESTING *****************
