@@ -777,7 +777,7 @@ def glove(tok=None,words=0):
 ##
 ############################################################################
 def extendglove(docs=[],gdoc=None,splits=2,props=2):
-    model= None
+    gdat = {}
     if not (len(docs) == 0 or gdoc == None):
         if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
             # number of cpu cores
@@ -793,7 +793,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
-            gd   = {}
+            #gd   = {}
             f    = open(gdoc)
             gdat = {wvec(line).keys()[0]:wvec(line).values()[0] for line in f.readlines()}
             #gdat = Parallel(n_jobs=nc)(delayed(extend1)(gd,wvec(line)) for line in f.readlines())
