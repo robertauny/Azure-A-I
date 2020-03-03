@@ -1071,7 +1071,11 @@ def ai_testing(M=500,N=2):
     print(o)
     # test glove output
     g    = extendglove(["README.txt","README.txt"],"data/glove.6B.50d.txt")
-    #print(g)
+    leng = len(g)
+    if leng <= 1000:
+        print(g)
+    else:
+        print("GloVe: "+str(leng))
     print(permute(range(0,len(ivals[0]))))
     print(brain(ivals))
     imgs = convert_from_path("files/kg.pdf")
