@@ -761,7 +761,7 @@ def glove(tok=None,words=0):
                 # count associated to current word
                 ccnt = d[word]
                 # compute log probability of word-word co-occurrence
-                lprob= (pcnt+ccnt)/pcnt
+                lprob= np.log((pcnt+ccnt)/pcnt)
                 # compute the dot product of values from previous row with what's currently in ret[word] to get final value
                 dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-2)],ret[word])
                 # compute the last value in this row of modeling constants for the marginals
