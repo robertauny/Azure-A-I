@@ -15,7 +15,7 @@
 ############################################################################
 
 from joblib                       import Parallel, delayed
-from itertools                    import combinations
+from itertools                    import combinations,combinations_with_replacement
 from string                       import punctuation
 from math                         import ceil, log
 
@@ -161,19 +161,28 @@ def unique(dat):
 ## Purpose:   Permutations of a list of integers for use in labeling hierarchies
 ##
 ############################################################################
-def permute(dat):
+def permute(dat=[],mine=True,l=3):
     ret  = []
     sz   = len(dat)
     if not (sz == 0):
-        # permute the array of indices beginning with the first element
-        for j in range(0,sz+1):
-            # all permutations of the array of indices
-            jdat = dat[j:] + dat[:j]
-            for i in range(0,sz):
-                # only retain the sub arrays that are length >= 2
-                tmp = [list(x) for x in combinations(jdat,i+2)]
-                if len(tmp) > 0:
-                    ret.extend(tmp)
+        if mine:
+            # permute the array of indices beginning with the first element
+            for j in range(0,sz+1):
+                # all permutations of the array of indices
+                jdat = dat[j:] + dat[:j]
+                for i in range(0,sz):
+                    # only retain the sub arrays that are length >= 2
+                    tmp = [list(x) for x in combinations(jdat,i+2)]
+                    if len(tmp) > 0:
+                        ret.extend(tmp)
+        else:
+            # number of cpu cores
+            nc   = mp.cpu_count()
+            # permute the array of indices beginning with the first element
+            lsz  = l
+            if not (0 < lsz and lsz < min(3,sz)):
+                lsz  = 3
+            ret.extend(list(combinations(dat,lsz)))
     return unique(ret)
 
 ############################################################################
@@ -439,7 +448,7 @@ def correction(dat=[]):
         # produce regressors to segregate the data that amount to
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
-        perms= permute(range(0,ssz))
+        perms= permute(range(0,ssz),False)
         lmax = sys.maxint
         # initial entropy is something higher than otherwise possible
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
@@ -447,40 +456,60 @@ def correction(dat=[]):
         # lower bound on the number of clusters to seek has to be >= 2 as at least one error is assumed
         #lo   = len(np.unique(cdat))
         lo   = 2
+        # calculate the means of each column, as we will use permutations of subsets of all columns
+        # and the mean in those columns that are not included in the permutation to test if entropy
+        # is increased or decreased as a result ... idea is to find the permutation of columns
+        # that leaves us with the fewest errors in the data set (lowest entropic state)
+        mns  = Parallel(n_jobs=nc)(delayed(np.mean)(ndat[:,i]) for i in range(0,len(ndat[0])))
+        # calculate some parameters for the main dbn
+        pdat = ndat
+        ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
+        pydat= np.asarray(ptdat)
         # we should sample at least as many data elements as there are clusters
         ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
+        # generate the model of the data for smoothing errors
+        #
+        # the idea is to smooth out the errors in the data set
+        # and use the data set that generates the model
+        # that does the best job of smoothing, resulting in
+        # fewer unique values, as fewer unique values are the result
+        # of the values with erroneous characters being classified with
+        # their correct counterparts
+        model= dbn(pdat[ind]
+                  ,pydat[ind]
+                  ,loss='mean_squared_error'
+                  ,optimizer='sgd'
+                  ,rbmact='sigmoid'
+                  ,dbnact='sigmoid'
+                  ,dbnout=1)
         for perm in perms:
-            beg  = perm[0]
-            end  = perm[len(perm)-1]
-            if (beg < end and np.array_equal(range(beg,end+1),perm)):
-                pdat = ndat[:,perm]
-                ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
-                pydat= np.asarray(ptdat)
-                # generate the model of the data for smoothing errors
-                #
-                # the idea is to smooth out the errors in the data set
-                # and use the data set that generates the model
-                # that does the best job of smoothing, resulting in
-                # fewer unique values, as fewer unique values are the result
-                # of the values with erroneous characters being classified with
-                # their correct counterparts
-                model= dbn(pdat[ind]
-                          ,pydat[ind]
-                          ,loss='mean_squared_error'
-                          ,optimizer='sgd'
-                          ,rbmact='sigmoid'
-                          ,dbnact='sigmoid'
-                          ,dbnout=1)
+            # we only want permutations of columns that are sorted correctly
+            # as we need to pass the columns to the predictor in the right order
+            if (np.array_equal(perm,np.sort(perm))):
+                # add a column of means if the column is not in the current permutation
+                # otherwise add the data corresponding to the column in the permutation
+                pdat = []
+                for i in range(0,len(ndat[0])):
+                    if not (i in perm):
+                        pdat.append(np.full(len(ndat[:,i]),mns[i]))
+                    else:
+                        pdat.append(ndat[:,i])
+                # columns were added as rows so we need to take the transpose
+                pdat = np.asarray(pdat).transpose()
+                # make the predictions
                 psdat= model.predict(pdat)
+                # record the updated predictions
                 updat= unique(psdat)
                 hi   = len(updat)
+                # is this the first time through the loop of perms
                 if np.array_equal(perm,perms[0]):
                     cols = perm
                     lmax = hi
                     tdat = psdat
                     udat = {max(x):i for i,x in enumerate(updat)}
                 else:
-                # ********************* compute current entropy somehow and make it a condition
+                # is there a reduction in current entropy
+                # if so, then record the current conditions
                     if (lo <= hi and hi < lmax):
                         cols = perm
                         lmax = hi
@@ -602,11 +631,152 @@ def expand(gm=[],pm=[],ind=const.BVAL):
 
 ############################################################################
 ##
+## Purpose:  Identify potential code block identifiers in a tokenized data set
+##
+############################################################################
+def blocks(tok=None):
+    ret  = {}
+    # expecting that the corpus is already tokenized and integers are fit to the text
+    if not (tok == None):
+        # the idea is simple ... we will calculate some pseudo parameters for a
+        # distribution and use them to identify potential code block demarcations
+        #
+        # we will use the median in place of the mean of the distribution of
+        # word frequencies in a calculation of the standard deviation ... then
+        # we will use >=4std, <4std & >=3std, <3std & >=2std, as the ranges to
+        # demarcate potential code blocks in the tokenized data sets
+        #
+        # word counts
+        cnts       = tok.word_counts.items()
+        keys       = cnts.keys()
+        vals       = cnts.values()
+        # median of the counts
+        med        = np.median(vals)
+        # pseudo squared error
+        serr       = [(vals[i]-med)**2 for i in range(0,len(keys))]
+        # pseudo variance of the counts distribution
+        varn       = sum(serr)/len(keys)
+        # standard deviation of the counts distribution
+        sd         = np.sqrt(varn)
+        # attempt to identify class, interface, package blocks and
+        # method definitions, as they should appear most infrequently
+        ret["top"] = [word for word,cnt in cnts if                        cnt <= med - (4*sd)]
+        # attempt to identify loops and conditionals
+        ret["mid"] = [word for word,cnt in cnts if med - (4*sd) < cnt and cnt <= med - (3*sd)]
+        # attempt to identify what's inside the blocks
+        ret["bot"] = [word for word,cnt in cnts if med - (3*sd) < cnt and cnt <= med         ]
+    return ret
+
+############################################################################
+##
+## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+##
+############################################################################
+def glove(tok=None,words=0):
+    ret  = {}
+    # expecting that the corpus is already tokenized and integers are fit to the text
+    if not (tok == None or words <= const.BVAL):
+        # we will make each marginal distribution a function of uwrd words
+        uwrd = len(tok.word_index.keys())
+        if (0 < words and words < uwrd):
+            uwrd = words
+        # each marginal is defined by a set of constants in such a way that the inner product of one set of
+        # constants with another gives the probability of word-word co-occurrence of the words defining the marginals
+        #
+        # for our data files, we could compute similar numbers by fitting the texts to sequences of integers and
+        # first computing the probability of word1 co-occurrence word2 as the product of the number of times word1
+        # appears out of all words times number of times word2 appears out of all words in the corpus
+        #
+        # note that this leads to symmetry
+        #
+        # let's say that each row of the glove data file has N constants, preceded by an associated word so
+        # that our goal for the combined data files is to obtain N constants for each word, such that their
+        # mutual inner products result in the log probability that the words co-occur
+        #
+        # to get the N constants, take a unique lising of the words and the first word from the list and randomly
+        # generate N constants to associate with the first word ... then take the second word and randomly generate
+        # N-1 constants while choosing the last constants so that the dot product of both sets of constants gives
+        # the log probability of co-occurrence that was already computed ... then take the 3rd word and randomly
+        # generate N-2 constants while choosing the other 2 constants so that the dot products of this line and the
+        # previous 2 lines gives the associated 2 log probabilities of co-occurrence that were previously computed ...
+        # note that this is a system of 2 equations in 2 unknowns resulting in a unique solution or no solution ...
+        # continue in this fashion until all M <= N words have the needed constants ... if there are only M words, then
+        # we have the needed glove constants for our data files ... otherwise we can truncate our data set in the Tokenizer
+        # call by setting the argument "num_words=M" ... or we can simply use the constants and probabilities from the first
+        # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
+        # constants that work for the other N-M words that were left ... see the comments below for more insights
+        #
+        # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
+        # derived from the previous sets of constants that are back solved using linear systems theory
+        #
+        # dictionary for word counts
+        d    = dict(tok.word_counts.items())
+        # total number of appearances for all words
+        tot  = sum(tok.word_counts.values())
+        # start the process of generating glove marginals for the data set that's been tokenized
+        for word,ind in tok.word_index.items():
+            if ret == {}:
+                ret[word] = list(np.random.sample(uwrd))
+            else:
+                # current keys
+                keys      = ret.keys()
+                # current values
+                vals      = ret.values()
+                # current count of words in the dictionary
+                cnt       = len(keys)
+                # randomly generate all but cnt+1 values, as the rest are predetermined
+                ret[word] = list(np.random.sample(uwrd-(cnt+1)))
+                # extend the list of glove values for word after the random values
+                # with all values in the last column, between the 2nd row and next to current row
+                ret[word].extend(np.asarray(vals)[1:cnt,uwrd-1])
+                # append the final value which is determined as such, supposing uwrd = 3, giving a 3x3
+                # matrix of glove constants to be used for the weights of each marginal we have
+                # 
+                #               a   b   c
+                #               d   e   x1
+                #               f   x2  x3
+                # 
+                # where a,b,c,d,e,f are randomly generated and x1,x2,x3 are unknowns that have to be calculated
+                # so that the dot product of row1 with row2 gives the log probability of word-word co-occurrence
+                # of word1 with word2 and so on ... now let y1 and y2 denote the probability of word-word co-occurrence
+                # between row1 & row2 and row1 & row3, respectively, then we can formulate the set up
+                # 
+                #               a   b   c         a        a^2 + b^2 + c^2
+                #               d   e   x1   *    b    =       log y1
+                #               f   x2  x3        c            log y2
+                # 
+                # now we let log(y1) = z1, then we can solve for x1 = [z1-((a*d)+(b*e))]/c ... letting
+                # log(y2) = z2 and x2 = x1, we can solve for x3 = [z2-((d*f)+(e*x1))]/x1 ... this same setup
+                # generalizes to uwrd = n, for arbitrary n, with x2 being replaced by a vector of values previously
+                # computed (now in the last column of the matrix) between the first and current row ... the dot product
+                # of constants in the previous row together with the current row, not including computed values in the last column
+                # of each row, is subtracted from the log probability of word-word co-occurrence
+                #
+                # previous word
+                pword= keys[len(keys)-1]
+                # previous values
+                pvals= vals[len(keys)-1]
+                # count associated to previous word
+                pcnt = d[pword]
+                # count associated to current word
+                ccnt = d[word]
+                # compute log probability of word-word co-occurrence
+                lprob= (pcnt+ccnt)/pcnt
+                # compute the dot product of values from previous row with what's currently in ret[word] to get final value
+                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-2)],ret[word])
+                # compute the last value in this row of modeling constants for the marginals
+                lval = (lprob-dp)/pvals[len(pvals)-1]
+                # append the last value to the end of what's currently specified for this word
+                ret[word].append(lval)
+    return ret
+
+############################################################################
+##
 ## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
 ##           that will be used to extend a sparse data set of words
 ##
 ############################################################################
-def glove(docs=[],gdoc=None,splits=2,props=2):
+def extendglove(docs=[],gdoc=None,splits=2,props=2):
     model= None
     if not (len(docs) == 0 or gdoc == None):
         if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
@@ -620,12 +790,6 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             tok  = Tokenizer()
             # tokenize the data
             tok.fit_on_texts(txts)
-            # generate sequences of integers from the texts
-            seqs = tok.texts_to_sequences(txts)
-            # the sequences will be of different lengths because the original docs
-            # were almost surely of different lengths ... so pad the sequences, which
-            # essentially appends the sequences together and tries to produce a square matrix
-            pdat = pad_sequences(seqs)[0]
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
@@ -642,9 +806,11 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             # another line, we get the log of the probability that the second word appears in word-word
             # co-occurrence relationship with the first
             #
-            # for our data files, we could compute similar numbers using pdat by first computing the probability of word1
-            # co-occurrence word2 as the product of the number of times word1 appears out of all words times
-            # number of times word2 appears out of all words in the corpus ... note that this leads to symmetry
+            # for our data files, we could compute similar numbers by fitting the texts to sequences of integers and
+            # first computing the probability of word1 co-occurrence word2 as the product of the number of times word1
+            # appears out of all words times number of times word2 appears out of all words in the corpus
+            #
+            # note that this leads to symmetry
             #
             # let's say that each row of the glove data file has N constants, preceded by an associated word so
             # that our goal for the combined data files is to obtain N constants for each word, such that their
@@ -662,6 +828,8 @@ def glove(docs=[],gdoc=None,splits=2,props=2):
             # call by setting the argument "num_words=M" ... or we can simply use the constants and probabilities from the first
             # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
             # constants that work for the other N-M words that were left ... see the comments below for more insights
+            #
+            # see the glove function above
             #
             # instead, we will just rely upon the fact that the words that do appear in both our corpus and the glove data
             # carry information about those words that only appear in our corpus so that the average model being returned
@@ -753,8 +921,12 @@ def ai_testing(M=500,N=2):
     o    = ocr(["files/kg.pdf"],0)
     print(o)
     # test glove output
-    g    = glove(["README.txt","README.txt"],"data/glove.6B.50d.txt")
-    #print(g)
+    g    = extendglove(["README.txt","README.txt"],"data/glove.6B.50d.txt")
+    leng = len(g)
+    if leng <= 1000:
+        print(g)
+    else:
+        print("GloVe: "+str(leng))
     print(permute(range(0,len(ivals[0]))))
     print(brain(ivals))
     imgs = convert_from_path("files/kg.pdf")
