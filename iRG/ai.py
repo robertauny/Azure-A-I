@@ -648,8 +648,8 @@ def blocks(tok=None):
         #
         # word counts
         cnts       = tok.word_counts.items()
-        keys       = cnts.keys()
-        vals       = cnts.values()
+        keys       = dict(cnts).keys()
+        vals       = dict(cnts).values()
         # median of the counts
         med        = np.median(vals)
         # pseudo squared error
@@ -718,17 +718,13 @@ def glove(tok=None,words=0):
             if ret == {}:
                 ret[word] = list(np.random.sample(uwrd))
             else:
-                # current keys
-                keys      = ret.keys()
-                # current values
-                vals      = ret.values()
-                # current count of words in the dictionary
-                cnt       = len(keys)
                 # randomly generate all but cnt+1 values, as the rest are predetermined
-                ret[word] = list(np.random.sample(uwrd-(cnt+1)))
+                #
+                # note that new entries into the dictionary will be first
+                ret[word] = list(np.random.sample(uwrd-cnt))
                 # extend the list of glove values for word after the random values
                 # with all values in the last column, between the 2nd row and next to current row
-                ret[word].extend(np.asarray(vals)[1:cnt,uwrd-1])
+                ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
                 # append the final value which is determined as such, supposing uwrd = 3, giving a 3x3
                 # matrix of glove constants to be used for the weights of each marginal we have
                 # 
@@ -752,10 +748,10 @@ def glove(tok=None,words=0):
                 # of constants in the previous row together with the current row, not including computed values in the last column
                 # of each row, is subtracted from the log probability of word-word co-occurrence
                 #
-                # previous word
-                pword= keys[len(keys)-1]
-                # previous values
-                pvals= vals[len(keys)-1]
+                # previous word, which will be in the first position, as keys does not contain the present word
+                pword= keys[0]
+                # previous values, which will be in the first position, as values does not contain the present values
+                pvals= vals[0]
                 # count associated to previous word
                 pcnt = d[pword]
                 # count associated to current word
@@ -763,11 +759,25 @@ def glove(tok=None,words=0):
                 # compute log probability of word-word co-occurrence
                 lprob= np.log((pcnt+ccnt)/pcnt)
                 # compute the dot product of values from previous row with what's currently in ret[word] to get final value
-                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-2)],ret[word])
+                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-1)],np.asarray(ret[word])[range(0,len(ret[word]))])
                 # compute the last value in this row of modeling constants for the marginals
                 lval = (lprob-dp)/pvals[len(pvals)-1]
                 # append the last value to the end of what's currently specified for this word
                 ret[word].append(lval)
+            # current keys
+            keys = np.asarray(ret.keys())
+            # current values
+            vals = np.asarray(ret.values())
+            # current count of words in the dictionary
+            #
+            # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
+            cnt  = len(keys)
+            if uwrd < len(tok.word_index.keys()):
+                ncnt = cnt % uwrd
+                if not (ncnt == 0):
+                    cnt  = ncnt
+                else:
+                    cnt  = 1
     return ret
 
 ############################################################################
