@@ -1025,9 +1025,9 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # of code that may be hiding the cyber security vulnerability and run the blocks through the predictor
             #
             # sequences associated to the identified code blocks that potentially house code vulnerabilities
-            bseq = [[i for word,i in items if word in blks["bot"]]]
+            bseq = [[i for word,i in items if word in blks[blk]] for blk in blks.keys()]
             # pad the sequences so that they are in a form that can be passed to the model, i.e. a number of uwrd rows
-            pseq = np.asarray(pad_sequences(bseq,uwrd)[0]).reshape((1,uwrd))
+            pseq = np.asarray(pad_sequences(bseq,uwrd)).reshape((len(bseq),uwrd))
             # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
             # conditional specification whose elements are the marginals defined by the modeling constants in gmat ... the
             # global is captured in "model" ... if we use model and pass a sequence of constants generated from one of the
