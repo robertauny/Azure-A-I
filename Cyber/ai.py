@@ -1052,15 +1052,25 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                 ngram= uwrd
             # obtain the n-grams of words for each row of the padded sequences
             #ret  = np.asarray([[" "]*ngram]*len(preds))
-            ret  = [list()] * len(preds)
+            ret  = [dict()] * len(preds)
             for i in range(0,len(preds)):
-                # the current prediction row
+                # the current prediction row containing probabilities of each word in the wrds length list of words
                 prow   = preds[i]
-                # sort the current row in ascending order to get the lowest to highest values
-                srow   = np.sort(prow)
                 # capture those values that correspond to the lowest probability n-gram
-                ret[i] = [keys[j] for j in range(0,len(prow)) if prow[j] in srow[range(0,ngram)]]
-    return ret
+                #
+                # out of the top wrds words we are getting the least probable n-grams
+                #
+                # new element of the dictionary of n-grams
+                lp     = len(prow)
+                if lp > ngram:
+                    ret[i] = {
+                        "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
+                        np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
+                        for k in range(0,lp-(ngram-1))
+                             }
+                else:
+                    ret[i] = {"-".join(keys):np.asarray(prow).prod()}
+    return np.unique(ret)
 
 # *************** TESTING *****************
 
