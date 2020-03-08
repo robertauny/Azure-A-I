@@ -901,16 +901,34 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 ivals= np.asarray(gmat.values())
                 # create the model using the inputs
                 model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
-                # for all words that don't appear in the glove data, just take the mean of the glove data for words that appear in
+                # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
                 # the corpus ... these words (and by extension, their values) carry information about the words that don't appear
                 # in the glove data ... the mean will carry all information about these words as well
-                mvals= np.mean(ivals,axis=0).reshape((1,len(ivals[0])))
+                #
+                # the commented code to do this follows
+                #
+                #mvals= np.mean(ivals,axis=0).reshape((1,len(ivals[0])))
                 # get the values associated with the mean
-                mmat = model.predict(mvals)
+                #mmat = model.predict(mvals)
                 # add to our glove dictionary all words that appear in the corpus but not currently in the dictionary
+                #for word,i in tok.word_index.items():
+                    #if not (word in gmat.keys()):
+                        #gdat[word] = mmat
+                # however, we will instead generate a glove data set for these words, then use the global distribution (random field),
+                # found from values of elements in the conditional specification associated to words that do appear in the corpus,
+                # to predict the generated glove data set
+                #
+                # recall that the global distribution carries information about its marginals so that certain inputs will give a word
+                # used to define an element of its conditional specification ... i.e. we get the values of the glove data set used
+                # to build the global distribution ... this is exactly what we want ... start with a generated glove data set and
+                # map this data set to elements of the conditional specification used to the build the global
+                #
+                # generate the glove data set
+                gd   = glove(tok,clust+1)
+                # predict the right values and add them to the output
                 for word,i in tok.word_index.items():
                     if not (word in gmat.keys()):
-                        gdat[word] = mmat
+                        gdat[word] = model.predict(np.reshape(gd[word],(1,clust+1)))
     return gdat
 
 # *************** TESTING *****************
@@ -927,10 +945,10 @@ def ai_testing(M=500,N=2):
     #ivals= np.random.sample(size=(500,3))
     ivals= np.random.sample(size=(m,p))
     # test ocr
-    o    = ocr(["files/kg.pdf"],0)
+    o    = ocr(["/home/robert/data/files/kg.pdf"],0)
     print(o)
     # test glove output
-    g    = extendglove(["README.txt","README.txt"],"data/glove.6B.50d.txt")
+    g    = extendglove(["README.txt","README.txt"],"/home/robert/data/glove.6B.50d.txt")
     leng = len(g)
     if leng <= 1000:
         print(g)
@@ -938,7 +956,7 @@ def ai_testing(M=500,N=2):
         print("GloVe: "+str(leng))
     print(permute(range(0,len(ivals[0]))))
     print(brain(ivals))
-    imgs = convert_from_path("files/kg.pdf")
+    imgs = convert_from_path("/home/robert/data/files/kg.pdf")
     print(imgs)
     for img in imgs:
         pil2 = pil2array(img)
