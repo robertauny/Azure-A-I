@@ -1063,6 +1063,19 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                 # new element of the dictionary of n-grams
                 lp     = len(prow)
                 if lp > ngram:
+                    # the idea is to first word in the list of wrds words and look at all other wrds-1 words to
+                    # find ones with the lowest probability of co-occurring with the present word, then join them
+                    # with an associated score that is the product probability measure
+                    #
+                    # we do the same with the next word in the list and find the words with lowest probability of co-occurrence
+                    #
+                    # we never consider the previous word when finding words with lowest probability of co-occurrence, because
+                    # the combination would have already been considered in the previous iteration
+                    #
+                    # we continue until there are ngram words left in the list and consider it last for addition to the list
+                    #
+                    # we continue until all sequences of predictions have been exhausted while noting that each
+                    # successive sequence is more important than the last, as we are getting deeper into code blocks
                     ret[i] = {
                         "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
                         np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
