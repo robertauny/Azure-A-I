@@ -1063,7 +1063,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                 # new element of the dictionary of n-grams
                 lp     = len(prow)
                 if lp > ngram:
-                    # the idea is to first word in the list of wrds words and look at all other wrds-1 words to
+                    # the idea is to take the first word in the list of wrds words and look at all other wrds-1 words to
                     # find ones with the lowest probability of co-occurring with the present word, then join them
                     # with an associated score that is the product probability measure
                     #
