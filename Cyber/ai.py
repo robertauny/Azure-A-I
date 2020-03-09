@@ -4,7 +4,7 @@
 ##
 ## File:      ai.py
 ##
-## Purpose:   Other A-I and machine learning functions needed for cyber security.
+## Purpose:   Other A-I and machine learning functions needed for iRG and cyber security.
 ##
 ## Parameter: N/A
 ##
@@ -466,7 +466,10 @@ def correction(dat=[]):
         ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
         pydat= np.asarray(ptdat)
         # we should sample at least as many data elements as there are clusters
-        ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
+        if len(ndat) > 1000:
+            ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
+        else:
+            ind  = range(0,len(ndat))
         # generate the model of the data for smoothing errors
         #
         # the idea is to smooth out the errors in the data set
