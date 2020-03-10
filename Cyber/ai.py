@@ -344,6 +344,202 @@ def numbers(dat=[],pre=0):
 
 ############################################################################
 ##
+## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+##
+############################################################################
+def glove(tok=None,words=0):
+    ret  = {}
+    # expecting that the corpus is already tokenized and integers are fit to the text
+    if not (tok == None or words <= const.BVAL):
+        # we will make each marginal distribution a function of uwrd words
+        uwrd = len(tok.word_index.keys())
+        if (0 < words and words < uwrd):
+            uwrd = words
+        # each marginal is defined by a set of constants in such a way that the inner product of one set of
+        # constants with another gives the probability of word-word co-occurrence of the words defining the marginals
+        #
+        # for our data files, we could compute similar numbers by fitting the texts to sequences of integers and
+        # first computing the probability of word1 co-occurrence word2 as the product of the number of times word1
+        # appears out of all words times number of times word2 appears out of all words in the corpus
+        #
+        # note that this leads to symmetry
+        #
+        # let's say that each row of the glove data file has N constants, preceded by an associated word so
+        # that our goal for the combined data files is to obtain N constants for each word, such that their
+        # mutual inner products result in the log probability that the words co-occur
+        #
+        # to get the N constants, take a unique lising of the words and the first word from the list and randomly
+        # generate N constants to associate with the first word ... then take the second word and randomly generate
+        # N-1 constants while choosing the last constants so that the dot product of both sets of constants gives
+        # the log probability of co-occurrence that was already computed ... then take the 3rd word and randomly
+        # generate N-2 constants while choosing the other 2 constants so that the dot products of this line and the
+        # previous 2 lines gives the associated 2 log probabilities of co-occurrence that were previously computed ...
+        # note that this is a system of 2 equations in 2 unknowns resulting in a unique solution or no solution ...
+        # continue in this fashion until all M <= N words have the needed constants ... if there are only M words, then
+        # we have the needed glove constants for our data files ... otherwise we can truncate our data set in the Tokenizer
+        # call by setting the argument "num_words=M" ... or we can simply use the constants and probabilities from the first
+        # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
+        # constants that work for the other N-M words that were left ... see the comments below for more insights
+        #
+        # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
+        # derived from the previous sets of constants that are back solved using linear systems theory
+        #
+        # dictionary for word counts
+        d    = dict(tok.word_counts.items())
+        # total number of appearances for all words
+        tot  = sum(tok.word_counts.values())
+        # start the process of generating glove marginals for the data set that's been tokenized
+        for word,ind in tok.word_index.items():
+            if ret == {}:
+                ret[word] = list(np.random.sample(uwrd))
+            else:
+                # randomly generate all but cnt+1 values, as the rest are predetermined
+                #
+                # note that new entries into the dictionary will be first
+                ret[word] = list(np.random.sample(uwrd-cnt))
+                # extend the list of glove values for word after the random values
+                # with all values in the last column, between the 2nd row and next to current row
+                ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
+                # append the final value which is determined as such, supposing uwrd = 3, giving a 3x3
+                # matrix of glove constants to be used for the weights of each marginal we have
+                # 
+                #               a   b   c
+                #               d   e   x1
+                #               f   x2  x3
+                # 
+                # where a,b,c,d,e,f are randomly generated and x1,x2,x3 are unknowns that have to be calculated
+                # so that the dot product of row1 with row2 gives the log probability of word-word co-occurrence
+                # of word1 with word2 and so on ... now let y1 and y2 denote the probability of word-word co-occurrence
+                # between row1 & row2 and row1 & row3, respectively, then we can formulate the set up
+                # 
+                #               a   b   c         a        a^2 + b^2 + c^2
+                #               d   e   x1   *    b    =       log y1
+                #               f   x2  x3        c            log y2
+                # 
+                # now we let log(y1) = z1, then we can solve for x1 = [z1-((a*d)+(b*e))]/c ... letting
+                # log(y2) = z2 and x2 = x1, we can solve for x3 = [z2-((d*f)+(e*x1))]/x1 ... this same setup
+                # generalizes to uwrd = n, for arbitrary n, with x2 being replaced by a vector of values previously
+                # computed (now in the last column of the matrix) between the first and current row ... the dot product
+                # of constants in the previous row together with the current row, not including computed values in the last column
+                # of each row, is subtracted from the log probability of word-word co-occurrence
+                #
+                # previous word, which will be in the first position, as keys does not contain the present word
+                pword= keys[0]
+                # previous values, which will be in the first position, as values does not contain the present values
+                pvals= vals[0]
+                # count associated to previous word
+                pcnt = d[pword]
+                # count associated to current word
+                ccnt = d[word]
+                # compute log probability of word-word co-occurrence
+                lprob= np.log((pcnt+ccnt)/pcnt)
+                # compute the dot product of values from previous row with what's currently in ret[word] to get final value
+                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-1)],np.asarray(ret[word])[range(0,len(ret[word]))])
+                # compute the last value in this row of modeling constants for the marginals
+                lval = (lprob-dp)/pvals[len(pvals)-1]
+                # append the last value to the end of what's currently specified for this word
+                ret[word].append(lval)
+            # current keys
+            keys = np.asarray(ret.keys())
+            # current values
+            vals = np.asarray(ret.values())
+            # current count of words in the dictionary
+            #
+            # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
+            cnt  = len(keys)
+            ncnt = cnt % uwrd
+            if not (ncnt == 0):
+                cnt  = ncnt
+            else:
+                cnt  = 1
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by whole words)
+##
+############################################################################
+def glovemost(dat=[]):
+    ret  = None
+    sz   = len(dat)
+    # need at least 2 rows for the modeling
+    if not (sz <= 1):
+        s    = 2
+        # we want to find the value p such that s**(2*p) gives the same number
+        # of potential clusters as there are found in glove, as indicated by the number of constants
+        # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
+        p    = 2
+        # recall that the global distribution carries information about its marginals so that certain inputs will give a word
+        # used to define an element of its conditional specification ... i.e. we get the values of the glove data set used
+        # to build the global distribution ... this is exactly what we want ... start with a generated glove data set and
+        # map this data set to elements of the conditional specification used to the build the global
+        #
+        # generate a "corpus" from the data that is passed in dat
+        #
+        # instantiate a default Tokenizer object without limiting the number of tokens
+        tok  = Tokenizer()
+        # create "texts" from the data
+        txts = [word.translate(None,punctuation).replace(" ","").lower() for word in dat]
+        # tokenize the data
+        tok.fit_on_texts(txts)
+        # tokenized keys and values with values corresponding to key rank in the corpus
+        items= np.asarray(tok.word_index.items())
+        # get the glove keys and values
+        keys = items[:,0]
+        # number of clusters is same as the default defined by the splits and properties
+        clust= len(keys)
+        # must have more than one key, otherwise just return the one key
+        if not (clust == 1):
+            # generate the glove data set
+            gd   = glove(tok,clust)
+            # we need values to turn into labels when training
+            # one-hot encode the integer labels as its required for the softmax
+            #
+            # the goal is to build a model with clust=clust outputs such that when clust inputs are passed in, we get a
+            # word in the glove data set associated to the clust constants ... furthermore, when the model constants are
+            # used in dot product with the constants of any word from the glove data set, we get the average log probability
+            # of the word from glove with any other arbitrary word from glove
+            # 
+            # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
+            # can consist of one unique value for each row of constants
+            #
+            # input values to the model are the values associated to the words that appear in our corpus
+            vals = np.asarray(gd.values())
+            pseq = pad_sequences(vals,clust)
+            ivals= np.asarray(pseq).reshape((len(vals),clust))
+            # generate the output values
+            ukeys= {x:i for i,x in enumerate(np.unique(keys))}
+            ovals= to_categorical([ukeys[word] for word in keys],num_classes=clust)
+            # create the model using the inputs and outputs
+            model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
+            # after generating the model, we should have a set of constants (weights) that number the same as those
+            # in the glove data file ... since we predict the word when using the associated constants of a word in the glove
+            # data file, then we only need for the dot product of the constants from the model with those of the
+            # constants in the data files to give us the log of the probability of the word-word co-occurrence
+            #
+            # however, the realizing distribution is a model of all words that gives you one particular word, when
+            # a certain set of constants are used as inputs ... thus we can use the output of the model as the
+            # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
+            # of any arbitrary word in the glove data set when dot product with the constants associated to another word
+            #
+            # in addition, we can predict any word, using its values, simply by supplying them as input to the model
+            # and finding the word that corresponds to the most probable entry in the return, as indicated by
+            # the highest value in the set of constants ... this is the word that we will return
+            #
+            # sample one word, get the prediction and return the word associated to the highest value
+            nvals= np.asarray(gd[keys[np.random.randint(0,clust)]]).reshape((1,clust))
+            preds= model.predict(nvals)
+            ret  = [word for word in dat if word.translate(None,punctuation).replace(" ","").lower() == \
+                                            keys[[i for i,val in enumerate(preds[0]) if val == max(preds[0])]][0]][0]
+        else:
+            ret  = keys[0]
+    else:
+        if not (sz == 0):
+            ret  = dat[0]
+    return ret
+
+############################################################################
+##
 ## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
@@ -415,14 +611,17 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
-        # change this to use all 3 predictions combined someway
-        mdat = mostly(dat,rdat,cols,preds,pre)
+        # change this to use all 4 predictions combined someway
+        mdat = glovemost(dat)
         ret  = "".join(mdat).lstrip()
         if not (ret in dat):
-            mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+            mdat = mostly(dat,rdat,cols,preds,pre)
             ret  = "".join(mdat).lstrip()
             if not (ret in dat):
-                ret  = almost(dat)
+                mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+                ret  = "".join(mdat).lstrip()
+                if not (ret in dat):
+                    ret  = almost(dat)
     return ret
 
 ############################################################################
@@ -430,7 +629,7 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
 ## Purpose:   Use DBN to correct a list of corrupt or misclassified strings
 ##
 ############################################################################
-def correction(dat=[]):
+def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
     ret  = None
     sz   = len(dat)
     if not (sz == 0):
@@ -455,7 +654,6 @@ def correction(dat=[]):
         cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
         # lower bound on the number of clusters to seek has to be >= 2 as at least one error is assumed
         #lo   = len(np.unique(cdat))
-        lo   = 2
         # calculate the means of each column, as we will use permutations of subsets of all columns
         # and the mean in those columns that are not included in the permutation to test if entropy
         # is increased or decreased as a result ... idea is to find the permutation of columns
@@ -466,8 +664,8 @@ def correction(dat=[]):
         ptdat= [sum(x)/(len(x)*max(x)) for x in pdat]
         pydat= np.asarray(ptdat)
         # we should sample at least as many data elements as there are clusters
-        if len(ndat) > 1000:
-            ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(0.1*len(ndat)))))]
+        if len(ndat) > mval:
+            ind  = [np.random.randint(0,len(ndat)) for i in range(0,max(lo,int(ceil(pcnt*len(ndat)))))]
         else:
             ind  = range(0,len(ndat))
         # generate the model of the data for smoothing errors
@@ -668,118 +866,6 @@ def blocks(tok=None):
         ret["mid"] = [word for word,cnt in cnts if med - (4*sd) < cnt and cnt <= med - (3*sd)]
         # attempt to identify what's inside the blocks
         ret["bot"] = [word for word,cnt in cnts if med - (3*sd) < cnt and cnt <= med         ]
-    return ret
-
-############################################################################
-##
-## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
-##
-############################################################################
-def glove(tok=None,words=0):
-    ret  = {}
-    # expecting that the corpus is already tokenized and integers are fit to the text
-    if not (tok == None or words <= const.BVAL):
-        # we will make each marginal distribution a function of uwrd words
-        uwrd = len(tok.word_index.keys())
-        if (0 < words and words < uwrd):
-            uwrd = words
-        # each marginal is defined by a set of constants in such a way that the inner product of one set of
-        # constants with another gives the probability of word-word co-occurrence of the words defining the marginals
-        #
-        # for our data files, we could compute similar numbers by fitting the texts to sequences of integers and
-        # first computing the probability of word1 co-occurrence word2 as the product of the number of times word1
-        # appears out of all words times number of times word2 appears out of all words in the corpus
-        #
-        # note that this leads to symmetry
-        #
-        # let's say that each row of the glove data file has N constants, preceded by an associated word so
-        # that our goal for the combined data files is to obtain N constants for each word, such that their
-        # mutual inner products result in the log probability that the words co-occur
-        #
-        # to get the N constants, take a unique lising of the words and the first word from the list and randomly
-        # generate N constants to associate with the first word ... then take the second word and randomly generate
-        # N-1 constants while choosing the last constants so that the dot product of both sets of constants gives
-        # the log probability of co-occurrence that was already computed ... then take the 3rd word and randomly
-        # generate N-2 constants while choosing the other 2 constants so that the dot products of this line and the
-        # previous 2 lines gives the associated 2 log probabilities of co-occurrence that were previously computed ...
-        # note that this is a system of 2 equations in 2 unknowns resulting in a unique solution or no solution ...
-        # continue in this fashion until all M <= N words have the needed constants ... if there are only M words, then
-        # we have the needed glove constants for our data files ... otherwise we can truncate our data set in the Tokenizer
-        # call by setting the argument "num_words=M" ... or we can simply use the constants and probabilities from the first
-        # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
-        # constants that work for the other N-M words that were left ... see the comments below for more insights
-        #
-        # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
-        # derived from the previous sets of constants that are back solved using linear systems theory
-        #
-        # dictionary for word counts
-        d    = dict(tok.word_counts.items())
-        # total number of appearances for all words
-        tot  = sum(tok.word_counts.values())
-        # start the process of generating glove marginals for the data set that's been tokenized
-        for word,ind in tok.word_index.items():
-            if ret == {}:
-                ret[word] = list(np.random.sample(uwrd))
-            else:
-                # randomly generate all but cnt+1 values, as the rest are predetermined
-                #
-                # note that new entries into the dictionary will be first
-                ret[word] = list(np.random.sample(uwrd-cnt))
-                # extend the list of glove values for word after the random values
-                # with all values in the last column, between the 2nd row and next to current row
-                ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
-                # append the final value which is determined as such, supposing uwrd = 3, giving a 3x3
-                # matrix of glove constants to be used for the weights of each marginal we have
-                # 
-                #               a   b   c
-                #               d   e   x1
-                #               f   x2  x3
-                # 
-                # where a,b,c,d,e,f are randomly generated and x1,x2,x3 are unknowns that have to be calculated
-                # so that the dot product of row1 with row2 gives the log probability of word-word co-occurrence
-                # of word1 with word2 and so on ... now let y1 and y2 denote the probability of word-word co-occurrence
-                # between row1 & row2 and row1 & row3, respectively, then we can formulate the set up
-                # 
-                #               a   b   c         a        a^2 + b^2 + c^2
-                #               d   e   x1   *    b    =       log y1
-                #               f   x2  x3        c            log y2
-                # 
-                # now we let log(y1) = z1, then we can solve for x1 = [z1-((a*d)+(b*e))]/c ... letting
-                # log(y2) = z2 and x2 = x1, we can solve for x3 = [z2-((d*f)+(e*x1))]/x1 ... this same setup
-                # generalizes to uwrd = n, for arbitrary n, with x2 being replaced by a vector of values previously
-                # computed (now in the last column of the matrix) between the first and current row ... the dot product
-                # of constants in the previous row together with the current row, not including computed values in the last column
-                # of each row, is subtracted from the log probability of word-word co-occurrence
-                #
-                # previous word, which will be in the first position, as keys does not contain the present word
-                pword= keys[0]
-                # previous values, which will be in the first position, as values does not contain the present values
-                pvals= vals[0]
-                # count associated to previous word
-                pcnt = d[pword]
-                # count associated to current word
-                ccnt = d[word]
-                # compute log probability of word-word co-occurrence
-                lprob= np.log((pcnt+ccnt)/pcnt)
-                # compute the dot product of values from previous row with what's currently in ret[word] to get final value
-                dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-1)],np.asarray(ret[word])[range(0,len(ret[word]))])
-                # compute the last value in this row of modeling constants for the marginals
-                lval = (lprob-dp)/pvals[len(pvals)-1]
-                # append the last value to the end of what's currently specified for this word
-                ret[word].append(lval)
-            # current keys
-            keys = np.asarray(ret.keys())
-            # current values
-            vals = np.asarray(ret.values())
-            # current count of words in the dictionary
-            #
-            # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
-            cnt  = len(keys)
-            ncnt = cnt % uwrd
-            if not (ncnt == 0):
-                cnt  = ncnt
-            else:
-                cnt  = 1
     return ret
 
 ############################################################################
