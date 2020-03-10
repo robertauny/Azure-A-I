@@ -459,6 +459,17 @@ def glove(tok=None,words=0):
 ## Purpose:   Which string in a list appears most (by whole words)
 ##
 ############################################################################
+def almost(dat=[]):
+    ret  = None
+    if not (len(dat) == 0):
+        ret  = max(set(dat),key=dat.count)
+    return ret
+
+############################################################################
+##
+## Purpose:   Which string in a list appears most (by whole words)
+##
+############################################################################
 def glovemost(dat=[]):
     ret  = None
     sz   = len(dat)
@@ -504,9 +515,7 @@ def glovemost(dat=[]):
             # can consist of one unique value for each row of constants
             #
             # input values to the model are the values associated to the words that appear in our corpus
-            vals = np.asarray(gd.values())
-            pseq = pad_sequences(vals,clust)
-            ivals= np.asarray(pseq).reshape((len(vals),clust))
+            ivals= np.asarray(gd.values())
             # generate the output values
             ukeys= {x:i for i,x in enumerate(np.unique(keys))}
             ovals= to_categorical([ukeys[word] for word in keys],num_classes=clust)
@@ -527,10 +536,18 @@ def glovemost(dat=[]):
             # the highest value in the set of constants ... this is the word that we will return
             #
             # sample one word, get the prediction and return the word associated to the highest value
-            nvals= np.asarray(gd[keys[np.random.randint(0,clust)]]).reshape((1,clust))
+            nvals= np.asarray([gd[key] for key in keys]).reshape((clust,clust))
             preds= model.predict(nvals)
-            ret  = [word for word in dat if word.translate(None,punctuation).replace(" ","").lower() == \
-                                            keys[[i for i,val in enumerate(preds[0]) if val == max(preds[0])]][0]][0]
+            # for each prediction, we want to identify the word associated with the prediction
+            # where each prediction is a set of constants defining probabilities for each cluster
+            #
+            # we will return the most probable of all predictions
+            ret  = []
+            for row in preds:
+                ret.extend([word for word in dat if word.translate(None,punctuation).replace(" ","").lower() in \
+                                                    keys[[i for i,val in enumerate(row) if val == max(row)]]])
+            if not (len(ret) == 0):
+                ret  = almost(ret)
         else:
             ret  = keys[0]
     else:
@@ -588,17 +605,6 @@ def mostly(dat=[],rdat=[],cols=[],preds=[],pre=0):
 
 ############################################################################
 ##
-## Purpose:   Which string in a list appears most (by whole words)
-##
-############################################################################
-def almost(dat=[]):
-    ret  = None
-    if not (len(dat) == 0):
-        ret  = max(set(dat),key=dat.count)
-    return ret
-
-############################################################################
-##
 ## Purpose:   Which string in a list appears most (by character)
 ##
 ############################################################################
@@ -608,20 +614,29 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
     if not (sz == 0 or pre < 0):
         # number of cpu cores
         nc   = mp.cpu_count()
+        # change this to use all 4 predictions combined someway
+        mret = []
+        # glovemost return
+        mdat = glovemost(dat)
+        if (mdat in dat):
+            mret.append(mdat)
+        # mostly return
+        mdat = mostly(dat,rdat,cols,preds,pre)
+        mdat = "".join(mdat).lstrip()
+        if (mdat in dat):
+            mret.append(mdat)
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
-        # change this to use all 4 predictions combined someway
-        mdat = glovemost(dat)
-        ret  = "".join(mdat).lstrip()
-        if not (ret in dat):
-            mdat = mostly(dat,rdat,cols,preds,pre)
-            ret  = "".join(mdat).lstrip()
-            if not (ret in dat):
-                mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-                ret  = "".join(mdat).lstrip()
-                if not (ret in dat):
-                    ret  = almost(dat)
+        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+        mdat = "".join(mdat).lstrip()
+        if (mdat in dat):
+            mret.append(mdat)
+        # which is most of the 3 returns or choose the most of all the original data
+        if not (len(mret) == 0):
+            ret  = almost(mret)
+        else:
+            ret  = almost(dat )
     return ret
 
 ############################################################################
