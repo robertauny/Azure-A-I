@@ -614,29 +614,19 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
     if not (sz == 0 or pre < 0):
         # number of cpu cores
         nc   = mp.cpu_count()
-        # change this to use all 4 predictions combined someway
-        mret = []
-        # glovemost return
-        mdat = glovemost(dat)
-        if (mdat in dat):
-            mret.append(mdat)
-        # mostly return
-        mdat = mostly(dat,rdat,cols,preds,pre)
-        mdat = "".join(mdat).lstrip()
-        if (mdat in dat):
-            mret.append(mdat)
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
-        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-        mdat = "".join(mdat).lstrip()
-        if (mdat in dat):
-            mret.append(mdat)
-        # which is most of the 3 returns or choose the most of all the original data
-        if not (len(mret) == 0):
-            ret  = almost(mret)
-        else:
-            ret  = almost(dat )
+        # change this to use all 4 predictions combined someway
+        mdat = mostly(dat,rdat,cols,preds,pre)
+        ret  = "".join(mdat).lstrip()
+        if not (ret in dat):
+            mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+            ret  = "".join(mdat).lstrip()
+            if not (ret in dat):
+                ret  = glovemost(dat)
+                if not (ret in dat):
+                    ret  = almost(dat)
     return ret
 
 ############################################################################
@@ -881,6 +871,8 @@ def blocks(tok=None):
         ret["mid"] = [word for word,cnt in cnts if med - (4*sd) < cnt and cnt <= med - (3*sd)]
         # attempt to identify what's inside the blocks
         ret["bot"] = [word for word,cnt in cnts if med - (3*sd) < cnt and cnt <= med         ]
+        # everything else
+        ret["ete"] = [word for word,cnt in cnts if                        cnt >  med         ]
     return ret
 
 ############################################################################
@@ -1079,15 +1071,19 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
         gdat = glove(tok,uwrd)
         # tokenized items
         items= tok.word_index.items()
+        # length of keys
+        lk   = len(items)
         # the top uwrd words in the corpus
         wrds = [i for i,item in enumerate(items) if item[1] in range(1,uwrd+1)]
         # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
         gmat = {word:gdat[word] for word in np.asarray(items)[wrds,0]}
         if not (gmat == {}):
+            # keys
             keys = gmat.keys()
+            # values
             vals = gmat.values()
             # number of clusters is different than the default defined by the splits and properties
-            clust= len(gmat[keys[0]])
+            clust= uwrd
             #
             s    = splits
             # we want to find the value p such that s**(2*p) gives the same number
@@ -1105,7 +1101,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
             # can consist of one unique value for each row of constants
             #ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
-            ovals= to_categorical([i-1 for word,i in items if word in keys],num_classes=clust)
+            ovals= to_categorical([i%len(keys) for word,i in items if word in keys],num_classes=clust)
             # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
             # of a plane ... i.e. each row of constants defines an element of a conditional specification
             #
@@ -1147,9 +1143,10 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # of code that may be hiding the cyber security vulnerability and run the blocks through the predictor
             #
             # sequences associated to the identified code blocks that potentially house code vulnerabilities
-            bseq = [[i for word,i in items if word in blks[blk]] for blk in blks.keys()]
-            # pad the sequences so that they are in a form that can be passed to the model, i.e. a number of uwrd rows
-            pseq = np.asarray(pad_sequences(bseq,uwrd)).reshape((len(bseq),uwrd))
+            #bseq = [[ivals[i] for i,word in enumerate(keys) if word in blks[blk]] for blk in blks.keys()]
+            bseq = [ivals[i] for i,word in enumerate(keys) if word in blks[blks.keys()[len(blks)-1]]]
+            # sequences are in a form that can be passed to the model ... take the median
+            pseq = np.median(np.asarray(bseq),axis=0).reshape((1,clust))
             # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
             # conditional specification whose elements are the marginals defined by the modeling constants in gmat ... the
             # global is captured in "model" ... if we use model and pass a sequence of constants generated from one of the
@@ -1166,45 +1163,46 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             # after forming the n-grams, one for each row of input data from the padded sequences, we can search the original
             # tokenized corpus for these low probability sequences and note their locations
             #
-            # predict the sequences in the blocks
-            preds= model.predict(pseq)
             # n-gram length should not be longer than uwrd
             ngram= ngrams
             if ngram > uwrd:
                 ngram= uwrd
-            # obtain the n-grams of words for each row of the padded sequences
-            #ret  = np.asarray([[" "]*ngram]*len(preds))
-            ret  = [dict()] * len(preds)
-            for i in range(0,len(preds)):
-                # the current prediction row containing probabilities of each word in the wrds length list of words
-                prow   = preds[i]
-                # capture those values that correspond to the lowest probability n-gram
-                #
-                # out of the top wrds words we are getting the least probable n-grams
-                #
-                # new element of the dictionary of n-grams
-                lp     = len(prow)
-                if lp > ngram:
-                    # the idea is to take the first word in the list of wrds words and look at all other wrds-1 words to
-                    # find ones with the lowest probability of co-occurring with the present word, then join them
-                    # with an associated score that is the product probability measure
+            # predict the median sequence in the blocks
+            if not (len(pseq) == 0):
+                preds= model.predict(np.asarray(pseq))
+                # obtain the n-grams of words for each row of the padded sequences
+                #ret  = np.asarray([[" "]*ngram]*len(preds))
+                ret  = [dict()] * len(preds)
+                for i in range(0,len(preds)):
+                    # the current prediction row containing probabilities of each word in the wrds length list of words
+                    prow   = preds[i]
+                    # capture those values that correspond to the lowest probability n-gram
                     #
-                    # we do the same with the next word in the list and find the words with lowest probability of co-occurrence
+                    # out of the top wrds words we are getting the least probable n-grams
                     #
-                    # we never consider the previous word when finding words with lowest probability of co-occurrence, because
-                    # the combination would have already been considered in the previous iteration
-                    #
-                    # we continue until there are ngram words left in the list and consider it last for addition to the list
-                    #
-                    # we continue until all sequences of predictions have been exhausted while noting that each
-                    # successive sequence is more important than the last, as we are getting deeper into code blocks
-                    ret[i] = {
-                        "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
-                        np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
-                        for k in range(0,lp-(ngram-1))
-                             }
-                else:
-                    ret[i] = {"-".join(keys):np.asarray(prow).prod()}
+                    # new element of the dictionary of n-grams
+                    lp     = len(prow)
+                    if lp > ngram:
+                        # the idea is to take the first word in the list of wrds words and look at all other wrds-1 words to
+                        # find ones with the lowest probability of co-occurring with the present word, then join them
+                        # with an associated score that is the product probability measure
+                        #
+                        # we do the same with the next word in the list and find the words with lowest probability of co-occurrence
+                        #
+                        # we never consider the previous word when finding words with lowest probability of co-occurrence, because
+                        # the combination would have already been considered in the previous iteration
+                        #
+                        # we continue until there are ngram words left in the list and consider it last for addition to the list
+                        #
+                        # we continue until all sequences of predictions have been exhausted while noting that each
+                        # successive sequence is more important than the last, as we are getting deeper into code blocks
+                        ret[i] = {
+                            "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
+                            np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
+                            for k in range(0,lp-(ngram-1))
+                                 }
+                    else:
+                        ret[i] = {"-".join(keys):np.asarray(prow).prod()}
     return np.unique(ret)
 
 # *************** TESTING *****************
