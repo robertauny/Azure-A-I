@@ -614,29 +614,19 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
     if not (sz == 0 or pre < 0):
         # number of cpu cores
         nc   = mp.cpu_count()
-        # change this to use all 4 predictions combined someway
-        mret = []
-        # glovemost return
-        mdat = glovemost(dat)
-        if (mdat in dat):
-            mret.append(mdat)
-        # mostly return
-        mdat = mostly(dat,rdat,cols,preds,pre)
-        mdat = "".join(mdat).lstrip()
-        if (mdat in dat):
-            mret.append(mdat)
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
-        mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-        mdat = "".join(mdat).lstrip()
-        if (mdat in dat):
-            mret.append(mdat)
-        # which is most of the 3 returns or choose the most of all the original data
-        if not (len(mret) == 0):
-            ret  = almost(mret)
-        else:
-            ret  = almost(dat )
+        # change this to use all 4 predictions combined someway
+        mdat = mostly(dat,rdat,cols,preds,pre)
+        ret  = "".join(mdat).lstrip()
+        if not (ret in dat):
+            mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+            ret  = "".join(mdat).lstrip()
+            if not (ret in dat):
+                ret  = glovemost(dat)
+                if not (ret in dat):
+                    ret  = almost(dat)
     return ret
 
 ############################################################################
@@ -881,6 +871,8 @@ def blocks(tok=None):
         ret["mid"] = [word for word,cnt in cnts if med - (4*sd) < cnt and cnt <= med - (3*sd)]
         # attempt to identify what's inside the blocks
         ret["bot"] = [word for word,cnt in cnts if med - (3*sd) < cnt and cnt <= med         ]
+        # everything else
+        ret["ete"] = [word for word,cnt in cnts if                        cnt >  med         ]
     return ret
 
 ############################################################################
