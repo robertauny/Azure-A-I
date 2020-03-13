@@ -18,6 +18,8 @@ from keras.layers import Dense, Dropout, Input, Embedding
 from keras.models import Sequential
 from keras.utils  import to_categorical
 
+from tensorflow   import set_random_seed
+
 import numpy as np
 import os
 
@@ -44,6 +46,8 @@ def dbn(inputs=[]
        ,verbose=0):
     model= None
     if inputs.any() and outputs.any():
+        # seed the random number generator for repeatable results
+        np.random.seed(12345)
         # linear stack of layers in the neural network (NN)
         model= Sequential()
         # add dense layers which are just densely connected typical artificial NN (ANN) layers

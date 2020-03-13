@@ -17,7 +17,7 @@
 from joblib                       import Parallel, delayed
 from itertools                    import combinations,combinations_with_replacement
 from string                       import punctuation
-from math                         import ceil, log
+from math                         import ceil, log, exp
 
 from keras.utils                  import to_categorical
 from keras.models                 import load_model
@@ -355,6 +355,28 @@ def glove(tok=None,words=0):
         uwrd = len(tok.word_index.keys())
         if (0 < words and words < uwrd):
             uwrd = words
+        # add the prior as the calculation of the probabilities of the top uwrd words
+        #
+        # calculation of the conditional specification elements carries all information about the distribution
+        #
+        # prior and the last element to make the dot products be the log probability of co-occurrence
+        probs= []
+        ditem= dict(tok.word_index.items())
+        items= [item for item in tok.word_counts.items() if ditem[item[0]] in range(1,uwrd+1)]
+        for i,item in enumerate(items):
+            # count associated to current word
+            ccnt = item[1]
+            # count associated to next word
+            if not (i == uwrd-1):
+                ncnt = items[i+1][1]
+                # compute log probability of word-word co-occurrence
+                lprob= np.log((ccnt+ncnt)/ccnt)
+            else:
+                # ensure that the last value is not zero, which necessarily means
+                # it will be one if all other values are zero
+                lprob= exp(max(probs))
+            # add the last value to the dictionary
+            probs.append(lprob)
         # each marginal is defined by a set of constants in such a way that the inner product of one set of
         # constants with another gives the probability of word-word co-occurrence of the words defining the marginals
         #
@@ -384,19 +406,17 @@ def glove(tok=None,words=0):
         # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
         # derived from the previous sets of constants that are back solved using linear systems theory
         #
-        # dictionary for word counts
-        d    = dict(tok.word_counts.items())
         # total number of appearances for all words
         tot  = sum(tok.word_counts.values())
         # start the process of generating glove marginals for the data set that's been tokenized
         for word,ind in tok.word_index.items():
             if ret == {}:
-                ret[word] = list(np.random.sample(uwrd))
+                ret[word] = probs
             else:
-                # randomly generate all but cnt+1 values, as the rest are predetermined
+                # use all but cnt+1 probs values, as the rest are predetermined
                 #
                 # note that new entries into the dictionary will be first
-                ret[word] = list(np.random.sample(uwrd-cnt))
+                ret[word] = probs[:uwrd-cnt]
                 # extend the list of glove values for word after the random values
                 # with all values in the last column, between the 2nd row and next to current row
                 ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
@@ -427,12 +447,8 @@ def glove(tok=None,words=0):
                 pword= keys[0]
                 # previous values, which will be in the first position, as values does not contain the present values
                 pvals= vals[0]
-                # count associated to previous word
-                pcnt = d[pword]
-                # count associated to current word
-                ccnt = d[word]
                 # compute log probability of word-word co-occurrence
-                lprob= np.log((pcnt+ccnt)/pcnt)
+                lprob= probs[cnt]
                 # compute the dot product of values from previous row with what's currently in ret[word] to get final value
                 dp   = np.dot(np.asarray(pvals)[range(0,len(pvals)-1)],np.asarray(ret[word])[range(0,len(ret[word]))])
                 # compute the last value in this row of modeling constants for the marginals
