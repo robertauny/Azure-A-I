@@ -1219,6 +1219,9 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                                  }
                     else:
                         ret[i] = {"-".join(keys):np.asarray(prow).prod()}
+                    rkeys  = np.asarray(ret[i].keys())
+                    rvals  = np.asarray(ret[i].values()) / max(ret[i].values())
+                    ret[i] = dict(np.transpose([rkeys,rvals]))
     return np.unique(ret)
 
 # *************** TESTING *****************
