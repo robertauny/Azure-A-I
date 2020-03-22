@@ -29,6 +29,8 @@ import numpy           as np
 
 sys.path.append('/home/robert/code/scripts/python/services')
 
+import constants       as const
+
 import ai
 
 ############################################################################
@@ -59,7 +61,7 @@ def corr(fl="/home/robert/data/food-inspections.csv",samp=100,cols=[4,5]):
 
 ############################################################################
 ##
-## Purpose:   For each column in the passed data set, attempt to correct errors.
+## Purpose:   Attempt to identify security vulnerabilities in software code
 ##
 ############################################################################
 def cs(docs=["/home/robert/data/java/test/test.java"]
@@ -67,5 +69,33 @@ def cs(docs=["/home/robert/data/java/test/test.java"]
       ,ngrams=3
       ,splits=2
       ,props=2):
-    # the corrections will be collected as rows so we need to return the transpose
+    # use custom glove, random fields and deep belief networks for the modeling
     return ai.cyberglove(docs,words,ngrams,splits,props)
+
+############################################################################
+##
+## Purpose:   For each column in the passed data set, attempt to correct errors.
+##
+############################################################################
+def kg(M=500,N=2,EV=const.E):
+    # number of data points and properties
+    m    = M
+    p    = N
+    if p > const.MAX_FEATURES:
+        p    = const.MAX_FEATURES
+    # define the number of splits of each property
+    s    = p
+    # uniformly sample values between 0 and 1
+    ivals= np.random.sample(size=(m,p))
+    # create the data for the sample knowledge graph
+    ret  = ai.create_kg(0,ivals,s)
+    # return the edges ... use the key const.V to return the vertices
+    return ret[EV]
+
+############################################################################
+##
+## Purpose:   For each column in the passed data set, attempt to correct errors.
+##
+############################################################################
+def ocr(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
+    return ai.ocr(pdfs,inst,testing)
