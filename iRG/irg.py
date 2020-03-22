@@ -15,13 +15,6 @@
 ##
 ############################################################################
 
-from keras.utils  import to_categorical
-from keras.models import load_model
-from joblib       import Parallel, delayed
-
-from pdf2image    import convert_from_bytes,convert_from_path
-from PIL          import Image
-
 import nn
 import ai
 import data
@@ -29,167 +22,8 @@ import constants as const
 
 import csv
 
-import multiprocessing as mp
-
 import numpy  as np
 import pandas as pd
-
-############################################################################
-##
-## Purpose:   Extend an array
-##
-############################################################################
-def extend(dat1=[],dat2=[]):
-    ret  = []
-    ret.append(dat1)
-    ret.extend(dat2)
-    return ret
-
-############################################################################
-##
-## Purpose:   Extend an array
-##
-############################################################################
-def extend1(dat1=[],dat2=[]):
-    # number of cpu cores
-    nc   = mp.cpu_count()
-    ret  = Parallel(n_jobs=nc)(delayed(extend)(dat1,dat2[i]) for i in range(0,len(dat2)))
-    return ret
-
-############################################################################
-##
-## Purpose:   Split a string
-##
-############################################################################
-def split(dat=[],ind=0):
-    ret  = None
-    if not (len(dat) == 0 or ind < 0 or ind > len(dat)-1):
-        ret  = dat.split("-")[ind]
-    return ret
-
-############################################################################
-##
-## Purpose:   Define edges between vertices of a knowledge graph
-##
-############################################################################
-def edges(clus=None,rows=[]):
-    ret  = None
-    if not (clus == None or len(rows) == 0):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # append the data point row numbers of those data points that are connected to the i-th data point in the current cluster
-        #
-        # have to sourround [x] so that extend doesn't separate the characters
-        tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j, x in enumerate(rows) if rows[j] != rows[i]]) for i in range(0,len(rows)))
-        # append the cluster number
-        ret  = Parallel(n_jobs=nc)(delayed(extend1)(clus,tret[i]) for i in range(0,len(tret)))
-    return ret
-
-############################################################################
-##
-## Purpose:   Create vertices and edges of a knowledge graph
-##
-############################################################################
-def create_kg_ve(dat=[],lbls=[],lbl=None,ve=None):
-    ret  = None
-    if not (len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        if ve == "v":
-            # only need to append the unique id defined by the row label to the data row
-            # this is the set of vertices for each data point in the data set
-            ret  = Parallel(n_jobs=nc)(delayed(extend)(lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
-        else:
-            # which cluster has been identified for storing the data
-            clus = Parallel(n_jobs=nc)(delayed(split)(lbls[i]  ) for i in range(0,len(lbls)))
-            ucs  = np.unique(clus)
-            # get the row number of the original data point
-            rows = Parallel(n_jobs=nc)(delayed(split)(lbls[i],1) for i in range(0,len(lbls)))
-            # only need to extract the cluster label to go along with the brain label that was passed in
-            # the edges will consist of the cluster label, brain label and connected data point pairs
-            # this shows which data points are connected to form a cluster under the model in the current brain
-            ret  = Parallel(n_jobs=nc)(delayed(edges)(ucs[i],[x for j, x in enumerate(rows) if clus[j] == ucs[i]]) for i in range(0,len(ucs)))
-    return ret
-
-############################################################################
-##
-## Purpose:   Heavy lift of creating a knowledge graph
-##
-############################################################################
-def build_kg(inst,dat=[],brn={},splits=2):
-    ret  = {const.V:[],const.E:[]}
-    if not (inst == None  or
-            inst < 0      or
-            len(dat) == 0 or
-            brn == {}     or
-            splits < 2):
-        # get the nn model for this brain
-        mdl  = brn[const.MDL]
-        # get the nn label for this brain
-        lbl  = brn[const.LBL]
-        # make the predictions using this model
-        model= load_model(mdl)
-        # make sure to get the right subset of the data
-        l    = list(map(int,lbl.split("-")))
-        d    = dat[:,l]
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # make the predictions
-        prds = model.predict(d)
-        #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
-        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*len(l))) for i in range(0,len(prds)))
-        # generate the labels for the data
-        lbls = ai.label(preds)
-        # create the vertices
-        v    = create_kg_ve(d,lbls,lbl,"v")
-        # create the edges
-        e    = create_kg_ve(d,lbls,lbl,"e")
-        ret[const.V] = v
-        ret[const.E   ] = e
-    return ret 
-
-############################################################################
-##
-## Purpose:   Append vertices and edges to a knowledge graph
-##
-############################################################################
-def append_kg(ret={},dat={}):
-    v    = []
-    e    = []
-    if not (ret == {} or dat == {} or len(dat[const.V]) == 0 or len(dat[const.E]) == 0):
-        # vertices
-        rv   = ret[const.V]
-        dv   = dat[const.V]
-        if not (len(rv) == 0):
-            v    = extend(rv,dv)
-        else:
-            v    = dv
-        # edges
-        re   = ret[const.E]
-        de   = dat[const.E]
-        if not (len(re) == 0):
-            e    = extend(re,de)
-        else:
-            e    = de
-    return {const.V:v,const.E:e}
-
-############################################################################
-##
-## Purpose:   Create a knowledge graph
-##
-############################################################################
-def create_kg(inst,dat=[],splits=2):
-    ret  = {const.V:[],const.E:[]}
-    if not (inst == None or inst < 0 or len(dat) == 0 or splits < 2):
-        # number of cpu cores
-        nc   = mp.cpu_count()
-        # generate the brains
-        brns = ai.brain(dat)
-        # generate the vertices and edges
-        bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
-        rret = ret
-        ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
-    return ret[0]
 
 # *************** TESTING *****************
 
@@ -205,7 +39,7 @@ def irg_testing(M=500,N=2):
     #ivals= np.random.sample(size=(500,3))
     ivals= np.random.sample(size=(m,p))
     # create the data for the sample knowledge graph
-    kg   = create_kg(0,ivals,s)
+    kg   = ai.create_kg(0,ivals,s)
     print(kg[const.E])
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
@@ -222,7 +56,7 @@ def irg_testing(M=500,N=2):
         print("iRG model is null.")
     # test the corrections function on some kaggle data
     rows = []
-    with open("data/food-inspections.csv") as f:
+    with open("/home/robert/data/food-inspections.csv") as f:
         dat1 = csv.reader(f,delimiter=",")
         flds = dat1.next()
         cnt  = 0

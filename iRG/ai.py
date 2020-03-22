@@ -55,7 +55,7 @@ def store(dat=[]):
     sz   = len(dat)
     if not (sz == 0):
         # which cluster has been identified for storing the data
-        tdat = [j for j, x in enumerate(dat) if x == max(dat)]
+        tdat = [j for j,x in enumerate(dat) if x == max(dat)]
         ret  = tdat[0]
     return ret
 
@@ -89,7 +89,7 @@ def append(i=const.BVAL,n=const.BVAL,m=const.BVAL):
 ## Purpose:   Extend a dictionary
 ##
 ############################################################################
-def extend(dat1={},k=None,v=None):
+def dextend(dat1={},k=None,v=None):
     ret  = dat1
     if not (k == None):
         ret[k] = v
@@ -100,10 +100,43 @@ def extend(dat1={},k=None,v=None):
 ## Purpose:   Extend a dictionary
 ##
 ############################################################################
-def extend1(dat1={},dat2={}):
+def dextend1(dat1={},dat2={}):
     # number of cpu cores
     nc   = mp.cpu_count()
-    ret  = Parallel(n_jobs=nc)(delayed(extend)(dat1,k,dat2[k]) for k in dat2.keys())
+    ret  = Parallel(n_jobs=nc)(delayed(dextend)(dat1,k,dat2[k]) for k in dat2.keys())
+    return ret
+
+############################################################################
+##
+## Purpose:   Extend an array
+##
+############################################################################
+def extend(dat1=[],dat2=[]):
+    ret  = []
+    ret.append(dat1)
+    ret.extend(dat2)
+    return ret
+
+############################################################################
+##
+## Purpose:   Extend an array
+##
+############################################################################
+def extend1(dat1=[],dat2=[]):
+    # number of cpu cores
+    nc   = mp.cpu_count()
+    ret  = Parallel(n_jobs=nc)(delayed(extend)(dat1,dat2[i]) for i in range(0,len(dat2)))
+    return ret
+
+############################################################################
+##
+## Purpose:   Split a string
+##
+############################################################################
+def split(dat=[],ind=0):
+    ret  = None
+    if not (len(dat) == 0 or ind < 0 or ind > len(dat)-1):
+        ret  = dat.split("-")[ind]
     return ret
 
 ############################################################################
@@ -288,18 +321,24 @@ def img2txt(img=[],inst=const.BVAL,testing=True):
         # request parameters: language is unknown, and we do detect orientation
         parms= {"language":"unk","detectOrientation":"true"}
         if not testing:
-            # get response from the server
-            resp = requests.post(url,headers=hdrs,params=parms,data=img)
-            resp.raise_for_status()
-            # get json data to parse it later
-            json = resp.json()
-            # all the lines from a page, including noise
             ftext= []
-            for reg in json["regions"]:
-                line = reg["lines"]
-                for elem in line:
-                    ltext = " ".join([word["text"] for word in elem["words"]])
-                    ftext.append(ltext.lower())
+            for i in img:
+                try:
+                    # get response from the server
+                    resp = requests.post(url,headers=hdrs,params=parms,data=i)
+                    resp.raise_for_status()
+                    # get json data to parse it later
+                    json = resp.json()
+                    # all the lines from a page, including noise
+                    for reg in json["regions"]:
+                        line = reg["lines"]
+                        for elem in line:
+                            ltext = " ".join([word["text"] for word in elem["words"]])
+                            ftext.append(ltext.lower())
+                except HTTPError as herr:
+                    ftext.append(str(herr))
+                except Exception as err:
+                    ftext.append(str( err))
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)
@@ -339,7 +378,7 @@ def numbers(dat=[],pre=0):
             d    = chars(dat,pre)
         else:
             d    = [" "] * pre
-        ret  = [1.0/float(ord(x)) for i, x in enumerate(d)]
+        ret  = [1.0/float(ord(x)) for i,x in enumerate(d)]
     return ret
 
 ############################################################################
@@ -807,7 +846,8 @@ def ocr(pdfs=[],inst=const.BVAL,testing=True):
         if not (len(oimgs) <= 1):
             ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]             ) for i in range(1,len(oimgs)))
         else:
-            ret  = oimgs
+            if not (len(oimgs) == 0):
+                ret  = oimgs[0]
     return ret
 
 ############################################################################
@@ -914,10 +954,8 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
-            #gd   = {}
             f    = open(gdoc)
             gdat = {wvec(line).keys()[0]:wvec(line).values()[0] for line in f.readlines()}
-            #gdat = Parallel(n_jobs=nc)(delayed(extend1)(gd,wvec(line)) for line in f.readlines())
             f.close()
             # we will pad the original sequences in a certain way so as to make them align with
             # the expanded set of words from the passed in GloVe data set then
@@ -1017,15 +1055,6 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # the corpus ... these words (and by extension, their values) carry information about the words that don't appear
                 # in the glove data ... the mean will carry all information about these words as well
                 #
-                # the commented code to do this follows
-                #
-                #mvals= np.mean(ivals,axis=0).reshape((1,len(ivals[0])))
-                # get the values associated with the mean
-                #mmat = model.predict(mvals)
-                # add to our glove dictionary all words that appear in the corpus but not currently in the dictionary
-                #for word,i in tok.word_index.items():
-                    #if not (word in gmat.keys()):
-                        #gdat[word] = mmat
                 # however, we will instead generate a glove data set for these words, then use the global distribution (random field),
                 # found from values of elements in the conditional specification associated to words that do appear in the corpus,
                 # to predict the generated glove data set
@@ -1043,6 +1072,130 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                         gdat[word] = model.predict(np.reshape(gd[word],(1,clust+1)))
     return gdat
 
+############################################################################
+##
+## Purpose:   Define edges between vertices of a knowledge graph
+##
+############################################################################
+def edges(clus=None,rows=[]):
+    ret  = None
+    if not (clus == None or len(rows) == 0):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # append the data point row numbers of those data points that are connected to the i-th data point in the current cluster
+        #
+        # have to sourround [x] so that extend doesn't separate the characters
+        tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i]]) for i in range(0,len(rows)))
+        # append the cluster number
+        ret  = Parallel(n_jobs=nc)(delayed(extend1)(clus,tret[i]) for i in range(0,len(tret)))
+    return ret
+
+############################################################################
+##
+## Purpose:   Create vertices and edges of a knowledge graph
+##
+############################################################################
+def create_kg_ve(dat=[],lbls=[],lbl=None,ve=None):
+    ret  = None
+    if not (len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        if ve == const.V:
+            # only need to append the unique id defined by the row label to the data row
+            # this is the set of vertices for each data point in the data set
+            ret  = Parallel(n_jobs=nc)(delayed(extend)(lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
+        else:
+            # which cluster has been identified for storing the data
+            clus = Parallel(n_jobs=nc)(delayed(split)(lbls[i]  ) for i in range(0,len(lbls)))
+            ucs  = np.unique(clus)
+            # get the row number of the original data point
+            rows = Parallel(n_jobs=nc)(delayed(split)(lbls[i],1) for i in range(0,len(lbls)))
+            # only need to extract the cluster label to go along with the brain label that was passed in
+            # the edges will consist of the cluster label, brain label and connected data point pairs
+            # this shows which data points are connected to form a cluster under the model in the current brain
+            ret  = Parallel(n_jobs=nc)(delayed(edges)(ucs[i],[x for j,x in enumerate(rows) if clus[j] == ucs[i]]) for i in range(0,len(ucs)))
+    return ret
+
+############################################################################
+##
+## Purpose:   Heavy lift of creating a knowledge graph
+##
+############################################################################
+def build_kg(inst,dat=[],brn={},splits=2):
+    ret  = {const.V:[],const.E:[]}
+    if not (inst == None  or
+            inst < 0      or
+            len(dat) == 0 or
+            brn == {}     or
+            splits < 2):
+        # get the nn model for this brain
+        mdl  = brn[const.MDL]
+        # get the nn label for this brain
+        lbl  = brn[const.LBL]
+        # make the predictions using this model
+        model= load_model(mdl)
+        # make sure to get the right subset of the data
+        l    = list(map(int,lbl.split("-")))
+        d    = dat[:,l]
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # make the predictions
+        prds = model.predict(d)
+        #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
+        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*len(l))) for i in range(0,len(prds)))
+        # generate the labels for the data
+        lbls = label(preds)
+        # create the vertices
+        v    = create_kg_ve(d,lbls,lbl,const.V)
+        # create the edges
+        e    = create_kg_ve(d,lbls,lbl,const.E)
+        ret[const.V] = v
+        ret[const.E   ] = e
+    return ret 
+
+############################################################################
+##
+## Purpose:   Append vertices and edges to a knowledge graph
+##
+############################################################################
+def append_kg(ret={},dat={}):
+    v    = []
+    e    = []
+    if not (ret == {} or dat == {} or len(dat[const.V]) == 0 or len(dat[const.E]) == 0):
+        # vertices
+        rv   = ret[const.V]
+        dv   = dat[const.V]
+        if not (len(rv) == 0):
+            v    = extend(rv,dv)
+        else:
+            v    = dv
+        # edges
+        re   = ret[const.E]
+        de   = dat[const.E]
+        if not (len(re) == 0):
+            e    = extend(re,de)
+        else:
+            e    = de
+    return {const.V:v,const.E:e}
+
+############################################################################
+##
+## Purpose:   Create a knowledge graph
+##
+############################################################################
+def create_kg(inst,dat=[],splits=2):
+    ret  = {const.V:[],const.E:[]}
+    if not (inst == None or inst < 0 or len(dat) == 0 or splits < 2):
+        # number of cpu cores
+        nc   = mp.cpu_count()
+        # generate the brains
+        brns = brain(dat)
+        # generate the vertices and edges
+        bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
+        rret = ret
+        ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
+    return ret[0]
+
 # *************** TESTING *****************
 
 def ai_testing(M=500,N=2):
@@ -1056,11 +1209,21 @@ def ai_testing(M=500,N=2):
     # uniformly sample values between 0 and 1
     #ivals= np.random.sample(size=(500,3))
     ivals= np.random.sample(size=(m,p))
+    # create the data for the sample knowledge graph
+    kg   = create_kg(0,ivals,s)
     # test ocr
     o    = ocr(["/home/robert/data/files/kg.pdf"],0)
     print(o)
+    # get the default configuration
+    cfg  = config.cfg()
+    # ordering of the data elements in the JSON file
+    inst = 0
+    src  = cfg["instances"][inst]["src"]["index"]
+    typ  = cfg["instances"][inst]["src"]["types"]["glove"]
+    # glove file
+    gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
     # test glove output
-    g    = extendglove(["README.txt","README.txt"],"/home/robert/data/glove.6B.50d.txt")
+    g    = extendglove(["README.txt","README.txt"],gfl)
     leng = len(g)
     if leng <= 1000:
         print(g)
