@@ -18,16 +18,80 @@ import config
 import sys
 import traceback
 
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+
+import constants as const
+
 # read the default json config file
 cfg  = config.cfg()
+
+############################################################################
+##
+## Purpose:   Generate the dataframe to read/write a knowledge graph
+##
+############################################################################
+def rw_json_kg(inst=const.BVAL,dat=[],kg=[],testing=True):
+    ret  = []
+    if not (inst <= const.BVAL or len(dat) == 0 or len(kg) == 0):
+        # get the default configuration
+        cfg  = config.cfg()
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["src"]["index"]
+        typ  = cfg["instances"][inst]["src"]["types"]["kg"]
+        # subscription key
+        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key" ]
+        # graph host
+        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+        # graph port
+        port = cfg["instances"][inst]["sources"][src][typ]["connection"]["port"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api" ]
+        if not (key == None):
+            if not (len(key) == 0):
+                # url
+                prot = "wss://"
+            else:
+                # url
+                prot = "ws://"
+        else:
+            # url
+            prot = "ws://"
+        # url
+        url  = prot + host + ":" + port + "/" + api
+        if not testing:
+            ftext= []
+            try:
+                # instantiate a JanusGraph object
+                graph= Graph()
+                # connection to the remote server
+                conn = DriverRemoteConnection(url,'g')
+                # get the remote graph traversal
+                g    = graph.traversal().withRemote(conn)
+                # all the lines from a page, including noise
+                for i in kg:
+                    for reg in json["regions"]:
+                        line = reg["lines"]
+                        for elem in line:
+                            ltext = " ".join([word["text"] for word in elem["words"]])
+                            ftext.append(ltext.lower())
+            except Exception as err:
+                ftext.append(str(err))
+            # clean array containing only important data
+            for line in ftext:
+                ret.append(line)
+        else:
+            ret  = [src,typ,key,host,url]
+    return ret
 
 ############################################################################
 ##
 ## Purpose:   Read/write a knowledge graph from/to a graph DB using spark
 ##
 ############################################################################
-def rw_kg(inst,df=None,testing=True):
-    if not (inst == None or inst < 0):
+def rw_kg(inst=const.BVAL,df=None,testing=True):
+    if not (inst <= const.BVAL):
         # ordering of the data elements in the JSON file
         kg   = cfg["instances"][inst]["kg"]
         # configuration parameters
@@ -54,11 +118,11 @@ def rw_kg(inst,df=None,testing=True):
             if not testing:
                 # Write configuration
                 wc = {
-                    "Endpoint": url,
-                    "Masterkey": key,
-                    "Database": dirn,
+                    "Endpoint"  : url,
+                    "Masterkey" : key,
+                    "Database"  : dirn,
                     "Collection": table,
-                    "Upsert": "true"
+                    "Upsert"    : "true"
                 }
                 # spark sqlContext should be used to create the data frame
                 # of edges and vertices in the following format
@@ -92,15 +156,15 @@ def rw_kg(inst,df=None,testing=True):
                 else:
                     # Read Configuration
                     rc = {
-                        "Endpoint": url,
-                        "Masterkey": key,
-                        "Database": db,
-                        "Collection": table,
-                        "ReadChangeFeed": "true",
-                        "ChangeFeedQueryName": dirn,
+                        "Endpoint"                       : url,
+                        "Masterkey"                      : key,
+                        "Database"                       : db,
+                        "Collection"                     : table,
+                        "ReadChangeFeed"                 : "true",
+                        "ChangeFeedQueryName"            : dirn,
                         "ChangeFeedStartFromTheBeginning": "false",
-                        "InferStreamSchema": "true",
-                        "ChangeFeedCheckpointLocation": "dbfs:/" + dirn
+                        "InferStreamSchema"              : "true",
+                        "ChangeFeedCheckpointLocation"   : "dbfs:/" + dirn
                     }
                     # Open a read stream to the Cosmos DB Change Feed via azure-cosmosdb-spark to create Spark DataFrame
                     df = (spark.readStream                                                                    \
@@ -116,9 +180,9 @@ def rw_kg(inst,df=None,testing=True):
 ## Purpose:   Housekeeping done when logging into a graph DB.
 ##
 ############################################################################
-def blob_conf_set(inst,acc,testing=True):
+def blob_conf_set(inst=const.BVAL,acc=None,testing=True):
     ret  = False
-    if not (inst == None or inst < 0 or acc == None):
+    if not (inst <= const.BVAL or acc == None):
         # ordering of the data elements in the JSON file
         wh   = cfg["instances"][inst]["wh"]
         # configuration parameters
@@ -137,8 +201,8 @@ def blob_conf_set(inst,acc,testing=True):
 ## Purpose:   Read/write data from/to a data warehouse using spark
 ##
 ############################################################################
-def rw_warehouse(inst,df=None,testing=True):
-    if not (inst == None or inst < 0):
+def rw_warehouse(inst=const.BVAL,df=None,testing=True):
+    if not (inst <= const.BVAL):
         # ordering of the data elements in the JSON file
         wh   = cfg["instances"][inst]["wh"]
         # configuration parameters

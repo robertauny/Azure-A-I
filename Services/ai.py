@@ -400,7 +400,9 @@ def glove(tok=None,words=0):
         #
         # prior and the last element to make the dot products be the log probability of co-occurrence
         probs= []
+        # dictionary of all words in the corpus
         ditem= dict(tok.word_index.items())
+        # items of the top uwrd words from the dictionary
         items= [item for item in tok.word_counts.items() if ditem[item[0]] in range(1,uwrd+1)]
         for i,item in enumerate(items):
             # count associated to current word
@@ -427,7 +429,7 @@ def glove(tok=None,words=0):
         #
         # let's say that each row of the glove data file has N constants, preceded by an associated word so
         # that our goal for the combined data files is to obtain N constants for each word, such that their
-        # mutual inner products result in the log probability that the words co-occur
+        # mutual inner products result in the log probability that the words co-occur together
         #
         # to get the N constants, take a unique lising of the words and the first word from the list and randomly
         # generate N constants to associate with the first word ... then take the second word and randomly generate
@@ -442,6 +444,25 @@ def glove(tok=None,words=0):
         # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
         # constants that work for the other N-M words that were left ... see the comments below for more insights
         #
+        # instead of randomly generating the constants with replacement at the end, instead we will use the priors of
+        # each of the top uwrd words and the reasoning follows from a simple Bayesian theory ... note first that
+        # the posterior probability $P(C|x) = P(C and x) / p(x) = P(C)p(x|C) / p(x)$ ... If we assume that the sample
+        # space is partitioned into a certain collection of subsets, say $\{C_1,C_2,...,C_N\}$ with $C=C_K$, for some
+        # $1 \le K \le N$, then clearly $p(x) = \sum_{K=1}^N P(x and C_K) = \sum_{K=1}^N P(C_K)p(x|C_K)$ so that the
+        # denominator is the same for all calculations of posteriors, given $x$ ... Now, $p(x|C)$ can be estimated from
+        # the data using the sample mean and variance as an approximately normal density (the inputs) so that our
+        # modeling constants are an estimate of $P(C_K)$ for each $K$, which in this case are the constants associated
+        # to each of the top uwrd words in our corpus
+        #
+        # Two notes for what comes next are that the constants can be reversed, as the last constant is associated to
+        # the first word, next-to-last to the second, etc. ... and so that we are able to identify the word associated
+        # to a given marginal, the most weight should be given to the constant associated with the word ... i.e. the last
+        # constant is 1 when the associated word is the first in our top uwrd words, next-to-last is 1 for the 2nd, etc.
+        #
+        # note that if we want to control the weights by adding on an extra penalty term (so to speak) to the model by
+        # performing L-normalization (necessarily meaning that our weights are in the unit interval), then we are allowing
+        # that $\|w\| <= 1$ where $w = (C_K)_{K=1}^N$ when normally in such a case $\|w\| < 1$
+        #
         # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
         # derived from the previous sets of constants that are back solved using linear systems theory
         #
@@ -449,13 +470,21 @@ def glove(tok=None,words=0):
         tot  = sum(tok.word_counts.values())
         # start the process of generating glove marginals for the data set that's been tokenized
         for word,ind in tok.word_index.items():
+            wcnt = ditem[word]
             if ret == {}:
+                # initialize our first set of constants with the priors
                 ret[word] = probs
+                # if the word is in our top uwrd words, then weight it the most
+                if wcnt in range(1,uwrd+1):
+                    ret[word][wcnt-1] = 1.0
             else:
                 # use all but cnt+1 probs values, as the rest are predetermined
                 #
                 # note that new entries into the dictionary will be first
                 ret[word] = probs[:uwrd-cnt]
+                # if the word is in our top uwrd-cnt words, then weight it the most
+                if wcnt in range(1,uwrd-cnt+1):
+                    ret[word][wcnt-1] = 1.0
                 # extend the list of glove values for word after the random values
                 # with all values in the last column, between the 2nd row and next to current row
                 ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
