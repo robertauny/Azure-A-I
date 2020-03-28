@@ -22,7 +22,7 @@ import os
 ## Purpose:   Read a configuration file
 ##
 ############################################################################
-def cfg(fl='irg.json'):
+def cfg(fl='cyber.json'):
     ret= None
     if( os.path.exists(fl) and os.stat(fl).st_size > 0 ):
         try:
@@ -39,7 +39,7 @@ def cfg(fl='irg.json'):
 ## Purpose:   Write a configuration file
 ##
 ############################################################################
-def wcfg(dat=None,fl='/tmp/irg.json'):
+def wcfg(dat=None,fl='/tmp/cyber.json'):
     ret= None
     if( len(dat) > 0 ):
         try:

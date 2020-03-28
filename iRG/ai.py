@@ -400,7 +400,9 @@ def glove(tok=None,words=0):
         #
         # prior and the last element to make the dot products be the log probability of co-occurrence
         probs= []
+        # dictionary of all words in the corpus
         ditem= dict(tok.word_index.items())
+        # items of the top uwrd words from the dictionary
         items= [item for item in tok.word_counts.items() if ditem[item[0]] in range(1,uwrd+1)]
         for i,item in enumerate(items):
             # count associated to current word
@@ -427,7 +429,7 @@ def glove(tok=None,words=0):
         #
         # let's say that each row of the glove data file has N constants, preceded by an associated word so
         # that our goal for the combined data files is to obtain N constants for each word, such that their
-        # mutual inner products result in the log probability that the words co-occur
+        # mutual inner products result in the log probability that the words co-occur together
         #
         # to get the N constants, take a unique lising of the words and the first word from the list and randomly
         # generate N constants to associate with the first word ... then take the second word and randomly generate
@@ -442,6 +444,25 @@ def glove(tok=None,words=0):
         # M words in the corpus to build a supervised neural network that will essentially give an "average" set of
         # constants that work for the other N-M words that were left ... see the comments below for more insights
         #
+        # instead of randomly generating the constants with replacement at the end, instead we will use the priors of
+        # each of the top uwrd words and the reasoning follows from a simple Bayesian theory ... note first that
+        # the posterior probability $P(C|x) = P(C and x) / p(x) = P(C)p(x|C) / p(x)$ ... If we assume that the sample
+        # space is partitioned into a certain collection of subsets, say $\{C_1,C_2,...,C_N\}$ with $C=C_K$, for some
+        # $1 \le K \le N$, then clearly $p(x) = \sum_{K=1}^N P(x and C_K) = \sum_{K=1}^N P(C_K)p(x|C_K)$ so that the
+        # denominator is the same for all calculations of posteriors, given $x$ ... Now, $p(x|C)$ can be estimated from
+        # the data using the sample mean and variance as an approximately normal density (the inputs) so that our
+        # modeling constants are an estimate of $P(C_K)$ for each $K$, which in this case are the constants associated
+        # to each of the top uwrd words in our corpus
+        #
+        # Two notes for what comes next are that the constants can be reversed, as the last constant is associated to
+        # the first word, next-to-last to the second, etc. ... and so that we are able to identify the word associated
+        # to a given marginal, the most weight should be given to the constant associated with the word ... i.e. the last
+        # constant is 1 when the associated word is the first in our top uwrd words, next-to-last is 1 for the 2nd, etc.
+        #
+        # note that if we want to control the weights by adding on an extra penalty term (so to speak) to the model by
+        # performing L-normalization (necessarily meaning that our weights are in the unit interval), then we are allowing
+        # that $\|w\| <= 1$ where $w = (C_K)_{K=1}^N$ when normally in such a case $\|w\| < 1$
+        #
         # have to do this sequentially for each word in the top uwrd of the list because each set of constants are
         # derived from the previous sets of constants that are back solved using linear systems theory
         #
@@ -449,13 +470,21 @@ def glove(tok=None,words=0):
         tot  = sum(tok.word_counts.values())
         # start the process of generating glove marginals for the data set that's been tokenized
         for word,ind in tok.word_index.items():
+            wcnt = ditem[word]
             if ret == {}:
+                # initialize our first set of constants with the priors
                 ret[word] = probs
+                # if the word is in our top uwrd words, then weight it the most
+                if wcnt in range(1,uwrd+1):
+                    ret[word][wcnt-1] = 1.0
             else:
                 # use all but cnt+1 probs values, as the rest are predetermined
                 #
                 # note that new entries into the dictionary will be first
                 ret[word] = probs[:uwrd-cnt]
+                # if the word is in our top uwrd-cnt words, then weight it the most
+                if wcnt in range(1,uwrd-cnt+1):
+                    ret[word][wcnt-1] = 1.0
                 # extend the list of glove values for word after the random values
                 # with all values in the last column, between the 2nd row and next to current row
                 ret[word].extend(vals[0][range(uwrd-cnt,uwrd-1)])
@@ -1071,6 +1100,187 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                     if not (word in gmat.keys()):
                         gdat[word] = model.predict(np.reshape(gd[word],(1,clust+1)))
     return gdat
+
+############################################################################
+##
+## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+##           that will be used to identify possible vulnerability areas in code
+##
+############################################################################
+def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
+    ret  = []
+    if not (len(docs) == 0 and ngrams <= 1):
+        # collect the text of all docs together into an array
+        txts = [dappend(d) for d in docs]
+        # tokenize the lines in the array and convert to sequences of integers
+        #
+        # instantiate a default Tokenizer object without limiting the number of tokens
+        tok  = Tokenizer()
+        # need to handle the txts in such a way that we have the hierarchy of
+        #
+        # class, package, interface definitions
+        # method definitions
+        # conditionals and loops
+        # memory (de)allocation, variable declarations, SQL statements
+        #
+        # or justify why the tokenizer will handle it for us, simply by the counts
+        #
+        # so we will run through the data once, appending all data to the output of the tokenizer
+        # then we will look at the frequencies for each word and add the files again, each time
+        # adding less frequently appearing words to the out-of-vocabulary (OOV) list
+        #
+        # the theory is that less frequently appearing words will demarcate blocks, like class, interface, etc.
+        # then as we continually add the txts again and again, we will have added most of the demarcations to
+        # the OOV list and defined our code blocks in an unsupervised fashion
+        #
+        # tokenize the data
+        tok.fit_on_texts(txts)
+        # identify potential code block demarcations in the tokenized corpus
+        blks = blocks(tok)
+        # we will make the glove data set a function of the top uwrd words
+        uwrd = len(tok.word_index.keys())
+        if (0 < words and words < uwrd):
+            uwrd = words
+        # calculate the constants for each word in the corpus using the GloVe methodology
+        gdat = glove(tok,uwrd)
+        # tokenized items
+        items= tok.word_index.items()
+        # length of keys
+        lk   = len(items)
+        # the top uwrd words in the corpus
+        wrds = [i for i,item in enumerate(items) if item[1] in range(1,uwrd+1)]
+        # use the word index to find the top uwrd words and limit the list when finding the global distribution (random field)
+        gmat = {word:gdat[word] for word in np.asarray(items)[wrds,0]}
+        if not (gmat == {}):
+            # keys
+            keys = gmat.keys()
+            # values
+            vals = gmat.values()
+            # number of clusters is different than the default defined by the splits and properties
+            clust= uwrd
+            #
+            s    = splits
+            # we want to find the value p such that s**(2*p) gives the same number
+            # of potential clusters as there are found in glove, as indicated by the number of constants
+            # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
+            p    = int(ceil(log(clust,s)/2.0))
+            # we need values to turn into labels when training
+            # one-hot encode the integer labels as its required for the softmax
+            #
+            # the goal is to build a model with clust=clust outputs such that when clust inputs are passed in, we get a
+            # word in the glove data set associated to the clust constants ... furthermore, when the model constants are
+            # used in dot product with the constants of any word from the glove data set, we get the average log probability
+            # of the word from glove with any other arbitrary word from glove
+            # 
+            # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
+            # can consist of one unique value for each row of constants
+            #ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
+            ovals= to_categorical([i%len(keys) for word,i in items if word in keys],num_classes=clust)
+            # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
+            # of a plane ... i.e. each row of constants defines an element of a conditional specification
+            #
+            # words are associated with constants that can be dot product with constants of other words to obtain word-word
+            # co-occurrence probabilities
+            #
+            # recall from the theory of random fields, that given a conditional specification, we seek a realizing
+            # global probability distribution such that each of the global's conditionals, given a word in the glove
+            # data set, is an element in the specification
+            #
+            # the DBN neural network can be used to find the global realizing distribution
+            #
+            # at this point, we have one-hot encoded each of the unique words in the glove data set that matched a word from
+            # our corpus ... we use the constants of the conditional distributions in the glove data set as inputs to the DBN
+            # that will find a distribution that has as its output the set of words that have been one-hot encoded ... i.e.
+            # we will have found constants that can be used in dot product with constants of the conditionals to find the
+            # average log probability of co-occurrence with any word appearing in both the corpus and glove data sets
+            #
+            # the result being that we will have found a set of constants (synaptic weights) of a network that identifies
+            # the word used to define a conditional distribution in the specification of the realizing distribution .. or
+            # more succinctly stated, with the neural network, we can identify if the inputs define
+            # a set of synaptic weights for a distribution in the conditional specification
+            #
+            # after generating the model, we should have a set of constants (weights) that number the same as those
+            # in the glove data file ... since we predict the word when using the associated constants of a word in the glove
+            # data file, then we only need for the dot product of the constants from the model with those of the
+            # constants in the data files to give us the log of the probability of the word-word co-occurrence
+            #
+            # however, the realizing distribution is a model of all words that gives you one particular word, when
+            # a certain set of constants are used as inputs ... thus we can use the output of the model as the
+            # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
+            # of any arbitrary word in the glove data set when dot product with the constants associated to another word
+            #
+            # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
+            ivals= np.asarray(vals)
+            # create the model using the inputs
+            model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
+            # we have created the model using the top uwrd values that appear most in the corpus ... now we want to get the blocks
+            # of code that may be hiding the cyber security vulnerability and run the blocks through the predictor
+            #
+            # sequences associated to the identified code blocks that potentially house code vulnerabilities
+            #bseq = [[ivals[i] for i,word in enumerate(keys) if word in blks[blk]] for blk in blks.keys()]
+            bseq = [ivals[i] for i,word in enumerate(keys) if word in blks[blks.keys()[len(blks)-1]]]
+            # sequences are in a form that can be passed to the model ... take the median
+            pseq = np.median(np.asarray(bseq),axis=0).reshape((1,clust))
+            # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
+            # conditional specification whose elements are the marginals defined by the modeling constants in gmat ... the
+            # global is captured in "model" ... if we use model and pass a sequence of constants generated from one of the
+            # marginals, then the output should be a set of constants greatly weighted (almost 1) towards the position of the word
+            # associated to the marginal in question, as indicated by the ordering of gmat.keys() ... otherwise, the
+            # expectation is to have a weighting that is more spread out amongst all positions of gmat.keys(), in which case
+            # our return should be a sequence of n-grams with the lowest probabilities from each row of the padded sequences
+            #
+            # the lowest probability n-grams are the ones with the n lowest weightings in the output rows from the predictor
+            #
+            # idea here ... low probability of occurrence in between blocks is an indicator of an anomaly, something to be observed
+            # especially when we started with the top uwrd appearing words in our corpus
+            #
+            # after forming the n-grams, one for each row of input data from the padded sequences, we can search the original
+            # tokenized corpus for these low probability sequences and note their locations
+            #
+            # n-gram length should not be longer than uwrd
+            ngram= ngrams
+            if ngram > uwrd:
+                ngram= uwrd
+            # predict the median sequence in the blocks
+            if not (len(pseq) == 0):
+                preds= model.predict(np.asarray(pseq))
+                # obtain the n-grams of words for each row of the padded sequences
+                #ret  = np.asarray([[" "]*ngram]*len(preds))
+                ret  = [dict()] * len(preds)
+                for i in range(0,len(preds)):
+                    # the current prediction row containing probabilities of each word in the wrds length list of words
+                    prow = preds[i]
+                    # capture those values that correspond to the lowest probability n-gram
+                    #
+                    # out of the top wrds words we are getting the least probable n-grams
+                    #
+                    # new element of the dictionary of n-grams
+                    lp   = len(prow)
+                    if lp > ngram:
+                        # the idea is to take the first word in the list of wrds words and look at all other wrds-1 words to
+                        # find ones with the lowest probability of co-occurring with the present word, then join them
+                        # with an associated score that is the product probability measure
+                        #
+                        # we do the same with the next word in the list and find the words with lowest probability of co-occurrence
+                        #
+                        # we never consider the previous word when finding words with lowest probability of co-occurrence, because
+                        # the combination would have already been considered in the previous iteration
+                        #
+                        # we continue until there are ngram words left in the list and consider it last for addition to the list
+                        #
+                        # we continue until all sequences of predictions have been exhausted while noting that each
+                        # successive sequence is more important than the last, as we are getting deeper into code blocks
+                        ret[i] = {
+                            "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
+                            np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
+                            for k in range(0,lp-(ngram-1))
+                                 }
+                    else:
+                        ret[i] = {"-".join(keys):np.asarray(prow).prod()}
+                    rkeys  = np.asarray(ret[i].keys())
+                    rvals  = np.asarray(ret[i].values()) / max(ret[i].values())
+                    ret[i] = dict(np.transpose([rkeys,rvals]))
+    return np.unique(ret)
 
 ############################################################################
 ##
