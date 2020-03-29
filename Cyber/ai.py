@@ -636,7 +636,7 @@ def glovemost(dat=[]):
             if not (len(ret) == 0):
                 ret  = almost(ret)
         else:
-            ret  = keys[0]
+            ret  = dat[0]
     else:
         if not (sz == 0):
             ret  = dat[0]
