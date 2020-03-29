@@ -581,10 +581,11 @@ def glovemost(dat=[]):
         items= np.asarray(tok.word_index.items())
         # get the glove keys and values
         keys = items[:,0]
+        uks  = np.unique(keys)
         # number of clusters is same as the default defined by the splits and properties
-        clust= len(keys)
+        clust= len(uks)
         # must have more than one key, otherwise just return the one key
-        if not (clust == 1):
+        if not (clust <= 1):
             # generate the glove data set
             gd   = glove(tok,clust)
             # we need values to turn into labels when training
@@ -601,8 +602,8 @@ def glovemost(dat=[]):
             # input values to the model are the values associated to the words that appear in our corpus
             ivals= np.asarray(gd.values())
             # generate the output values
-            ukeys= {x:i for i,x in enumerate(np.unique(keys))}
-            ovals= to_categorical([ukeys[word] for word in keys],num_classes=clust)
+            ukeys= {x:i for i,x in enumerate(uks)}
+            ovals= to_categorical([ukeys[word] for word in uks],num_classes=clust)
             # create the model using the inputs and outputs
             model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
             # after generating the model, we should have a set of constants (weights) that number the same as those
@@ -620,7 +621,7 @@ def glovemost(dat=[]):
             # the highest value in the set of constants ... this is the word that we will return
             #
             # sample one word, get the prediction and return the word associated to the highest value
-            nvals= np.asarray([gd[key] for key in keys]).reshape((clust,clust))
+            nvals= np.mean([gd[key] for key in keys],axis=0).reshape((1,clust))
             preds= model.predict(nvals)
             # for each prediction, we want to identify the word associated with the prediction
             # where each prediction is a set of constants defining probabilities for each cluster
@@ -628,8 +629,10 @@ def glovemost(dat=[]):
             # we will return the most probable of all predictions
             ret  = []
             for row in preds:
-                ret.extend([word for word in dat if word.translate(None,punctuation).replace(" ","").lower() in \
-                                                    keys[[i for i,val in enumerate(row) if val == max(row)]]])
+                wrds = [word for word in dat if word.translate(None,punctuation).replace(" ","").lower() in \
+                                                uks[[i for i,val in enumerate(row) if val == max(row)]]]
+                if not (len(wrds) == 0):
+                    ret.extend(wrds)
             if not (len(ret) == 0):
                 ret  = almost(ret)
         else:
@@ -677,14 +680,17 @@ def mostly(dat=[],rdat=[],cols=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # for the final return, take the characters closest to the mean
-        rret = [" "] * csz
-        for i in range(0,csz):
-            udat    = "".join(unique(cdat[:,cols[i]]))
-            ndat    = numbers(udat,len(udat))
-            mmn     = abs(ndat-np.full(len(ndat),mn[i]))
-            j       = [k for k,x in enumerate(mmn) if x == min(mmn)][0]
-            rret[i] = udat[j]
-        ret  = "".join(rret).lstrip()
+        rret = [" "] * pre
+        for i in range(0,pre):
+            if i in cols:
+                udat    = "".join(unique(cdat[:,i]))
+                ndat    = numbers(udat,len(udat))
+                mmn     = abs(ndat-np.full(len(ndat),mn[i]))
+                j       = [k for k,x in enumerate(mmn) if x == min(mmn)][0]
+                rret[i] = udat[j]
+            else:
+                rret[i] = almost(list(cdat[:,i]))
+        ret  = "".join(rret).strip()
     return ret
 
 ############################################################################
@@ -702,15 +708,14 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # change this to use all 4 predictions combined someway
-        mdat = mostly(dat,rdat,cols,preds,pre)
-        ret  = "".join(mdat).lstrip()
+        ret  = mostly(dat,rdat,cols,preds,pre)
         if not (ret in dat):
             mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-            ret  = "".join(mdat).lstrip()
+            ret  = "".join(mdat).strip()
             if not (ret in dat):
-                ret  = glovemost(dat)
+                ret  = almost(dat)
                 if not (ret in dat):
-                    ret  = almost(dat)
+                    ret  = glovemost(dat)
     return ret
 
 ############################################################################
