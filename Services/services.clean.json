@@ -14,11 +14,16 @@
 			"sources" : [
 				{
 					"connection" : {
-						"app"  : "gremlin",
-						"host" : "localhost",
-						"port" : "8182",
-						"key"  : "",
-						"api"  : "gremlin"
+						"host" : "rammancosmos.gremlin.cosmosdb.azure.com",
+						"port" : "443",
+						"db"   : "kgdb",
+						"acc"  : "account-name",
+						"key"  : "account-key",
+						"app"  : "cyber",
+						"sec"  : "true",
+						"con"  : "container-name",
+						"dirn" : "directory-name",
+						"tbl"  : "KG"
 					},
 					"special" : null
 				},
