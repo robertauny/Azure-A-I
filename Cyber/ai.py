@@ -600,10 +600,10 @@ def glovemost(dat=[]):
             # can consist of one unique value for each row of constants
             #
             # input values to the model are the values associated to the words that appear in our corpus
-            ivals= np.asarray(gd.values())
+            ivals= np.asarray([gd[word] for word in txts])
             # generate the output values
             ukeys= {x:i for i,x in enumerate(uks)}
-            ovals= to_categorical([ukeys[word] for word in uks],num_classes=clust)
+            ovals= to_categorical([ukeys[word] for word in txts],num_classes=clust)
             # create the model using the inputs and outputs
             model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
             # after generating the model, we should have a set of constants (weights) that number the same as those
@@ -621,7 +621,7 @@ def glovemost(dat=[]):
             # the highest value in the set of constants ... this is the word that we will return
             #
             # sample one word, get the prediction and return the word associated to the highest value
-            nvals= np.mean([gd[key] for key in keys],axis=0).reshape((1,clust))
+            nvals= np.median(ivals,axis=0).reshape((1,clust))
             preds= model.predict(nvals)
             # for each prediction, we want to identify the word associated with the prediction
             # where each prediction is a set of constants defining probabilities for each cluster
@@ -708,14 +708,14 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
         # change this to use all 4 predictions combined someway
-        ret  = mostly(dat,rdat,cols,preds,pre)
+        ret  = glovemost(dat)
         if not (ret in dat):
-            mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
-            ret  = "".join(mdat).strip()
+            ret  = mostly(dat,rdat,cols,preds,pre)
             if not (ret in dat):
-                ret  = almost(dat)
+                mdat = Parallel(n_jobs=nc)(delayed(max)(set(cdat[:,i].tolist()),key=cdat[:,i].tolist().count) for i in range(0,pre))
+                ret  = "".join(mdat).strip()
                 if not (ret in dat):
-                    ret  = glovemost(dat)
+                    ret  = almost(dat)
     return ret
 
 ############################################################################
