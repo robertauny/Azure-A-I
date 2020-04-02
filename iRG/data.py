@@ -100,7 +100,7 @@ def write_kg(coln=[],kgdat=[],g=None):
     lkg  = len(kgdat)
     if not (lcol == 0 or lkg == 0 or g == None):
         # returns for each stem, one KG row at a time
-        ret  = [write_nlp(stem,coln,kgdat,g) for stem in const.stems]
+        ret  = [write_nlp(stem,coln,kgdat,g) for stem in const.STEMS]
     return ret
 
 ############################################################################
