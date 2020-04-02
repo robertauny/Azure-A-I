@@ -6,4 +6,5 @@ E            = "edges"
 MDL          = "model"
 LBL          = "label"
 # global stem variables for some NLP
-stems= [V,"toks","ents","cons","post","stem"]
+STEMS        = [V,"toks","ents","cons","post","stem"]
+EXT          = ".xml"

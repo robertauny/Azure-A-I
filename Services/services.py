@@ -109,18 +109,27 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
         port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
         # api
         api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
+        # api
+        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
+        # set the url
         if not (key == None):
             if not (len(key) == 0):
-                # url
+                # protocol
                 prot = "wss://"
             else:
-                # url
+                # protocol
                 prot = "ws://"
         else:
-            # url
+            # protocol
             prot = "ws://"
-        # url
+        # create the url
         url  = prot + host + ":" + port + "/" + api
+        # set the output file extension
+        if not (ext == None):
+            if len(ext) == 0:
+                ext  = const.EXT
+        else:
+            ext  = const.EXT
         if not testing:
             try:
                 ret  = []
@@ -136,7 +145,7 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
                     # write the graph to disk
                     ids  = np.asarray(k[const.V][0][0].split("-"))
                     ids  = "-".join(ids[range(0,len(ids)-1)])
-                    g.io("data/"+ids+".xml").write().iterate()
+                    g.io("data/"+ids+ext).write().iterate()
                     # close the connection
                     conn.close()
             except Exception as err:
