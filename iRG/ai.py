@@ -1129,15 +1129,15 @@ def edges(clus=None,rows=[]):
 ## Purpose:   Create vertices and edges of a knowledge graph
 ##
 ############################################################################
-def create_kg_ve(dat=[],lbls=[],lbl=None,ve=None):
+def create_kg_ve(inst=const.BVAL,dat=[],lbls=[],lbl=None,ve=None):
     ret  = None
-    if not (len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
+    if not (inst <= const.BVAL or len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
         # number of cpu cores
         nc   = mp.cpu_count()
         if ve == const.V:
             # only need to append the unique id defined by the row label to the data row
             # this is the set of vertices for each data point in the data set
-            ret  = Parallel(n_jobs=nc)(delayed(extend)(lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
+            ret  = Parallel(n_jobs=nc)(delayed(extend)(str(inst)+'-'+lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
         else:
             # which cluster has been identified for storing the data
             clus = Parallel(n_jobs=nc)(delayed(split)(lbls[i]  ) for i in range(0,len(lbls)))
@@ -1170,21 +1170,20 @@ def build_kg(inst,dat=[],brn={},splits=2):
         model= load_model(mdl)
         # make sure to get the right subset of the data
         l    = list(map(int,lbl.split("-")))
-        d    = dat[:,l]
         # number of cpu cores
         nc   = mp.cpu_count()
         # make the predictions
-        prds = model.predict(d)
+        prds = model.predict(dat[:,l])
         #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
         preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*len(l))) for i in range(0,len(prds)))
         # generate the labels for the data
         lbls = label(preds)
         # create the vertices
-        v    = create_kg_ve(d,lbls,lbl,const.V)
+        v    = create_kg_ve(inst,dat,lbls,lbl,const.V)
         # create the edges
-        e    = create_kg_ve(d,lbls,lbl,const.E)
+        e    = create_kg_ve(inst,dat,lbls,lbl,const.E)
         ret[const.V] = v
-        ret[const.E   ] = e
+        ret[const.E] = e
     return ret 
 
 ############################################################################
@@ -1228,7 +1227,7 @@ def create_kg(inst,dat=[],splits=2):
         bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
         rret = ret
         ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
-    return ret[0]
+    return ret
 
 # *************** TESTING *****************
 
@@ -1245,6 +1244,7 @@ def ai_testing(M=500,N=2):
     ivals= np.random.sample(size=(m,p))
     # create the data for the sample knowledge graph
     kg   = create_kg(0,ivals,s)
+    print(kg[0])
     # test ocr
     o    = ocr(["/home/robert/data/files/kg.pdf"],0)
     print(o)
