@@ -14,12 +14,16 @@
 ##
 ############################################################################
 
-from keras.utils  import to_categorical
-from keras.models import load_model
-from joblib       import Parallel, delayed
+from keras.utils                                    import to_categorical
+from keras.models                                   import load_model
+from joblib                                         import Parallel, delayed
 
-from pdf2image    import convert_from_bytes,convert_from_path
-from PIL          import Image
+from pdf2image                                      import convert_from_bytes,convert_from_path
+from PIL                                            import Image
+
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 import csv
 import sys
@@ -32,6 +36,11 @@ sys.path.append('/home/robert/code/scripts/python/services')
 import constants       as const
 
 import ai
+import data
+import config
+
+# get the default configuration
+cfg  = config.cfg()
 
 ############################################################################
 ##
@@ -77,25 +86,61 @@ def cs(docs=["/home/robert/data/java/test/test.java"]
 ## Purpose:   For each column in the passed data set, attempt to correct errors.
 ##
 ############################################################################
-def kg(M=500,N=2,EV=const.E):
-    # number of data points and properties
-    m    = M
-    p    = N
-    if p > const.MAX_FEATURES:
-        p    = const.MAX_FEATURES
-    # define the number of splits of each property
-    s    = p
-    # uniformly sample values between 0 and 1
-    ivals= np.random.sample(size=(m,p))
-    # create the data for the sample knowledge graph
-    ret  = ai.create_kg(0,ivals,s)
-    # return the edges ... use the key const.V to return the vertices
-    return ret[EV]
+def ocr(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
+    return ai.ocr(pdfs,inst,testing)
 
 ############################################################################
 ##
-## Purpose:   For each column in the passed data set, attempt to correct errors.
+## Purpose:   Write a knowledge graph
 ##
 ############################################################################
-def ocr(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
-    return ai.ocr(pdfs,inst,testing)
+def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
+    ret  = []
+    lcol = len(coln)
+    lkg  = len(kgdat)
+    if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["kg"]
+        # subscription key
+        key  = cfg["instances"][inst]["sources"][src]["connection"]["key" ]
+        # graph host
+        host = cfg["instances"][inst]["sources"][src]["connection"]["host"]
+        # graph port
+        port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
+        if not (key == None):
+            if not (len(key) == 0):
+                # url
+                prot = "wss://"
+            else:
+                # url
+                prot = "ws://"
+        else:
+            # url
+            prot = "ws://"
+        # url
+        url  = prot + host + ":" + port + "/" + api
+        if not testing:
+            try:
+                ret  = []
+                for k in kgdat:
+                    # instantiate a JanusGraph object
+                    graph= Graph()
+                    # connection to the remote server
+                    conn = DriverRemoteConnection(url,'g')
+                    # get the remote graph traversal
+                    g    = graph.traversal().withRemote(conn)
+                    # write the graph to memory
+                    ret.append(data.write_kg(coln,k,g))
+                    # write the graph to disk
+                    ids  = np.asarray(k[const.V][0][0].split("-"))
+                    ids  = "-".join(ids[range(0,len(ids)-1)])
+                    g.io("data/"+ids+".xml").write().iterate()
+                    # close the connection
+                    conn.close()
+            except Exception as err:
+                ret  = str(err)
+        else:
+            ret  = [src,typ,key,host,url]
+    return ret
