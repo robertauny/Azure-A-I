@@ -14,13 +14,14 @@
 ##
 ############################################################################
 
+from joblib import Parallel, delayed
+
 import config
 import sys
 import traceback
 
-# gremlin imports
-from gremlin_python.structure.graph                 import Graph
-from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+import numpy           as np
+import multiprocessing as mp
 
 import constants as const
 
@@ -29,60 +30,77 @@ cfg  = config.cfg()
 
 ############################################################################
 ##
-## Purpose:   Generate the dataframe to read/write a knowledge graph
+## Purpose:   Heavy lift of writing a knowledge graph vertices and edges
 ##
 ############################################################################
-def rw_json_kg(inst=const.BVAL,dat=[],kg=[],testing=True):
-    ret  = []
-    if not (inst <= const.BVAL or len(dat) == 0 or len(kg) == 0):
-        # get the default configuration
-        cfg  = config.cfg()
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["src"]["index"]
-        typ  = cfg["instances"][inst]["src"]["types"]["kg"]
-        # subscription key
-        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key" ]
-        # graph host
-        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
-        # graph port
-        port = cfg["instances"][inst]["sources"][src][typ]["connection"]["port"]
-        # api
-        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api" ]
-        if not (key == None):
-            if not (len(key) == 0):
-                # url
-                prot = "wss://"
-            else:
-                # url
-                prot = "ws://"
+def write_ve(stem=None,coln=[],kgdat=[],g=None):
+    ret  = None
+    lcol = len(coln)
+    lkg0 = len(kgdat)
+    # creating vertices/edges for exactly one KG
+    if not (stem == None or lcol == 0 or lkg0 == 0 or g == None):
+        if stem == const.V:
+            # create IDs using the ID defined by the vertices
+            ret  = np.asarray(kgdat[0].split("-"))
+            ret  = ["-".join(ret[range(0,len(ret)-1)])]
+            for i in range(0,len(kgdat)):
+                if i == 0:
+                    # add the ID
+                    g    = g.addV(stem).property("id",kgdat[i])
+                else:
+                    # add all of the other properties
+                    if i == len(kgdat)-1:
+                        ret.append(g.property(coln[i-1],kgdat[i]).next())
+                        g    = ret[1]
+                    else:
+                        g    = g.property(coln[i-1],kgdat[i])
+    return ret
+
+############################################################################
+##
+## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
+##
+############################################################################
+def write_nlp(stem=None,coln=[],kgdat=[],g=None):
+    ret  = None
+    if not (stem == None or len(coln) == 0 or len(kgdat) == 0 or g == None):
+        if stem in [const.V,const.E]:
+            # returns for the current stem, one KG row at a time
+            ret  = [write_ve(const.V,coln,k,g) for k in kgdat[const.V]]
+            # possibly have multiple clusters and multiple rows in that cluster
+            for clus in kgdat[const.E]:
+                for blk in clus:
+                    for row in blk:
+                        row1 = int(row[1])
+                        row2 = int(row[2])
+                        # create the ID
+                        ids1 = ret[row1-1][0] + "-" + str(row1)
+                        ids2 = ret[row2-1][0] + "-" +                   str(row2)
+                        ids12= ret[row1-1][0] + "-" + str(row1) + "-" + str(row2)
+                        # get vertices associated to the IDs in question
+                        v1   = ret[row1-1][1]
+                        v2   = ret[row2-1][1]
+                        # create the edge between the vertices in question
+                        g.V(v1).addE(const.E).to(v2).property("id",ids12).next()
         else:
-            # url
-            prot = "ws://"
-        # url
-        url  = prot + host + ":" + port + "/" + api
-        if not testing:
-            ftext= []
-            try:
-                # instantiate a JanusGraph object
-                graph= Graph()
-                # connection to the remote server
-                conn = DriverRemoteConnection(url,'g')
-                # get the remote graph traversal
-                g    = graph.traversal().withRemote(conn)
-                # all the lines from a page, including noise
-                for i in kg:
-                    for reg in json["regions"]:
-                        line = reg["lines"]
-                        for elem in line:
-                            ltext = " ".join([word["text"] for word in elem["words"]])
-                            ftext.append(ltext.lower())
-            except Exception as err:
-                ftext.append(str(err))
-            # clean array containing only important data
-            for line in ftext:
-                ret.append(line)
-        else:
-            ret  = [src,typ,key,host,url]
+            # just a placeholder for the moment
+            # call the appropriate function in the future
+            # then append things to the graph using property tags
+            ret  = None
+    return ret
+
+############################################################################
+##
+## Purpose:   Heavy lift of writing a knowledge graph
+##
+############################################################################
+def write_kg(coln=[],kgdat=[],g=None):
+    ret  = None
+    lcol = len(coln)
+    lkg  = len(kgdat)
+    if not (lcol == 0 or lkg == 0 or g == None):
+        # returns for each stem, one KG row at a time
+        ret  = [write_nlp(stem,coln,kgdat,g) for stem in const.stems]
     return ret
 
 ############################################################################
