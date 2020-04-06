@@ -25,6 +25,8 @@ import multiprocessing as mp
 
 import constants as const
 
+from nn    import dbn
+
 # read the default json config file
 cfg  = config.cfg()
 
@@ -64,11 +66,18 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
 def write_nlp(stem=None,coln=[],kgdat=[],g=None):
     ret  = None
     if not (stem == None or len(coln) == 0 or len(kgdat) == 0 or g == None):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["kg"]
+        # file extension
+        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
         if stem in [const.V,const.E]:
+            # current set of vertices
+            vert = kgdat[const.V]
             # returns for the current stem, one KG row at a time
-            ret  = [write_ve(const.V,coln,k,g) for k in kgdat[const.V]]
+            ret  = [write_ve(const.V,coln,k,g) for k in vert]
             # possibly have multiple clusters and multiple rows in that cluster
             for clus in kgdat[const.E]:
+                crow = []
                 for blk in clus:
                     for row in blk:
                         row1 = int(row[1])
@@ -82,6 +91,24 @@ def write_nlp(stem=None,coln=[],kgdat=[],g=None):
                         v2   = ret[row2-1][1]
                         # create the edge between the vertices in question
                         g.V(v1).addE(const.E).to(v2).property("id",ids12).next()
+                        # add the current row1 value to the list of rows in this cluster
+                        crow.append(row1)
+                # write the graph to disk
+                fl   = "data/" + ret[0][0] + ext
+                g.io(fl).write().iterate()
+                # data to generate a neural network for the rows in the current cluster
+                dat  = np.asarray(vert)[np.unique(crow),1:]
+                # generate the model
+                mdl  = dbn(dat[:,1:]
+                          ,dat[:,0]
+                          ,loss="mean_squared_error"
+                          ,optimizer="sgd"
+                          ,rbmact="selu"
+                          ,dbnact="tanh"
+                          ,dbnout=1)
+                # identify the file and save the data from the current cluster
+                fl   = "models/" + ret[0][0] + ".h5"
+                mdl.save(fl)
         else:
             # just a placeholder for the moment
             # call the appropriate function in the future
@@ -101,6 +128,94 @@ def write_kg(coln=[],kgdat=[],g=None):
     if not (lcol == 0 or lkg == 0 or g == None):
         # returns for each stem, one KG row at a time
         ret  = [write_nlp(stem,coln,kgdat,g) for stem in const.STEMS]
+    return ret
+
+############################################################################
+##
+## Purpose:   Get the URL to the knowledge graph
+##
+############################################################################
+def url_kg(inst=const.BVAL):
+    ret  = None
+    if not (inst <= const.BVAL):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["kg"]
+        # subscription key
+        key  = cfg["instances"][inst]["sources"][src]["connection"]["key" ]
+        # graph host
+        host = cfg["instances"][inst]["sources"][src]["connection"]["host"]
+        # graph port
+        port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
+        # set the url
+        if not (key == None):
+            if not (len(key) == 0):
+                # protocol
+                prot = "wss://"
+            else:
+                # protocol
+                prot = "ws://"
+        else:
+            # protocol
+            prot = "ws://"
+        # create the url
+        ret  = prot + host + ":" + port + "/" + api
+    return ret
+
+############################################################################
+##
+## Purpose:   Read a knowledge graph from the remote DB
+##
+############################################################################
+def read_kg(inst=const.BVAL,coln={}):
+    ret  = {"labels":[],"nns":[],"dat":[]}
+    if not (inst <= const.BVAL or coln == {}):
+        try:
+            # depending upon what I decide to pass as arguments,
+            # might be able to get the instance from lbl
+            #
+            # url to the remote KG DB
+            url  = url_kg(inst)
+            # instantiate a JanusGraph object
+            graph= Graph()
+            # connection to the remote server
+            conn = DriverRemoteConnection(url,'g')
+            # get the remote graph traversal
+            g    = graph.traversal().withRemote(conn)
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["kg"]
+            # file extension
+            ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
+            # create the label that defines the ID of the data
+            lbl  = "-".join([str(inst)].extend(coln.keys()))
+            # read all files matching the current pattern determined by lbl
+            fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind("-")] == lbl} for r,d,f in os.walk("data/")]
+            for fl in fls:
+                # add the label and neural network for this file
+                ret["labels"].append(fl.keys())
+                ret["nns"].append("models/"+fl.keys()+".h5")
+                # read the data for this file
+                g.io("data/"+fl.values()).read().iterate()
+                # get the data set
+                dat  = g.V().hasLabel("vertices").valueMap(True).toList()
+                # parse the data set into what we want, assuming that the label
+                # consists of instance, brain, cluster and row numbers
+                if not (len(dat) == 0):
+                    dat  = np.unique([[dat[j].values()[i][0] for i in range(0,len(dat[0].values()))                                     \
+                                       if dat[j].keys()[i] in coln.keys() and dat[j]["id"][0:dat[j]["id"].rfind("-")] == fl.rfind(ext)] \
+                                       for j in range(0,len(dat))],axis=0)
+                    # add the data for this file
+                    ret["dat"].append(dat)
+                else:
+                    ret["dat"].append(None)
+                # drop all of the data that was just loaded
+                g.E().drop().iterate()
+                g.V().drop().iterate()
+            # close the connection
+            conn.close()
+        except Exception as err:
+            ret  = str(err)
     return ret
 
 ############################################################################

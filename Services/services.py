@@ -99,31 +99,8 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
     lcol = len(coln)
     lkg  = len(kgdat)
     if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["kg"]
-        # subscription key
-        key  = cfg["instances"][inst]["sources"][src]["connection"]["key" ]
-        # graph host
-        host = cfg["instances"][inst]["sources"][src]["connection"]["host"]
-        # graph port
-        port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
-        # api
-        api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
-        # api
-        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
-        # set the url
-        if not (key == None):
-            if not (len(key) == 0):
-                # protocol
-                prot = "wss://"
-            else:
-                # protocol
-                prot = "ws://"
-        else:
-            # protocol
-            prot = "ws://"
         # create the url
-        url  = prot + host + ":" + port + "/" + api
+        url  = data.url_kg(inst)
         # set the output file extension
         if not (ext == None):
             if len(ext) == 0:
@@ -142,10 +119,9 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
                     g    = graph.traversal().withRemote(conn)
                     # write the graph to memory
                     ret.append(data.write_kg(coln,k,g))
-                    # write the graph to disk
-                    ids  = np.asarray(k[const.V][0][0].split("-"))
-                    ids  = "-".join(ids[range(0,len(ids)-1)])
-                    g.io("data/"+ids+ext).write().iterate()
+                    # drop the graph
+                    g.E().drop().iterate()
+                    g.V().drop().iterate()
                     # close the connection
                     conn.close()
             except Exception as err:

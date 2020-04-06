@@ -45,6 +45,7 @@ def dbn(inputs=[]
        ,encs=None
        ,verbose=0):
     model= None
+    print(inputs); print(outputs)
     if inputs.any() and outputs.any():
         # seed the random number generator for repeatable results
         np.random.seed(12345)
