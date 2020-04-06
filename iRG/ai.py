@@ -245,13 +245,49 @@ def brain(dat=[],splits=2):
             # projections onto the last feature of the data, as we are only using
             # the last of the input features in the definition of the outputs
             odat = to_categorical(dat[:,len(perm)-1],num_classes=splits**(2*p))
-            # generate the model
+            # generate the cluster model
             mdl  = dbn(dat[:,perm],odat,splits=splits,props=p)
-            # save the model to a local file
+            # save the cluster model to a local file
             fl   = "models/" + lbl + ".h5"
             mdl.save(fl)
+            # generate the regression model whose genesis is to learn the
+            # model of the distribution of the highly correlated set of data
+            # points that are assumed to have the markov property, meaning
+            # that the most recent data point (or the last data point, in this case)
+            # carries with it all information about the data points that preceded it
+            # in the sequence of sampled output ... the idea for this model is simple
+            # ... learn the distribution of the previous data points that will predict
+            # the last data point ... then we can make predictions about the next values
+            # to be be seen in the input sequence, as a distribution of this type will
+            # be needed by the thought function
+            #
+            # the thought function will infer the next data points, which can be used to
+            # infer the cluster to which the next data points belong using the clustering
+            # model ... then we can predict the one-dimensional output as a function of the
+            # multi-dimensional inputs using the specific cluster regression models that are
+            # produced elsewhere ... the idea is this
+            #
+            # we have inputs from which we infer the next set of inputs, which will allow
+            # us to make inferences about the set of outputs of interest
+            #
+            # we use almost all inputs and reason about the next set of inputs to get to the desired outputs
+            # as this is the normal (human) thought process that we are attempting to model
+            #
+            # the way that we will find this model is to have the (k-1)-th data point to predict the k-th data point
+            # since the markov property guarantees that only the (k-1)-th data point is significant in predicting
+            # its successor k-th data point
+            mdl  = dbn(dat[0:(len(dat)-1),perm]
+                      ,dat[1: len(dat)   ,perm]
+                      ,loss="mean_squared_error"
+                      ,optimizer="sgd"
+                      ,rbmact="selu"
+                      ,dbnact="tanh"
+                      ,dbnout=len(perm))
+            # regression model
+            rfl  = "models/" + "".join(lbl.split("-")) + ".h5"
+            mdl.save(rfl)
             # add the current label and model to the return
-            ret.append({"label":lbl,"model":fl})
+            ret.append({"label":lbl,"model":fl,"rmodel":rfl})
     return ret
 
 ############################################################################
@@ -259,20 +295,72 @@ def brain(dat=[],splits=2):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=const.BVAL,lbl=None):
+def thought(inst=0,coln={},preds=3):
     ret  = []
-    if not (inst <= const.BVAL or lbl == None):
+    if not (inst == None or coln == {} or preds <= 0):
         # assume that models are built so we will search the models
         # in the DB and return the one corresponding to the label 
         #
         # neural networks obtained from the DB later ... None for now
-        df   = rw_kg(inst)
-        nns  = df["nns"]
-        for nn in nns:
-            if lbl == nn["label"]:
-                # load the model from the file path that is returned
-                ret  = nn["model"]
-                break
+        df   = data.read_kg(inst,coln)
+        # labels for each cluster
+        lbls = df["labels"]
+        # beginning and end indices in the label string that need to be removed to find the brain
+        b    = lbls[0].find("-")
+        e    = lbls[0].rfind("-")
+        # file for the clustering model
+        fl   = "models/" + lbls[b:e] + ".h5"
+        if os.path.exists(fl) and os.path.getsize(fl) > 0:
+            # the data set for each cluster
+            data = df["dat"]
+            # we could take the original data set that has been broken into clusters and merge it,
+            # then shuffle it to randomize it (the original ordering doesn't matter much
+            # in our case as the next point in the markov process only depends upon the last
+            # one and the last one defines the first point used to find our predicted inputs)
+            # instead we will just take the medians of the individual columns to make a new point
+            dat  = data[0]
+            if len(data) > 1:
+                for d in data[1:len(data)]:
+                    dat  = np.vstack(dat,d)
+            # so what we will do is to manufacture a data point by taking the median of each
+            # column of the data defining the brain then predict the cluster for that data point
+            pt   = np.resize([median(dat[:,i]) for i in range(0,len(dat[0,:]))],(1,len(dat[0,:])))
+            # load the clustering model and make the cluster prediction for this data point
+            mdl  = load_model(fl)
+            pred = mdl.predict(pt)
+            pred = [i for i in range(0,len(pred)) if pred[i] == max(pred)][0]
+            # regression neural networks for the predicted cluster
+            nnet = df["nns"][pred]
+            # what we want to do is to use the regression network for this brain
+            # where the brain is obtained as the set of values in the dictionary
+            # coln and make the number of requested predictions preds ... this network
+            # is also defined by the labels when we remove the instance found before
+            # the first "-" in the label and the cluster, which is found when removing characters
+            # after the last "-" in the label ... then we just squeeze the remaining
+            # characters and prepend with the "models/" directory and add the ".h5" file ext
+            #
+            # then get the column indices of the original data set that defines this brain
+            cols = lbls[b:e].split("-")
+            # load the regression model for this brain so we can make the predictions
+            # of the next input data points that will be seen beyond the current data set
+            rfl  = "models/" + "".join(cols) + ".h5"
+            if os.path.exists(rfl) and os.path.getsize(rfl) > 0:
+                rmdl = load_model(rfl)
+                # so we load the model and make the predictions preds ... after making the
+                # requested number of predictions, we use the main clustering model that has
+                # almost the same name as the regression model, except we don't squeeze the remaining
+                # characters since we leave the "-" in between ... we predict the cluster of the
+                # resulting predictions from the regression model so that we know which cluster model
+                # to use when making the final (more specific) regression predictions preds
+                #
+                # making the requested number of predictions
+                rdat = []
+                for i in range(0,preds):
+                    npt  = rmdl.predict(pt)[0]
+                    rdat.append(npt)
+                    pt   = npt
+                # using these data points, make the predictions using nnet
+                ret  = rmdl.predict(rdat)
     return ret
 
 ############################################################################
