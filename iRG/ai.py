@@ -309,7 +309,7 @@ def thought(inst=0,coln={},preds=3):
         b    = lbls[0].find("-")
         e    = lbls[0].rfind("-")
         # file for the clustering model
-        fl   = "models/" + lbls[b:e] + ".h5"
+        fl   = "models/" + lbls[0][b:e] + ".h5"
         if os.path.exists(fl) and os.path.getsize(fl) > 0:
             # the data set for each cluster
             data = df["dat"]
@@ -324,11 +324,10 @@ def thought(inst=0,coln={},preds=3):
                     dat  = np.vstack(dat,d)
             # so what we will do is to manufacture a data point by taking the median of each
             # column of the data defining the brain then predict the cluster for that data point
-            pt   = np.resize([median(dat[:,i]) for i in range(0,len(dat[0,:]))],(1,len(dat[0,:])))
+            pt   = np.resize(np.median([row for row in dat if not (row == None)],axis=0),(1,len(dat[0])))
             # load the clustering model and make the cluster prediction for this data point
             mdl  = load_model(fl)
-            pred = mdl.predict(pt)
-            pred = [i for i in range(0,len(pred)) if pred[i] == max(pred)][0]
+            pred = store(mdl.predict(pt))
             # regression neural networks for the predicted cluster
             nnet = df["nns"][pred]
             # what we want to do is to use the regression network for this brain
@@ -340,11 +339,12 @@ def thought(inst=0,coln={},preds=3):
             # characters and prepend with the "models/" directory and add the ".h5" file ext
             #
             # then get the column indices of the original data set that defines this brain
-            cols = lbls[b:e].split("-")
+            cols = lbls[0][b:e].split("-")
             # load the regression model for this brain so we can make the predictions
             # of the next input data points that will be seen beyond the current data set
             rfl  = "models/" + "".join(cols) + ".h5"
             if os.path.exists(rfl) and os.path.getsize(rfl) > 0:
+                # load the particular regression model for the chosen cluster
                 rmdl = load_model(rfl)
                 # so we load the model and make the predictions preds ... after making the
                 # requested number of predictions, we use the main clustering model that has
