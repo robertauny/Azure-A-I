@@ -102,6 +102,10 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
         # create the url
         url  = data.url_kg(inst)
         # set the output file extension
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["kg"]
+        # file extension
+        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
         if not (ext == None):
             if len(ext) == 0:
                 ext  = const.EXT
@@ -118,7 +122,7 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
                     # get the remote graph traversal
                     g    = graph.traversal().withRemote(conn)
                     # write the graph to memory
-                    ret.append(data.write_kg(coln,k,g))
+                    ret.append(data.write_kg(inst,coln,k,g))
                     # drop the graph
                     g.E().drop().iterate()
                     g.V().drop().iterate()

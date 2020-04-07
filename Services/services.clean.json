@@ -19,6 +19,7 @@
 						"port" : "8182",
 						"key"  : null,
 						"api"  : "gremlin",
+						"home" : "/usr/local/apache-tinkerpop-gremlin-server-3.4.6",
 						"ext"  : ".xml"
 					},
 					"special" : null

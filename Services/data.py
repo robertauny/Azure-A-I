@@ -14,18 +14,23 @@
 ##
 ############################################################################
 
-from joblib import Parallel, delayed
+from joblib                                         import Parallel, delayed
 
-import config
+import os
 import sys
 import traceback
+
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 import numpy           as np
 import multiprocessing as mp
 
+import config
 import constants as const
 
-from nn    import dbn
+from nn                                             import dbn
 
 # read the default json config file
 cfg  = config.cfg()
@@ -63,9 +68,9 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
 ## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
 ##
 ############################################################################
-def write_nlp(stem=None,coln=[],kgdat=[],g=None):
+def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
     ret  = None
-    if not (stem == None or len(coln) == 0 or len(kgdat) == 0 or g == None):
+    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0 or g == None):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["kg"]
         # file extension
@@ -97,10 +102,10 @@ def write_nlp(stem=None,coln=[],kgdat=[],g=None):
                 fl   = "data/" + ret[0][0] + ext
                 g.io(fl).write().iterate()
                 # data to generate a neural network for the rows in the current cluster
-                dat  = np.asarray(vert)[np.unique(crow),1:]
+                dat  = np.asarray(vert)[np.unique(crow)-1,1:]
                 # generate the model
-                mdl  = dbn(dat[:,1:]
-                          ,dat[:,0]
+                mdl  = dbn(np.asarray([map(float,row) for row in dat[:,1:]])
+                          ,np.asarray(map(float,dat[:,0]))
                           ,loss="mean_squared_error"
                           ,optimizer="sgd"
                           ,rbmact="selu"
@@ -121,13 +126,13 @@ def write_nlp(stem=None,coln=[],kgdat=[],g=None):
 ## Purpose:   Heavy lift of writing a knowledge graph
 ##
 ############################################################################
-def write_kg(coln=[],kgdat=[],g=None):
+def write_kg(inst=const.BVAL,coln=[],kgdat=None,g=None):
     ret  = None
     lcol = len(coln)
     lkg  = len(kgdat)
-    if not (lcol == 0 or lkg == 0 or g == None):
+    if not (inst <= const.BVAL or lcol == 0 or lkg == 0 or g == None):
         # returns for each stem, one KG row at a time
-        ret  = [write_nlp(stem,coln,kgdat,g) for stem in const.STEMS]
+        ret  = [write_nlp(stem,inst,coln,kgdat,g) for stem in const.STEMS]
     return ret
 
 ############################################################################
@@ -185,28 +190,33 @@ def read_kg(inst=const.BVAL,coln={}):
             g    = graph.traversal().withRemote(conn)
             # ordering of the data elements in the JSON file
             src  = cfg["instances"][inst]["kg"]
+            # gremlin home dir
+            home = cfg["instances"][inst]["sources"][src]["connection"]["home"]
             # file extension
             ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
             # create the label that defines the ID of the data
-            lbl  = "-".join([str(inst)].extend(coln.keys()))
+            lbl  = [str(inst)]
+            lbl.extend(coln.values())
+            lbl  = "-".join(map(str,lbl))
             # read all files matching the current pattern determined by lbl
-            fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind("-")] == lbl} for r,d,f in os.walk("data/")]
+            fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind("-")] == lbl} for r,d,f in os.walk(home+"/data/")]
             for fl in fls:
-                # add the label and neural network for this file
-                ret["labels"].append(fl.keys())
-                ret["nns"].append("models/"+fl.keys()+".h5")
+                # add the label for this file
+                ret["labels"].append(fl.keys()[0])
+                # add the neural network for this file
+                ret["nns"].append("models/"+fl.keys()[0]+".h5")
                 # read the data for this file
-                g.io("data/"+fl.values()).read().iterate()
+                g.io(home+"/data/"+fl.values()[0]).read().iterate()
                 # get the data set
                 dat  = g.V().hasLabel("vertices").valueMap(True).toList()
                 # parse the data set into what we want, assuming that the label
                 # consists of instance, brain, cluster and row numbers
                 if not (len(dat) == 0):
-                    dat  = np.unique([[dat[j].values()[i][0] for i in range(0,len(dat[0].values()))                                     \
-                                       if dat[j].keys()[i] in coln.keys() and dat[j]["id"][0:dat[j]["id"].rfind("-")] == fl.rfind(ext)] \
+                    ndat = np.unique([[dat[j].values()[i][0] for i in range(0,len(dat[0].values()))                                          \
+                                       if dat[j].keys()[i] in coln.keys() and dat[j]["id"][0][0:dat[j]["id"][0].rfind("-")] == fl.keys()[0]] \
                                        for j in range(0,len(dat))],axis=0)
                     # add the data for this file
-                    ret["dat"].append(dat)
+                    ret["dat"].append(np.median(ndat,axis=0))
                 else:
                     ret["dat"].append(None)
                 # drop all of the data that was just loaded
