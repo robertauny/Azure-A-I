@@ -306,28 +306,33 @@ def thought(inst=0,coln={},preds=3):
         # labels for each cluster
         lbls = df["labels"]
         # beginning and end indices in the label string that need to be removed to find the brain
-        b    = lbls[0].find("-")
+        b    = lbls[0].find("-") + 1
         e    = lbls[0].rfind("-")
         # file for the clustering model
-        fl   = "models/" + lbls[0][b:e] + ".h5"
+        fl   = str("models/"+lbls[0][b:e]+".h5")
         if os.path.exists(fl) and os.path.getsize(fl) > 0:
             # the data set for each cluster
-            data = df["dat"]
+            dat1 = df["dat"]
             # we could take the original data set that has been broken into clusters and merge it,
             # then shuffle it to randomize it (the original ordering doesn't matter much
             # in our case as the next point in the markov process only depends upon the last
             # one and the last one defines the first point used to find our predicted inputs)
             # instead we will just take the medians of the individual columns to make a new point
-            dat  = data[0]
-            if len(data) > 1:
-                for d in data[1:len(data)]:
-                    dat  = np.vstack(dat,d)
+            #
             # so what we will do is to manufacture a data point by taking the median of each
             # column of the data defining the brain then predict the cluster for that data point
-            pt   = np.resize(np.median([row for row in dat if not (row == None)],axis=0),(1,len(dat[0])))
+            if not (len(dat1) <= 1):
+                dat  = dat1[0]
+                if len(dat1) > 1:
+                    for d in dat1[1:len(dat1)]:
+                        dat  = np.vstack(dat,d)
+                pt   = np.resize(np.median([row for row in dat if not (row == None)],axis=0),(1,len(dat[0])))
+            else:
+                if not (len(dat1) == 0):
+                    pt   = np.resize(dat1,(1,len(dat1[0])))
             # load the clustering model and make the cluster prediction for this data point
             mdl  = load_model(fl)
-            pred = store(mdl.predict(pt))
+            pred = store(mdl.predict(pt)[0])
             # regression neural networks for the predicted cluster
             nnet = df["nns"][pred]
             # what we want to do is to use the regression network for this brain
@@ -342,7 +347,7 @@ def thought(inst=0,coln={},preds=3):
             cols = lbls[0][b:e].split("-")
             # load the regression model for this brain so we can make the predictions
             # of the next input data points that will be seen beyond the current data set
-            rfl  = "models/" + "".join(cols) + ".h5"
+            rfl  = str("models/"+"".join(cols)+".h5")
             if os.path.exists(rfl) and os.path.getsize(rfl) > 0:
                 # load the particular regression model for the chosen cluster
                 rmdl = load_model(rfl)
@@ -358,9 +363,9 @@ def thought(inst=0,coln={},preds=3):
                 for i in range(0,preds):
                     npt  = rmdl.predict(pt)[0]
                     rdat.append(npt)
-                    pt   = npt
+                    pt   = np.resize(npt,(1,len(npt)))
                 # using these data points, make the predictions using nnet
-                ret  = rmdl.predict(rdat)
+                ret  = rmdl.predict(np.asarray(rdat))
     return ret
 
 ############################################################################
