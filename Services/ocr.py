@@ -23,6 +23,5 @@ import constants as const
 ## Purpose:   Extraction of characters from PDFs
 ##
 ############################################################################
-def cognitive_testing(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=False):
+def ocr_testing(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=False):
     print(cognitive(const.OCR,pdfs,inst,testing))
-    print(cognitive(const.EE ,pdfs,inst,testing))
