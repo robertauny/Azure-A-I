@@ -6,9 +6,10 @@
 			"src": {
 				"index" : 2,
 				"types" : {
-					"mysql" : 0,
-					"ocr"   : 1,
-					"glove" : 2
+					"mysql"      : 0,
+					"ocr"        : 1,
+					"keyPhrases" : 2,
+					"glove"      : 3
 				}
 			},
 			"sources" : [
@@ -54,6 +55,16 @@
 							"app"  : "ocr",
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "key",
+							"dir"  : "dir"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "keyPhrases",
+							"host" : "westus.api.cognitive.microsoft.com",
+							"api"  : "text/analytics",
 							"ver"  : "v2.1",
 							"key"  : "key",
 							"dir"  : "dir"

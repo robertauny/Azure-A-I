@@ -14,12 +14,15 @@
 ##
 ############################################################################
 
-from services import ocr
+from services import cognitive
+
+import constants as const
 
 ############################################################################
 ##
 ## Purpose:   Extraction of characters from PDFs
 ##
 ############################################################################
-def ocr_testing(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=False):
-    print(ocr(pdfs,inst,testing))
+def cognitive_testing(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=False):
+    print(cognitive(const.OCR,pdfs,inst,testing))
+    print(cognitive(const.EE ,pdfs,inst,testing))

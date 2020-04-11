@@ -86,8 +86,8 @@ def cs(docs=["/home/robert/data/java/test/test.java"]
 ## Purpose:   For each column in the passed data set, attempt to correct errors.
 ##
 ############################################################################
-def ocr(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
-    return ai.ocr(pdfs,inst,testing)
+def cognitive(wtyp=const.OCR,pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
+    return ai.cognitive(wtyp,pdfs,inst,testing)
 
 ############################################################################
 ##
