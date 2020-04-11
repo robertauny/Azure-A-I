@@ -14,10 +14,10 @@
 ##
 ############################################################################
 
-from joblib                       import Parallel, delayed
+from joblib                       import Parallel,delayed
 from itertools                    import combinations,combinations_with_replacement
 from string                       import punctuation
-from math                         import ceil, log, exp
+from math                         import ceil,log,exp
 
 from keras.utils                  import to_categorical
 from keras.models                 import load_model
@@ -30,6 +30,7 @@ from PIL                          import Image
 
 import requests
 import io
+import json
 
 import numpy  as np
 import pandas as pd
@@ -141,6 +142,24 @@ def split(dat=[],ind=0):
 
 ############################################################################
 ##
+## Purpose:   Check if a string is actually a number
+##
+############################################################################
+def is_number(dat=None):
+    ret  = False
+    if not (dat == None):
+        if (type(dat) in [type([]),type(np.asarray([]))]):
+            ret  = map(is_number,dat)
+        else:
+            try:
+                dump = float(dat)
+                ret  = True
+            except ValueError:
+                ret  = False
+    return ret
+
+############################################################################
+##
 ## Purpose:   Unique label for each row of data with cluster number and row number
 ##
 ############################################################################
@@ -202,7 +221,8 @@ def permute(dat=[],mine=True,l=3):
             # permute the array of indices beginning with the first element
             for j in range(0,sz+1):
                 # all permutations of the array of indices
-                jdat = dat[j:] + dat[:j]
+                jdat = list(dat[j:])
+                jdat.extend(list(dat[:j]))
                 for i in range(0,sz):
                     # only retain the sub arrays that are length >= 2
                     tmp = [list(x) for x in combinations(jdat,i+2)]
@@ -295,9 +315,9 @@ def brain(dat=[],splits=2):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=0,coln={},preds=3):
+def thought(inst=0,coln=[],preds=3):
     ret  = []
-    if not (inst == None or coln == {} or preds <= 0):
+    if not (inst == None or len(coln) == 0 or preds <= 0):
         # assume that models are built so we will search the models
         # in the DB and return the one corresponding to the label 
         #
@@ -366,77 +386,6 @@ def thought(inst=0,coln={},preds=3):
                     pt   = np.resize(npt,(1,len(npt)))
                 # using these data points, make the predictions using nnet
                 ret  = rmdl.predict(np.asarray(rdat))
-    return ret
-
-############################################################################
-##
-## Purpose:   Convert Python image library (PIL) image to an array
-##
-############################################################################
-def pil2array(pil=None):
-    ret  = None
-    if not (pil == None):
-        # get addressable memory for writing the image
-        imgb = io.BytesIO()
-        # save the passed image to the addressable memory
-        pil.save(imgb,format='PNG')
-        # get a reference to the addressable memory for the return
-        ret  = imgb.getvalue()
-    return ret
-
-############################################################################
-##
-## Purpose:   Convert Python image library (PIL) image data to text
-##
-############################################################################
-def img2txt(img=[],inst=const.BVAL,testing=True):
-    ret  = []
-    if not (len(img) == 0 or inst <= const.BVAL):
-        # get the default configuration
-        cfg  = config.cfg()
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["src"]["index"]
-        typ  = cfg["instances"][inst]["src"]["types"]["ocr"]
-        # azure subscription key
-        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
-        # azure vision api
-        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
-        # api
-        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
-        # version
-        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
-        # app
-        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
-        # url
-        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
-        # request headers. Important: content should be bytestream as we are sending an image from local
-        hdrs = {"Ocp-Apim-Subscription-Key":key,"Content-Type":"application/octet-stream"}
-        # request parameters: language is unknown, and we do detect orientation
-        parms= {"language":"unk","detectOrientation":"true"}
-        if not testing:
-            ftext= []
-            for i in img:
-                try:
-                    # get response from the server
-                    resp = requests.post(url,headers=hdrs,params=parms,data=i)
-                    resp.raise_for_status()
-                    # get json data to parse it later
-                    json = resp.json()
-                    # all the lines from a page, including noise
-                    for reg in json["regions"]:
-                        line = reg["lines"]
-                        for elem in line:
-                            ltext = " ".join([word["text"] for word in elem["words"]])
-                            ftext.append(ltext.lower())
-                except HTTPError as herr:
-                    ftext.append(str(herr))
-                except Exception as err:
-                    ftext.append(str( err))
-            # clean array containing only important data
-            for line in ftext:
-                ret.append(line)
-        else:
-            ret  = [src,typ,key,host,url,hdrs,parms]
     return ret
 
 ############################################################################
@@ -617,9 +566,9 @@ def glove(tok=None,words=0):
                 # append the last value to the end of what's currently specified for this word
                 ret[word].append(lval)
             # current keys
-            keys = np.asarray(ret.keys())
+            keys = np.asarray(list(ret.keys()))
             # current values
-            vals = np.asarray(ret.values())
+            vals = np.asarray(list(ret.values()))
             # current count of words in the dictionary
             #
             # if uwrd < len(tok.word_index.keys()), then we need to recycle and restart the count after uwrd words
@@ -671,7 +620,7 @@ def glovemost(dat=[]):
         # tokenize the data
         tok.fit_on_texts(txts)
         # tokenized keys and values with values corresponding to key rank in the corpus
-        items= np.asarray(tok.word_index.items())
+        items= np.asarray(list(tok.word_index.items()))
         # get the glove keys and values
         keys = items[:,0]
         uks  = np.unique(keys)
@@ -944,6 +893,100 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
 
 ############################################################################
 ##
+## Purpose:   Convert Python image library (PIL) image to an array
+##
+############################################################################
+def pil2array(pil=None):
+    ret  = None
+    if not (pil == None):
+        # get addressable memory for writing the image
+        imgb = io.BytesIO()
+        # save the passed image to the addressable memory
+        pil.save(imgb,format='PNG')
+        # get a reference to the addressable memory for the return
+        ret  = imgb.getvalue()
+    return ret
+
+############################################################################
+##
+## Purpose:   Convert Python image library (PIL) image data to text
+##            Other text analytics
+##
+############################################################################
+def cognitive(wtyp="ocr",docs=[],inst=const.BVAL,testing=True):
+    ret  = []
+    if not (wtyp == None or len(docs) == 0 or inst <= const.BVAL):
+        # get the default configuration
+        cfg  = config.cfg()
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["src"]["index"]
+        typ  = cfg["instances"][inst]["src"]["types"][wtyp]
+        # azure subscription key
+        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
+        # azure vision api
+        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
+        # version
+        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
+        # app
+        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
+        # url
+        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
+        # request headers. Important: content should be bytestream as we are sending an image from local
+        hdrs = {"Ocp-Apim-Subscription-Key":key,"Content-Type":"application/octet-stream"}
+        # request parameters: language is unknown, and we do detect orientation
+        parms= {"language":"unk","detectOrientation":"true"}
+        if not testing:
+            ftext= []
+            if typ == "ocr":
+                for i in docs:
+                    try:
+                        # get response from the server
+                        resp = requests.post(url,headers=hdrs,params=parms,data=i)
+                        resp.raise_for_status()
+                        # get json data to parse it later
+                        json = resp.json()
+                        # all the lines from a page, including noise
+                        for reg in json["regions"]:
+                            line = reg["lines"]
+                            for elem in line:
+                                ltext = " ".join([word["text"] for word in elem["words"]])
+                                ftext.append(ltext.lower())
+                    except HTTPError as herr:
+                        ftext.append(str(herr))
+                    except Exception as err:
+                        ftext.append(str( err))
+            else:
+                # request headers. Important: content should be json as we are sending an array of json objects
+                hdrs["Content-Type"] = "application/json"
+                if typ == "ee":
+                    try:
+                        ijson= { documents: [{"language":parms["language"],"id":i,"text":docs[i]} for i in range(0,len(docs))] }
+                        # get response from the server
+                        resp = requests.post(url,headers=hdrs,params=parms,json=json.dumps(ijson))
+                        resp.raise_for_status()
+                        # get json data to parse it later
+                        json = resp.json()
+                        # all the lines from a page, including noise
+                        for doc in json["documents"]:
+                            keys = doc["keyPhrases"]
+                            ftext.append(keys)
+                    except HTTPError as herr:
+                        ftext.append(str(herr))
+                    except Exception as err:
+                        ftext.append(str( err))
+                else:
+                    ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+            # clean array containing only important data
+            for line in ftext:
+                ret.append(line)
+        else:
+            ret  = [src,typ,key,host,url,hdrs,parms]
+    return ret
+
+############################################################################
+##
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
@@ -964,14 +1007,19 @@ def ocre(imgs=[]):
 def ocr(pdfs=[],inst=const.BVAL,testing=True):
     ret  = None
     if not (len(pdfs) == 0 or inst <= const.BVAL):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["src"]["index"]
+        typ  = cfg["instances"][inst]["src"]["types"]["ocr"]
+        # app
+        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
         # number of cpu cores
         nc   = mp.cpu_count()
         # converted images
-        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)( pdfs[i]             ) for i in range(0,len(pdfs )))
-        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )( imgs[i]             ) for i in range(0,len(imgs )))
-        oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                  ) for i in range(0,len(pdfs )))
+        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                  ) for i in range(0,len(imgs )))
+        oimgs=     Parallel(n_jobs=nc)(delayed(cognitive        )(app,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
         if not (len(oimgs) <= 1):
-            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]             ) for i in range(1,len(oimgs)))
+            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                 ) for i in range(1,len(oimgs)))
         else:
             if not (len(oimgs) == 0):
                 ret  = oimgs[0]
@@ -1037,8 +1085,8 @@ def blocks(tok=None):
         #
         # word counts
         cnts       = tok.word_counts.items()
-        keys       = dict(cnts).keys()
-        vals       = dict(cnts).values()
+        keys       = list(dict(cnts).keys())
+        vals       = list(dict(cnts).values())
         # median of the counts
         med        = np.median(vals)
         # pseudo squared error
@@ -1122,8 +1170,11 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # still allows us to extend our original data set beyond the original corpus
             gmat = {word:gdat[word] for word,i in tok.word_index.items() if word in gdat.keys()}
             if not (gmat == {}):
+                # gmat keys and values
+                gkeys= list(gmat.keys())
+                gvals= list(gmat.values())
                 # number of clusters is different than the default defined by the splits and properties
-                clust= len(gmat[gmat.keys()[0]])-1
+                clust= len(gmat[list(gmat.keys())[0]])-1
                 #
                 s    = splits
                 # we want to find the value p such that s**(2*p) gives the same number
@@ -1140,7 +1191,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # 
                 # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
                 # can consist of one unique value for each row of constants
-                ovals= to_categorical(np.sum(gmat.values(),axis=1),num_classes=clust)
+                ovals= to_categorical(np.sum(vals,axis=1),num_classes=clust)
                 # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
                 # of a plane ... i.e. each row of constants defines an element of a conditional specification
                 #
@@ -1175,7 +1226,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # of any arbitrary word in the glove data set when dot product with the constants associated to another word
                 #
                 # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
-                ivals= np.asarray(gmat.values())
+                ivals= np.asarray(vals)
                 # create the model using the inputs
                 model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
                 # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
@@ -1195,7 +1246,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 gd   = glove(tok,clust+1)
                 # predict the right values and add them to the output
                 for word,i in tok.word_index.items():
-                    if not (word in gmat.keys()):
+                    if not (word in gkeys):
                         gdat[word] = model.predict(np.reshape(gd[word],(1,clust+1)))
     return gdat
 
@@ -1251,9 +1302,9 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
         gmat = {word:gdat[word] for word in np.asarray(items)[wrds,0]}
         if not (gmat == {}):
             # keys
-            keys = gmat.keys()
+            keys = list(gmat.keys())
             # values
-            vals = gmat.values()
+            vals = list(gmat.values())
             # number of clusters is different than the default defined by the splits and properties
             clust= uwrd
             #
@@ -1316,7 +1367,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
             #
             # sequences associated to the identified code blocks that potentially house code vulnerabilities
             #bseq = [[ivals[i] for i,word in enumerate(keys) if word in blks[blk]] for blk in blks.keys()]
-            bseq = [ivals[i] for i,word in enumerate(keys) if word in blks[blks.keys()[len(blks)-1]]]
+            bseq = [ivals[i] for i,word in enumerate(keys) if word in blks[list(blks.keys())[len(blks)-1]]]
             # sequences are in a form that can be passed to the model ... take the median
             pseq = np.median(np.asarray(bseq),axis=0).reshape((1,clust))
             # at this point, we have the global distribution (random field) obtained by using a deep belief network and the
@@ -1375,8 +1426,9 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                                  }
                     else:
                         ret[i] = {"-".join(keys):np.asarray(prow).prod()}
-                    rkeys  = np.asarray(ret[i].keys())
-                    rvals  = np.asarray(ret[i].values()) / max(ret[i].values())
+                    rkeys  = np.asarray(list(ret[i].keys()))
+                    rvals  = list(ret[i].values())
+                    rvals  = np.asarray(rvals) / max(rvals)
                     ret[i] = dict(np.transpose([rkeys,rvals]))
     return np.unique(ret)
 
@@ -1522,6 +1574,10 @@ def ai_testing(M=500,N=2):
     # test ocr
     o    = ocr(["/home/robert/data/files/kg.pdf"],0)
     print(o)
+    # create column names (normally obtained by var.dtype.names)
+    coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    # test the thought function with the default number of predictions 3
+    print(thought(inst,coln))
     # get the default configuration
     cfg  = config.cfg()
     # ordering of the data elements in the JSON file
@@ -1544,7 +1600,7 @@ def ai_testing(M=500,N=2):
     for img in imgs:
         pil2 = pil2array(img)
         #print(pil2)
-    src,typ,key,host,url,hdrs,parms = img2txt(imgs,0)
+    src,typ,key,host,url,hdrs,parms = cognitive(docs=imgs,inst=0)
     print(src)
     print(typ)
     print(key)

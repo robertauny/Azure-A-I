@@ -104,8 +104,8 @@ def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
                 # data to generate a neural network for the rows in the current cluster
                 dat  = np.asarray(vert)[np.unique(crow)-1,1:]
                 # generate the model
-                mdl  = dbn(np.asarray([map(float,row) for row in dat[:,1:]])
-                          ,np.asarray(map(float,dat[:,0]))
+                mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
+                          ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
                           ,loss="mean_squared_error"
                           ,optimizer="sgd"
                           ,rbmact="selu"
@@ -173,9 +173,12 @@ def url_kg(inst=const.BVAL):
 ## Purpose:   Read a knowledge graph from the remote DB
 ##
 ############################################################################
-def read_kg(inst=const.BVAL,coln={}):
+def read_kg(inst=const.BVAL,coln=[]):
     ret  = {"labels":[],"nns":[],"dat":[]}
-    if not (inst <= const.BVAL or coln == {}):
+    if not (inst <= const.BVAL or len(coln) == 0):
+        # column keys and values
+        ckeys= np.asarray(coln)[:,0]
+        cvals= np.asarray(coln)[:,1]
         try:
             # depending upon what I decide to pass as arguments,
             # might be able to get the instance from lbl
@@ -196,24 +199,29 @@ def read_kg(inst=const.BVAL,coln={}):
             ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
             # create the label that defines the ID of the data
             lbl  = [str(inst)]
-            lbl.extend(coln.values())
+            lbl.extend(cvals)
             lbl  = "-".join(map(str,lbl))
             # read all files matching the current pattern determined by lbl
             fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind("-")] == lbl} for r,d,f in os.walk(home+"/data/")]
             for fl in fls:
+                # file keys and values
+                fkeys= list(fl.keys())
+                fvals= list(fl.values())
                 # add the label for this file
-                ret["labels"].append(fl.keys()[0])
+                ret["labels"].append(fkeys[0])
                 # add the neural network for this file
-                ret["nns"].append("models/"+fl.keys()[0]+".h5")
+                ret["nns"].append("models/"+fkeys[0]+".h5")
                 # read the data for this file
-                g.io(home+"/data/"+fl.values()[0]).read().iterate()
+                g.io(home+"/data/"+fvals[0]).read().iterate()
                 # get the data set
                 dat  = g.V().hasLabel("vertices").valueMap(True).toList()
                 # parse the data set into what we want, assuming that the label
                 # consists of instance, brain, cluster and row numbers
                 if not (len(dat) == 0):
-                    ndat = np.unique([[dat[j].values()[i][0] for i in range(0,len(dat[0].values()))                                          \
-                                       if dat[j].keys()[i] in coln.keys() and dat[j]["id"][0][0:dat[j]["id"][0].rfind("-")] == fl.keys()[0]] \
+                    datk = [list(dat[j].keys()  ) for j in range(0,len(dat))]
+                    datv = [list(dat[j].values()) for j in range(0,len(dat))]
+                    ndat = np.unique([[datv[j][i][0] for i in range(0,len(datv[0]))                                                      \
+                                       if datk[j][i] in ckeys and list(dat[j]["id"])[0][0:list(dat[j]["id"])[0].rfind("-")] == fkeys[0]] \
                                        for j in range(0,len(dat))],axis=0)
                     # add the data for this file
                     ret["dat"].append(np.median(ndat,axis=0))
