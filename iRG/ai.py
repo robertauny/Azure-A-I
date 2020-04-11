@@ -934,12 +934,12 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
         # url
         url  = "https://" + host + "/" + api + "/" + ver + "/" + app
         # request headers. Important: content should be bytestream as we are sending an image from local
-        hdrs = {"Ocp-Apim-Subscription-Key":key,"Content-Type":"application/octet-stream"}
-        # request parameters: language is unknown, and we do detect orientation
+        hdrs = {"Ocp-Apim-Subscription-Key":key}
         parms= {"language":"unk","detectOrientation":"true"}
         if not testing:
             ftext= []
             if wtyp == const.OCR:
+                hdrs["Content-Type"] = "application/octet-stream"
                 for i in docs:
                     try:
                         # get response from the server
@@ -960,16 +960,17 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                 hdrs["Content-Type"] = "application/json"
                 if wtyp == const.EE:
                     try:
-                        ijson= { "documents": [{"language":parms["language"],"id":i,"text":docs[i]} for i in range(0,len(docs))] }
+                        ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
                         # get response from the server
-                        resp = requests.post(url,headers=hdrs,params=parms,json=json.dumps(ijson))
+                        resp = requests.post(url,headers=hdrs,json=ijson)
                         resp.raise_for_status()
                         # get json data to parse it later
                         js   = resp.json()
                         # all the lines from a page, including noise
                         for doc in js["documents"]:
                             keys = doc["keyPhrases"]
-                            ftext.append(keys)
+                            if not (len(keys) == 0):
+                                ftext.append(keys)
                     except Exception as err:
                         ftext.append(str(err))
                 else:
@@ -1002,18 +1003,22 @@ def ocre(imgs=[]):
 ############################################################################
 def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
     ret  = None
-    if not (len(pdfs) == 0 or inst <= const.BVAL):
+    if not (wtyp == None or len(pdfs) == 0 or inst <= const.BVAL):
         # number of cpu cores
         nc   = mp.cpu_count()
-        # converted images
-        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                   ) for i in range(0,len(pdfs )))
-        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                   ) for i in range(0,len(imgs )))
-        oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
-        if not (len(oimgs) <= 1):
-            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs)))
+        if wtyp == const.OCR:
+            # converted images
+            imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                   ) for i in range(0,len(pdfs )))
+            pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                   ) for i in range(0,len(imgs )))
+            oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+            if not (len(oimgs) <= 1):
+                ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs)))
+            else:
+                if not (len(oimgs) == 0):
+                    ret  = oimgs[0]
+            ret  = [ret,cognitive(const.EE,ret,inst,testing)]
         else:
-            if not (len(oimgs) == 0):
-                ret  = oimgs[0]
+            ret  = img2txt(wtyp,pdfs,inst,testing)
     return ret
 
 ############################################################################
