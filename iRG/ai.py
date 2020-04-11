@@ -913,7 +913,7 @@ def pil2array(pil=None):
 ##            Other text analytics
 ##
 ############################################################################
-def cognitive(wtyp="ocr",docs=[],inst=const.BVAL,testing=True):
+def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
     ret  = []
     if not (wtyp == None or len(docs) == 0 or inst <= const.BVAL):
         # get the default configuration
@@ -939,43 +939,39 @@ def cognitive(wtyp="ocr",docs=[],inst=const.BVAL,testing=True):
         parms= {"language":"unk","detectOrientation":"true"}
         if not testing:
             ftext= []
-            if typ == "ocr":
+            if wtyp == const.OCR:
                 for i in docs:
                     try:
                         # get response from the server
                         resp = requests.post(url,headers=hdrs,params=parms,data=i)
                         resp.raise_for_status()
                         # get json data to parse it later
-                        json = resp.json()
+                        js   = resp.json()
                         # all the lines from a page, including noise
-                        for reg in json["regions"]:
+                        for reg in js["regions"]:
                             line = reg["lines"]
                             for elem in line:
                                 ltext = " ".join([word["text"] for word in elem["words"]])
                                 ftext.append(ltext.lower())
-                    except HTTPError as herr:
-                        ftext.append(str(herr))
                     except Exception as err:
-                        ftext.append(str( err))
+                        ftext.append(str(err))
             else:
                 # request headers. Important: content should be json as we are sending an array of json objects
                 hdrs["Content-Type"] = "application/json"
-                if typ == "ee":
+                if wtyp == const.EE:
                     try:
-                        ijson= { documents: [{"language":parms["language"],"id":i,"text":docs[i]} for i in range(0,len(docs))] }
+                        ijson= { "documents": [{"language":parms["language"],"id":i,"text":docs[i]} for i in range(0,len(docs))] }
                         # get response from the server
                         resp = requests.post(url,headers=hdrs,params=parms,json=json.dumps(ijson))
                         resp.raise_for_status()
                         # get json data to parse it later
-                        json = resp.json()
+                        js   = resp.json()
                         # all the lines from a page, including noise
-                        for doc in json["documents"]:
+                        for doc in js["documents"]:
                             keys = doc["keyPhrases"]
                             ftext.append(keys)
-                    except HTTPError as herr:
-                        ftext.append(str(herr))
                     except Exception as err:
-                        ftext.append(str( err))
+                        ftext.append(str(err))
                 else:
                     ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
             # clean array containing only important data
@@ -1004,22 +1000,17 @@ def ocre(imgs=[]):
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
-def ocr(pdfs=[],inst=const.BVAL,testing=True):
+def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
     ret  = None
     if not (len(pdfs) == 0 or inst <= const.BVAL):
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["src"]["index"]
-        typ  = cfg["instances"][inst]["src"]["types"]["ocr"]
-        # app
-        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
         # number of cpu cores
         nc   = mp.cpu_count()
         # converted images
-        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                  ) for i in range(0,len(pdfs )))
-        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                  ) for i in range(0,len(imgs )))
-        oimgs=     Parallel(n_jobs=nc)(delayed(cognitive        )(app,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+        imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                   ) for i in range(0,len(pdfs )))
+        pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                   ) for i in range(0,len(imgs )))
+        oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
         if not (len(oimgs) <= 1):
-            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                 ) for i in range(1,len(oimgs)))
+            ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs)))
         else:
             if not (len(oimgs) == 0):
                 ret  = oimgs[0]
