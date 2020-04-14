@@ -40,7 +40,7 @@ def kg_testing(inst=0,M=100,N=5,testing=False):
     # create column names (normally obtained by var.dtype.names)
     #
     # use an explicit dict to make sure that the order is preserved
-    coln = [("col"+str(i),(i-1)) for i in range(1,len(dat[0])+1)]
+    coln = [("col"+str(i),(i-1)) for i in range(1,p+1)]
     # create the data for the sample knowledge graph
     kgdat= create_kg(inst,dat,s)
     # populate the knowledge graph into the remote DB
