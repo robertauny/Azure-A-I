@@ -37,6 +37,39 @@ cfg  = config.cfg()
 
 ############################################################################
 ##
+## Purpose:   Get the URL to the knowledge graph
+##
+############################################################################
+def url_kg(inst=const.BVAL):
+    ret  = None
+    if not (inst <= const.BVAL):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["kg"]
+        # subscription key
+        key  = cfg["instances"][inst]["sources"][src]["connection"]["key" ]
+        # graph host
+        host = cfg["instances"][inst]["sources"][src]["connection"]["host"]
+        # graph port
+        port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
+        # api
+        api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
+        # set the url
+        if not (key == None):
+            if not (len(key) == 0):
+                # protocol
+                prot = "wss://"
+            else:
+                # protocol
+                prot = "ws://"
+        else:
+            # protocol
+            prot = "ws://"
+        # create the url
+        ret  = prot + host + ":" + port + "/" + api
+    return ret
+
+############################################################################
+##
 ## Purpose:   Heavy lift of writing a knowledge graph vertices and edges
 ##
 ############################################################################
@@ -58,7 +91,7 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
                     # add all of the other properties
                     if i == len(kgdat)-1:
                         ret.append(g.property(coln[i-1],kgdat[i]).next())
-                        g    = ret[1]
+                        g    = ret[len(ret)-1]
                     else:
                         g    = g.property(coln[i-1],kgdat[i])
     return ret
@@ -68,14 +101,20 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
 ## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
 ##
 ############################################################################
-def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
+def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[]):
     ret  = None
-    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0 or g == None):
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["kg"]
-        # file extension
-        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
+    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0):
         if stem in [const.V,const.E]:
+            # instantiate a JanusGraph object
+            graph= Graph()
+            # connection to the remote server
+            conn = DriverRemoteConnection(url_kg(inst),'g')
+            # get the remote graph traversal
+            g    = graph.traversal().withRemote(conn)
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["kg"]
+            # file extension
+            ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
             # current set of vertices
             vert = kgdat[const.V]
             # returns for the current stem, one KG row at a time
@@ -114,6 +153,11 @@ def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
                 # identify the file and save the data from the current cluster
                 fl   = "models/" + ret[0][0] + ".h5"
                 mdl.save(fl)
+            # drop the graph
+            g.E().drop().iterate()
+            g.V().drop().iterate()
+            # close the connection
+            conn.close()
         else:
             # just a placeholder for the moment
             # call the appropriate function in the future
@@ -126,46 +170,13 @@ def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
 ## Purpose:   Heavy lift of writing a knowledge graph
 ##
 ############################################################################
-def write_kg(inst=const.BVAL,coln=[],kgdat=None,g=None):
+def write_kg(inst=const.BVAL,coln=[],kgdat=None):
     ret  = None
     lcol = len(coln)
     lkg  = len(kgdat)
-    if not (inst <= const.BVAL or lcol == 0 or lkg == 0 or g == None):
+    if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
         # returns for each stem, one KG row at a time
-        ret  = [write_nlp(stem,inst,coln,kgdat,g) for stem in const.STEMS]
-    return ret
-
-############################################################################
-##
-## Purpose:   Get the URL to the knowledge graph
-##
-############################################################################
-def url_kg(inst=const.BVAL):
-    ret  = None
-    if not (inst <= const.BVAL):
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["kg"]
-        # subscription key
-        key  = cfg["instances"][inst]["sources"][src]["connection"]["key" ]
-        # graph host
-        host = cfg["instances"][inst]["sources"][src]["connection"]["host"]
-        # graph port
-        port = cfg["instances"][inst]["sources"][src]["connection"]["port"]
-        # api
-        api  = cfg["instances"][inst]["sources"][src]["connection"]["api" ]
-        # set the url
-        if not (key == None):
-            if not (len(key) == 0):
-                # protocol
-                prot = "wss://"
-            else:
-                # protocol
-                prot = "ws://"
-        else:
-            # protocol
-            prot = "ws://"
-        # create the url
-        ret  = prot + host + ":" + port + "/" + api
+        ret  = [write_nlp(stem,inst,coln,kgdat) for stem in const.STEMS]
     return ret
 
 ############################################################################
