@@ -10,3 +10,4 @@ STEMS        = [V,"toks","ents","cons","post","stem"]
 EXT          = ".xml"
 OCR          = "ocr"
 EE           = "keyPhrases"
+SENT         = "sentiment"
