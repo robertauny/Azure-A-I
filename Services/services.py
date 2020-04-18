@@ -101,35 +101,12 @@ def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
     if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
         # create the url
         url  = data.url_kg(inst)
-        # set the output file extension
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["kg"]
-        # file extension
-        ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
-        if not (ext == None):
-            if len(ext) == 0:
-                ext  = const.EXT
-        else:
-            ext  = const.EXT
         if not testing:
             try:
-                ret  = []
-                for k in kgdat:
-                    # instantiate a JanusGraph object
-                    graph= Graph()
-                    # connection to the remote server
-                    conn = DriverRemoteConnection(url,'g')
-                    # get the remote graph traversal
-                    g    = graph.traversal().withRemote(conn)
-                    # write the graph to memory
-                    ret.append(data.write_kg(inst,coln,k,g))
-                    # drop the graph
-                    g.E().drop().iterate()
-                    g.V().drop().iterate()
-                    # close the connection
-                    conn.close()
+                # write the graph to memory
+                ret  = [data.write_kg(inst,coln,k) for k in kgdat]
             except Exception as err:
-                ret  = str(err)
+                ret  = [str(err)]
         else:
-            ret  = [src,typ,key,host,url]
+            ret  = [url]
     return ret

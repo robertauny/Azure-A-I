@@ -321,7 +321,7 @@ def brain(dat=[],splits=2):
 ##
 ############################################################################
 def thought(inst=0,coln=[],preds=3):
-    ret  = []
+    ret  = {}
     if not (inst == None or len(coln) == 0 or preds <= 0):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["kg"]
@@ -367,7 +367,7 @@ def thought(inst=0,coln=[],preds=3):
                     pred = store(mdl.predict(pt)[0],True)
                     if int(lbls[m][e+1]) in pred:
                         # regression neural networks for the predicted cluster
-                        nnet = df["nns"][m]
+                        nnet = str(df["nns"][m])
                         # what we want to do is to use the regression network for this brain
                         # where the brain is obtained as the set of values in the dictionary
                         # coln and make the number of requested predictions preds ... this network
@@ -400,8 +400,8 @@ def thought(inst=0,coln=[],preds=3):
                             # using these data points, make the predictions using nnet
                             if os.path.exists(nnet) and os.path.getsize(nnet) > 0:
                                 # load the particular regression model for the predicted cluster
-                                rmdl = load_model(nnet)
-                                ret.append(rmdl.predict(np.asarray(rdat)))
+                                rmdl         = load_model(nnet)
+                                ret[lbls[m]] = rmdl.predict(np.asarray(rdat))
     return ret
 
 ############################################################################
@@ -974,7 +974,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
             else:
                 # request headers. Important: content should be json as we are sending an array of json objects
                 hdrs["Content-Type"] = "application/json"
-                if wtyp == const.EE:
+                if wtyp in [const.EE,const.SENT]:
                     try:
                         ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
                         # get response from the server
@@ -984,7 +984,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         js   = resp.json()
                         # all the lines from a page, including noise
                         for doc in js["documents"]:
-                            keys = doc["keyPhrases"]
+                            keys = doc[wtyp]
                             ftext.append(keys)
                     except Exception as err:
                         ftext.append(str(err))
@@ -1031,7 +1031,8 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
             else:
                 if not (len(oimgs) == 0):
                     ret  = oimgs[0]
-            ret  = [ret,cognitive(const.EE,ret,inst,testing)]
+            ret  = [ret,cognitive(const.EE  ,ret   ,inst,testing)]
+            ret  = [ret,cognitive(const.SENT,ret[0],inst,testing)]
         else:
             ret  = img2txt(wtyp,pdfs,inst,testing)
     return ret

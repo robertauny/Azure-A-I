@@ -9,7 +9,8 @@
 					"mysql"      : 0,
 					"ocr"        : 1,
 					"keyPhrases" : 2,
-					"glove"      : 3
+					"sentiment"  : 3,
+					"glove"      : 4
 				}
 			},
 			"sources" : [
@@ -66,6 +67,16 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
+							"key"  : "key",
+							"dir"  : "dir"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "sentiment",
+							"host" : "rammansentiment.cognitiveservices.azure.com",
+							"api"  : "text/analytics",
+							"ver"  : "v3.0-preview.1",
 							"key"  : "key",
 							"dir"  : "dir"
 						}
