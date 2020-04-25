@@ -1028,6 +1028,8 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
             # converted images
             imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                   ) for i in range(0,len(pdfs )))
             pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                   ) for i in range(0,len(imgs )))
+            # this thread can die due to timeout waiting for a response from Azure
+            # results in a warning from tensorflow about __del__
             oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
             if not (len(oimgs) <= 1):
                 ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs)))

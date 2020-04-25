@@ -120,7 +120,7 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
                     # read the data for this file
                     g.io(ret["fl"][len(ret["fl"])-1]).read().iterate()
                 # get the data set
-                dat  = g.V().hasLabel(const.V).valueMap(True).toList()
+                dat  = g.V().hasLabel(fkeys[0]).valueMap(True).toList()
                 if gn:
                     # drop all of the data that was just loaded
                     g.E().drop().iterate()
@@ -128,13 +128,10 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
                 # parse the data set into what we want, assuming that the label
                 # consists of instance, brain, cluster and row numbers
                 if not (len(dat) == 0):
-                    cdat = [k for k,x in enumerate(list(dat[0].keys())) if x in ckeys]
                     datk = [list(dat[j].keys()  ) for j in range(0,len(dat))]
                     datv = [list(dat[j].values()) for j in range(0,len(dat))]
-                    ndat = [[datv[j][i][0] for i in cdat                                   \
-                             if dat[j]["id"][0][0:dat[j]["id"][0].rfind("-")] == fkeys[0]] \
-                             for j in range(0,len(dat))]
-                    ndat = [n for n in ndat if not (len(n) == 0)]
+                    cdat = [k for k,x in enumerate(list(dat[0].keys())) if x in ckeys]
+                    ndat = [[datv[j][i][0] for i in cdat] for j in range(0,len(dat))]
                     # add the data for this file
                     ret["dat"].append(np.median(ndat,axis=0))
                 else:
@@ -167,9 +164,9 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
                 if i == 0:
                     # add the ID
                     if not (len(kgdat) <= 1):
-                        g    = g.addV(stem).property("id",kgdat[i])
+                        g    = g.addV(ret[i]).property("id",kgdat[i])
                     else:
-                        ret.append(g.addV(stem).property("id",kgdat[i]).next())
+                        ret.append(g.addV(ret[i]).property("id",kgdat[i]).next())
                         g    = ret[len(ret)-1]
                 else:
                     # add all of the other properties
@@ -246,17 +243,17 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
                 for i in range(0,len(coln)):
                     # id, vertex and GloVe constants of the current word
                     ids1 = ret[i][0]
-                    v1   = ids1
+                    v1   = ret[i][1]
                     c1   = kgdat[i][1]
                     for j in range(i+1,len(coln)):
                         # id, vertex and GloVe constants of the next words after the current one
                         ids2 = ret[j][0]
-                        v2   = ids2
+                        v2   = ret[j][1]
                         c2   = kgdat[j][1]
                         # create the ID
                         ids12= "-".join((ids1,ids2))
                         # create the edge between the vertices in question
-                        g.V().has(const.V,"id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
+                        g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
                 # write the graph to disk
                 g.io(kg["fl"][0]).write().iterate()
                 # drop all of the data that was just loaded
