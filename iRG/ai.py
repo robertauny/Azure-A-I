@@ -352,15 +352,16 @@ def thought(inst=0,coln=[],preds=3):
                 # so what we will do is to manufacture a data point by taking the median of each
                 # column of the data defining the brain then predict the cluster for that data point
                 pt   = []
-                if not (len(dat1) <= 1):
-                    dat  = dat1[m]
-                    if len(dat1) > 1:
-                        for d in dat1[1:len(dat1)]:
-                            dat  = np.vstack(dat,d)
-                    pt   = np.resize(np.median([row for row in dat[:,1:] if not (row == None)],axis=0),(1,len(dat[0])-1))
-                else:
-                    if not (len(dat1) == 0):
-                        pt   = np.resize(np.asarray(dat1)[:,1:],(1,len(dat1[0])-1))
+                if not (dat1[0][0] == None):
+                    if not (len(dat1) <= 1):
+                        dat  = dat1[m]
+                        if len(dat1) > 1:
+                            for d in dat1[1:len(dat1)]:
+                                dat  = np.vstack(dat,d)
+                        pt   = np.resize(np.median([row for row in dat[:,1:] if not (row == None)],axis=0),(1,len(dat[0])-1))
+                    else:
+                        if not (len(dat1) == 0):
+                            pt   = np.resize(np.asarray(dat1)[:,1:],(1,len(dat1[0])-1))
                 if not (len(pt) == 0):
                     # load the clustering model and make the cluster prediction for this data point
                     mdl  = load_model(fl)
@@ -985,6 +986,8 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         # all the lines from a page, including noise
                         for doc in js["documents"]:
                             keys = doc[wtyp]
+                            if wtyp == const.SENT:
+                                keys = [keys,doc["documentScores"][keys]]
                             ftext.append(keys)
                     except Exception as err:
                         ftext.append(str(err))
@@ -1031,7 +1034,9 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
             else:
                 if not (len(oimgs) == 0):
                     ret  = oimgs[0]
+            # key phrases or entity extractions
             ret  = [ret,cognitive(const.EE  ,ret   ,inst,testing)]
+            # sentiment and scores
             ret  = [ret,cognitive(const.SENT,ret[0],inst,testing)]
         else:
             ret  = img2txt(wtyp,pdfs,inst,testing)
@@ -1125,13 +1130,16 @@ def blocks(tok=None):
 ##
 ############################################################################
 def extendglove(docs=[],gdoc=None,splits=2,props=2):
-    gdat = {}
+    ret  = {}
     if not (len(docs) == 0 or gdoc == None):
         if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
             # number of cpu cores
             nc   = mp.cpu_count()
             # append the text of all docs together into a string
-            txts = [dappend(d) for d in docs]
+            if os.path.exists(docs[0]) and os.path.getsize(docs[0]) > 0:
+                txts = [dappend(d) for d in docs]
+            else:
+                txts = docs
             # tokenize the lines in the array and convert to sequences of integers
             #
             # instantiate a default Tokenizer object without limiting the number of tokens
@@ -1142,7 +1150,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
             f    = open(gdoc)
-            gdat = {wvec(line).keys()[0]:wvec(line).values()[0] for line in f.readlines()}
+            gdat = {list(wvec(line).keys())[0]:list(wvec(line).values())[0] for line in f.readlines()}
             f.close()
             # we will pad the original sequences in a certain way so as to make them align with
             # the expanded set of words from the passed in GloVe data set then
@@ -1180,13 +1188,13 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # instead, we will just rely upon the fact that the words that do appear in both our corpus and the glove data
             # carry information about those words that only appear in our corpus so that the average model being returned
             # still allows us to extend our original data set beyond the original corpus
-            gmat = {word:gdat[word] for word,i in tok.word_index.items() if word in gdat.keys()}
+            gmat = {word:gdat[word] for word,i in tok.word_index.items() if word in list(gdat.keys())}
             if not (gmat == {}):
                 # gmat keys and values
                 gkeys= list(gmat.keys())
                 gvals= list(gmat.values())
                 # number of clusters is different than the default defined by the splits and properties
-                clust= len(gmat[list(gmat.keys())[0]])-1
+                clust= len(gmat[gkeys[0]])-1
                 #
                 s    = splits
                 # we want to find the value p such that s**(2*p) gives the same number
@@ -1203,7 +1211,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # 
                 # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
                 # can consist of one unique value for each row of constants
-                ovals= to_categorical(np.sum(vals,axis=1),num_classes=clust)
+                ovals= to_categorical(np.sum(gvals,axis=1),num_classes=clust)
                 # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
                 # of a plane ... i.e. each row of constants defines an element of a conditional specification
                 #
@@ -1238,7 +1246,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # of any arbitrary word in the glove data set when dot product with the constants associated to another word
                 #
                 # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
-                ivals= np.asarray(vals)
+                ivals= np.asarray(gvals)
                 # create the model using the inputs
                 model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
                 # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
