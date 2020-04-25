@@ -14,20 +14,29 @@
 ##
 ############################################################################
 
-from services import kg
-from data     import read_kg
-from ai       import create_kg,thought
+from data                                           import url_kg
+from services                                       import kg
+from ai                                             import create_kg,extendglove,thought
+from ocr                                            import ocr_testing
 
 import constants as const
 
+import config
+
 import numpy     as np
+
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+
+cfg  = config.cfg()
 
 ############################################################################
 ##
 ## Purpose:   Generate a knowledge graph
 ##
 ############################################################################
-def kg_testing(inst=0,M=100,N=5,testing=False):
+def kg_testing(inst=0,M=10,N=5,testing=False):
     # number of data points and properties
     m    = M
     p    = N
@@ -45,10 +54,32 @@ def kg_testing(inst=0,M=100,N=5,testing=False):
     kgdat= create_kg(inst,dat,s)
     # populate the knowledge graph into the remote DB
     #
+    # instantiate a JanusGraph object
+    graph= Graph()
+    # connection to the remote server
+    conn = DriverRemoteConnection(url_kg(inst),'g')
+    # get the remote graph traversal
+    g    = graph.traversal().withRemote(conn)
     # force an ordering on the columns always
-    print(kg(inst,np.asarray(coln)[:,0],kgdat,testing))
-    # read the knowledge graph
-    # shuffle the ordering of coln (keys/values) to read other data
-    print(read_kg(inst,coln))
+    print(kg(const.V,inst,coln,kgdat,g,testing))
+    # after building the knowledge graph, use the output of ocr to test the GloVe write
+    #
+    # call cognitive to produce the ocr output
+    oret = ocr_testing()
+    # get the location of the glove file
+    src  = cfg["instances"][inst]["src"]["index"]
+    typ  = cfg["instances"][inst]["src"]["types"]["glove"]
+    gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
+    # call extendglove to produce the GloVe output and transform it to an array
+    # with the first term in each row being the key and all other terms are values
+    rdat = extendglove(oret[0][0],gfl)
+    rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
+    # write the glove output to the knowledge graph
+    print(kg(const.ENTS,inst,coln,rdat,g,testing))
+    # drop the graph
+    g.E().drop().iterate()
+    g.V().drop().iterate()
+    # close the connection
+    conn.close()
     # test the thought function with the default number of predictions 3
     print(thought(inst,coln))

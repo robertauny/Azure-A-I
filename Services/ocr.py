@@ -24,4 +24,4 @@ import constants as const
 ##
 ############################################################################
 def ocr_testing(pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=False):
-    print(cognitive(const.OCR,pdfs,inst,testing))
+    return cognitive(const.OCR,pdfs,inst,testing)

@@ -70,138 +70,30 @@ def url_kg(inst=const.BVAL):
 
 ############################################################################
 ##
-## Purpose:   Heavy lift of writing a knowledge graph vertices and edges
-##
-############################################################################
-def write_ve(stem=None,coln=[],kgdat=[],g=None):
-    ret  = None
-    lcol = len(coln)
-    lkg0 = len(kgdat)
-    # creating vertices/edges for exactly one KG
-    if not (stem == None or lcol == 0 or lkg0 == 0 or g == None):
-        if stem == const.V:
-            # create IDs using the ID defined by the vertices
-            ret  = np.asarray(kgdat[0].split("-"))
-            ret  = ["-".join(ret[range(0,len(ret)-1)])]
-            for i in range(0,len(kgdat)):
-                if i == 0:
-                    # add the ID
-                    g    = g.addV(stem).property("id",kgdat[i])
-                else:
-                    # add all of the other properties
-                    if i == len(kgdat)-1:
-                        ret.append(g.property(coln[i-1],kgdat[i]).next())
-                        g    = ret[len(ret)-1]
-                    else:
-                        g    = g.property(coln[i-1],kgdat[i])
-    return ret
-
-############################################################################
-##
-## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
-##
-############################################################################
-def write_nlp(stem=None,inst=const.BVAL,coln=[],kgdat=[]):
-    ret  = None
-    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0):
-        if stem in [const.V,const.E]:
-            # instantiate a JanusGraph object
-            graph= Graph()
-            # connection to the remote server
-            conn = DriverRemoteConnection(url_kg(inst),'g')
-            # get the remote graph traversal
-            g    = graph.traversal().withRemote(conn)
-            # ordering of the data elements in the JSON file
-            src  = cfg["instances"][inst]["kg"]
-            # file extension
-            ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
-            # current set of vertices
-            vert = kgdat[const.V]
-            # returns for the current stem, one KG row at a time
-            ret  = [write_ve(const.V,coln,k,g) for k in vert]
-            # possibly have multiple clusters and multiple rows in that cluster
-            for clus in kgdat[const.E]:
-                crow = []
-                for blk in clus:
-                    for row in blk:
-                        row1 = int(row[1])
-                        row2 = int(row[2])
-                        # create the ID
-                        ids1 = ret[row1-1][0] + "-" + str(row1)
-                        ids2 = ret[row2-1][0] + "-" +                   str(row2)
-                        ids12= ret[row1-1][0] + "-" + str(row1) + "-" + str(row2)
-                        # get vertices associated to the IDs in question
-                        v1   = ret[row1-1][1]
-                        v2   = ret[row2-1][1]
-                        # create the edge between the vertices in question
-                        g.V(v1).addE(const.E).to(v2).property("id",ids12).next()
-                        # add the current row1 value to the list of rows in this cluster
-                        crow.append(row1)
-                # write the graph to disk
-                fl   = "data/" + ret[0][0] + ext
-                g.io(fl).write().iterate()
-                # data to generate a neural network for the rows in the current cluster
-                dat  = np.asarray(vert)[np.unique(crow)-1,1:]
-                # generate the model
-                mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
-                          ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
-                          ,loss="mean_squared_error"
-                          ,optimizer="sgd"
-                          ,rbmact="selu"
-                          ,dbnact="tanh"
-                          ,dbnout=1)
-                # identify the file and save the data from the current cluster
-                fl   = "models/" + ret[0][0] + ".h5"
-                mdl.save(fl)
-            # drop the graph
-            g.E().drop().iterate()
-            g.V().drop().iterate()
-            # close the connection
-            conn.close()
-        else:
-            # just a placeholder for the moment
-            # call the appropriate function in the future
-            # then append things to the graph using property tags
-            ret  = None
-    return ret
-
-############################################################################
-##
-## Purpose:   Heavy lift of writing a knowledge graph
-##
-############################################################################
-def write_kg(inst=const.BVAL,coln=[],kgdat=None):
-    ret  = None
-    lcol = len(coln)
-    lkg  = len(kgdat)
-    if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
-        # returns for each stem, one KG row at a time
-        ret  = [write_nlp(stem,inst,coln,kgdat) for stem in const.STEMS]
-    return ret
-
-############################################################################
-##
 ## Purpose:   Read a knowledge graph from the remote DB
 ##
 ############################################################################
-def read_kg(inst=const.BVAL,coln=[]):
-    ret  = {"labels":[],"nns":[],"dat":[]}
+def read_kg(inst=const.BVAL,coln=[],g=None):
+    ret  = {"fl":[],"labels":[],"nns":[],"dat":[]}
     if not (inst <= const.BVAL or len(coln) == 0):
+        gn   = False
         # column keys and values
         ckeys= np.asarray(coln)[:,0]
         cvals= np.asarray(coln)[:,1]
         try:
-            # depending upon what I decide to pass as arguments,
-            # might be able to get the instance from lbl
-            #
-            # url to the remote KG DB
-            url  = url_kg(inst)
-            # instantiate a JanusGraph object
-            graph= Graph()
-            # connection to the remote server
-            conn = DriverRemoteConnection(url,'g')
-            # get the remote graph traversal
-            g    = graph.traversal().withRemote(conn)
+            if g == None:
+                gn   = True
+                # depending upon what I decide to pass as arguments,
+                # might be able to get the instance from lbl
+                #
+                # url to the remote KG DB
+                url  = url_kg(inst)
+                # instantiate a JanusGraph object
+                graph= Graph()
+                # connection to the remote server
+                conn = DriverRemoteConnection(url,'g')
+                # get the remote graph traversal
+                g    = graph.traversal().withRemote(conn)
             # ordering of the data elements in the JSON file
             src  = cfg["instances"][inst]["kg"]
             # gremlin home dir
@@ -218,33 +110,163 @@ def read_kg(inst=const.BVAL,coln=[]):
                 # file keys and values
                 fkeys= list(fl.keys())
                 fvals= list(fl.values())
+                # add the file from which the data came
+                ret["fl"].append(home+"/data/"+fvals[0])
                 # add the label for this file
                 ret["labels"].append(fkeys[0])
                 # add the neural network for this file
                 ret["nns"].append("models/"+fkeys[0]+".h5")
-                # read the data for this file
-                g.io(home+"/data/"+fvals[0]).read().iterate()
+                if gn:
+                    # read the data for this file
+                    g.io(ret["fl"][len(ret["fl"])-1]).read().iterate()
                 # get the data set
-                dat  = g.V().hasLabel("vertices").valueMap(True).toList()
+                dat  = g.V().hasLabel(const.V).valueMap(True).toList()
+                if gn:
+                    # drop all of the data that was just loaded
+                    g.E().drop().iterate()
+                    g.V().drop().iterate()
                 # parse the data set into what we want, assuming that the label
                 # consists of instance, brain, cluster and row numbers
                 if not (len(dat) == 0):
+                    cdat = [k for k,x in enumerate(list(dat[0].keys())) if x in ckeys]
                     datk = [list(dat[j].keys()  ) for j in range(0,len(dat))]
                     datv = [list(dat[j].values()) for j in range(0,len(dat))]
-                    ndat = np.unique([[datv[j][i][0] for i in range(0,len(datv[0]))                                                      \
-                                       if datk[j][i] in ckeys and list(dat[j]["id"])[0][0:list(dat[j]["id"])[0].rfind("-")] == fkeys[0]] \
-                                       for j in range(0,len(dat))],axis=0)
+                    ndat = [[datv[j][i][0] for i in cdat                                   \
+                             if dat[j]["id"][0][0:dat[j]["id"][0].rfind("-")] == fkeys[0]] \
+                             for j in range(0,len(dat))]
+                    ndat = [n for n in ndat if not (len(n) == 0)]
                     # add the data for this file
                     ret["dat"].append(np.median(ndat,axis=0))
                 else:
-                    ret["dat"].append(None)
+                    ret["dat"].append([None])
+            if gn:
+                # close the connection
+                conn.close()
+        except Exception as err:
+            ret  = str(err)
+    return ret
+
+############################################################################
+##
+## Purpose:   Heavy lift of writing a knowledge graph vertices and edges
+##
+############################################################################
+def write_ve(stem=None,coln=[],kgdat=[],g=None):
+    ret  = None
+    lcol = len(coln)
+    lkg0 = len(kgdat)
+    # creating vertices/edges for exactly one KG
+    if not (stem == None or lcol == 0 or lkg0 == 0 or g == None):
+        if stem == const.V:
+            cols = np.asarray(coln)[:,0]
+            # create IDs using the ID defined by the vertices
+            ret  = kgdat[0].split("-")
+            if not (len(ret) <= 1):
+                ret  = ["-".join(np.asarray(ret)[range(0,len(ret)-1)])]
+            for i in range(0,len(kgdat)):
+                if i == 0:
+                    # add the ID
+                    if not (len(kgdat) <= 1):
+                        g    = g.addV(stem).property("id",kgdat[i])
+                    else:
+                        ret.append(g.addV(stem).property("id",kgdat[i]).next())
+                        g    = ret[len(ret)-1]
+                else:
+                    # add all of the other properties
+                    if i == len(kgdat)-1:
+                        ret.append(g.property(cols[i-1],kgdat[i]).next())
+                        # get the beginning of the graph
+                        g    = ret[len(ret)-1]
+                    else:
+                        g    = g.property(cols[i-1],kgdat[i])
+    return ret
+
+############################################################################
+##
+## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
+##
+############################################################################
+def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None):
+    ret  = None
+    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0 or g == None):
+        if stem in [const.V,const.E]:
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["kg"]
+            # file extension
+            ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
+            # current set of vertices
+            vert = kgdat[const.V]
+            # returns for the current stem, one KG row at a time
+            ret  = [write_ve(const.V,coln,k,g) for k in vert]
+            # possibly have multiple clusters and multiple rows in that cluster
+            for clus in kgdat[const.E]:
+                if not (len(clus) == 0 or len(clus[0]) == 0):
+                    # needed length for the weight of the edge
+                    lclus= float(len(clus))
+                    crow = []
+                    for blk in clus:
+                        # needed length for the weight of the edge
+                        lblk = float(len(blk))
+                        for row in blk:
+                            row1 = int(row[1])
+                            row2 = int(row[2])
+                            # create the ID
+                            ids1 = ret[row1-1][0] + "-" + str(row1)
+                            ids2 = ret[row2-1][0] + "-" +                   str(row2)
+                            ids12= ret[row1-1][0] + "-" + str(row1) + "-" + str(row2)
+                            # get vertices associated to the IDs in question
+                            v1   = ret[row1-1][1]
+                            v2   = ret[row2-1][1]
+                            # create the edge between the vertices in question
+                            g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",lblk/lclus).next()
+                            # add the current row1 value to the list of rows in this cluster
+                            crow.append(row1)
+                    # write the graph to disk
+                    fl   = "data/" + ret[0][0] + ext
+                    g.io(fl).write().iterate()
+                    # data to generate a neural network for the rows in the current cluster
+                    dat  = np.asarray(vert)[np.unique(crow)-1,1:]
+                    # generate the model
+                    mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
+                              ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
+                              ,loss="mean_squared_error"
+                              ,optimizer="sgd"
+                              ,rbmact="selu"
+                              ,dbnact="tanh"
+                              ,dbnout=1)
+                    # identify the file and save the data from the current cluster
+                    fl   = "models/" + ret[0][0] + ".h5"
+                    mdl.save(fl)
+        else:
+            if stem == const.ENTS:
+                # read the graph associated with this sequence of columns
+                kg   = read_kg(inst,coln,g)
+                # returns for the current stem, one KG row at a time
+                ret  = [write_ve(const.V,[["word"]],[str(k[0])],g) for k in kgdat]
+                for i in range(0,len(coln)):
+                    # id, vertex and GloVe constants of the current word
+                    ids1 = ret[i][0]
+                    v1   = ids1
+                    c1   = kgdat[i][1]
+                    for j in range(i+1,len(coln)):
+                        # id, vertex and GloVe constants of the next words after the current one
+                        ids2 = ret[j][0]
+                        v2   = ids2
+                        c2   = kgdat[j][1]
+                        # create the ID
+                        ids12= "-".join((ids1,ids2))
+                        # create the edge between the vertices in question
+                        g.V().has(const.V,"id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
+                # write the graph to disk
+                g.io(kg["fl"][0]).write().iterate()
                 # drop all of the data that was just loaded
                 g.E().drop().iterate()
                 g.V().drop().iterate()
-            # close the connection
-            conn.close()
-        except Exception as err:
-            ret  = str(err)
+            else:
+                # just a placeholder for the moment
+                # call the appropriate function in the future
+                # then append things to the graph using property tags
+                ret  = None
     return ret
 
 ############################################################################

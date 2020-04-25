@@ -94,17 +94,27 @@ def cognitive(wtyp=const.OCR,pdfs=["/home/robert/data/files/kg.pdf"],inst=0,test
 ## Purpose:   Write a knowledge graph
 ##
 ############################################################################
-def kg(inst=const.BVAL,coln=[],kgdat=[],testing=True):
+def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,testing=True):
     ret  = []
     lcol = len(coln)
     lkg  = len(kgdat)
-    if not (inst <= const.BVAL or lcol == 0 or lkg == 0):
+    if not (stem == None or inst <= const.BVAL or lcol == 0 or lkg == 0 or g == None):
         # create the url
         url  = data.url_kg(inst)
         if not testing:
             try:
                 # write the graph to memory
-                ret  = [data.write_kg(inst,coln,k) for k in kgdat]
+                if stem in [const.V,const.E]:
+                    ret  = [data.write_kg(stem,inst,coln,k,g) for k in kgdat]
+                else:
+                    if stem == const.ENTS:
+                        # single row processing in the function call
+                        ret  = data.write_kg(stem,inst,coln,kgdat,g)
+                    else:
+                        # just a placeholder for the moment
+                        # call the appropriate function in the future
+                        # then append things to the graph using property tags
+                        ret  = None
             except Exception as err:
                 ret  = [str(err)]
         else:
