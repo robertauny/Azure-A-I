@@ -5,6 +5,7 @@ V            = "vertices"
 E            = "edges"
 MDL          = "model"
 LBL          = "label"
+SEP          = "-"
 # global stem variables for some NLP
 #
 # tokenization

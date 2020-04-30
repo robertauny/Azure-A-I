@@ -86,8 +86,8 @@ def append(i=const.BVAL,n=const.BVAL,m=const.BVAL):
     if not (i <= const.BVAL or n <= const.BVAL or m <= const.BVAL):
         n   += 1 # note that this modifies the passed in value for all to see
         m   += (i+1) # note that this modifies the passed in value for all to see
-        ret  = str(n) + "-" + str(m)
-        #ret  = str(n+1) + "-" + str(m)
+        ret  = str(n) + const.SEP + str(m)
+        #ret  = str(n+1) + const.SEP + str(m)
     return ret
 
 ############################################################################
@@ -142,7 +142,7 @@ def extend1(dat1=[],dat2=[]):
 def split(dat=[],ind=0):
     ret  = None
     if not (len(dat) == 0 or ind < 0 or ind > len(dat)-1):
-        ret  = dat.split("-")[ind]
+        ret  = dat.split(const.SEP)[ind]
     return ret
 
 ############################################################################
@@ -248,13 +248,16 @@ def permute(dat=[],mine=True,l=3):
 ## Purpose:   Knowledge brain of all data hierarchies and neural networks
 ##
 ############################################################################
-def brain(dat=[],splits=2):
+def brain(dat=[],splits=2,permu=[]):
     ret  = []
     # number of data points in all clusters to label
     sz   = len(dat)
     if not (sz == 0 or splits <= 0):
-        # get all permutations of the 
-        perms= permute(range(0,len(dat[0])))
+        if not (len(permu) == 0 or type(permu[0]) == type(0)):
+            perms= permu
+        else:
+            # get all permutations of the 
+            perms= permute(range(0,len(dat[0])))
         # add all models to the return
         for perm in perms:
             # model label
@@ -309,7 +312,7 @@ def brain(dat=[],splits=2):
                       ,dbnact="tanh"
                       ,dbnout=p)
             # regression model
-            rfl  = "models/" + "".join(lbl.split("-")) + ".h5"
+            rfl  = "models/" + "".join(lbl.split(const.SEP)) + ".h5"
             mdl.save(rfl)
             # add the current label and model to the return
             ret.append({"label":lbl,"model":fl,"rmodel":rfl})
@@ -336,7 +339,7 @@ def thought(inst=0,coln=[],preds=3):
         lbls = df["labels"]
         for m in range(0,len(lbls)):
             # beginning and end indices in the label string that need to be removed to find the brain
-            b    = lbls[m].find("-") + 1
+            b    = lbls[m].find(const.SEP) + 1
             e    = lbls[m].rfind(ext) - 1
             # file for the clustering model
             fl   = str("models/"+lbls[m][b:e]+".h5")
@@ -355,17 +358,21 @@ def thought(inst=0,coln=[],preds=3):
                 if not (dat1[0][0] == None):
                     if not (len(dat1) <= 1):
                         dat  = dat1[m]
+                        # if we have multiple medians (clusters), then combine them back into one data set
+                        # then use the entire data set to find the median used to get the correct cluster
                         if len(dat1) > 1:
                             for d in dat1[1:len(dat1)]:
                                 dat  = np.vstack(dat,d)
                         pt   = np.resize(np.median([row for row in dat[:,1:] if not (row == None)],axis=0),(1,len(dat[0])-1))
                     else:
+                        # if only one median (cluster), then use it as the point to get the cluster
                         if not (len(dat1) == 0):
                             pt   = np.resize(np.asarray(dat1)[:,1:],(1,len(dat1[0])-1))
                 if not (len(pt) == 0):
                     # load the clustering model and make the cluster prediction for this data point
                     mdl  = load_model(fl)
                     pred = store(mdl.predict(pt)[0],True)
+                    # is the correct cluster being predicted, as referenced by the list pred
                     if int(lbls[m][e+1]) in pred:
                         # regression neural networks for the predicted cluster
                         nnet = str(df["nns"][m])
@@ -373,12 +380,12 @@ def thought(inst=0,coln=[],preds=3):
                         # where the brain is obtained as the set of values in the dictionary
                         # coln and make the number of requested predictions preds ... this network
                         # is also defined by the labels when we remove the instance found before
-                        # the first "-" in the label and the cluster, which is found when removing characters
-                        # after the last "-" in the label ... then we just squeeze the remaining
+                        # the first const.SEP in the label and the cluster, which is found when removing characters
+                        # after the last const.SEP in the label ... then we just squeeze the remaining
                         # characters and prepend with the "models/" directory and add the ".h5" file ext
                         #
                         # then get the column indices of the original data set that defines this brain
-                        cols = lbls[m][b:e].split("-")
+                        cols = lbls[m][b:e].split(const.SEP)
                         # load the regression model for this brain so we can make the predictions
                         # of the next input data points that will be seen beyond the current data set
                         rfl  = str("models/"+"".join(cols)+".h5")
@@ -388,7 +395,7 @@ def thought(inst=0,coln=[],preds=3):
                             # so we load the model and make the predictions preds ... after making the
                             # requested number of predictions, we use the main clustering model that has
                             # almost the same name as the regression model, except we don't squeeze the remaining
-                            # characters since we leave the "-" in between ... we predict the cluster of the
+                            # characters since we leave the const.SEP in between ... we predict the cluster of the
                             # resulting predictions from the regression model so that we know which cluster model
                             # to use when making the final (more specific) regression predictions preds
                             #
@@ -398,6 +405,7 @@ def thought(inst=0,coln=[],preds=3):
                                 npt  = rmdl.predict(pt)[0]
                                 rdat.append(npt)
                                 pt   = np.resize(npt,(1,len(npt)))
+                                #pt   = np.resize(np.median([row for row in np.append(pt,npt) if not (row == None)],axis=0),(1,len(pt[0])))
                             # using these data points, make the predictions using nnet
                             if os.path.exists(nnet) and os.path.getsize(nnet) > 0:
                                 # load the particular regression model for the predicted cluster
@@ -888,7 +896,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         # get the labels
         lbls = label(odat)
         # split the labels to know the available clusters
-        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)("-") for i in range(0,len(lbls)))
+        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)(const.SEP) for i in range(0,len(lbls)))
         slbl = np.asarray(slbl)
         # cluster labels
         clus = slbl[:,0]
@@ -933,8 +941,6 @@ def pil2array(pil=None):
 def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
     ret  = []
     if not (wtyp == None or len(docs) == 0 or inst <= const.BVAL):
-        # get the default configuration
-        cfg  = config.cfg()
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["src"]["index"]
         typ  = cfg["instances"][inst]["src"]["types"][wtyp]
@@ -1026,20 +1032,21 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
         nc   = mp.cpu_count()
         if wtyp == const.OCR:
             # converted images
-            imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path)(pdfs[i]                   ) for i in range(0,len(pdfs )))
-            pimgs=     Parallel(n_jobs=nc)(delayed(ocre             )(imgs[i]                   ) for i in range(0,len(imgs )))
+            imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path  )(pdfs[i]                   ) for i in range(0,len(pdfs )))
+            pimgs=     Parallel(n_jobs=nc)(delayed(ocre               )(imgs[i]                   ) for i in range(0,len(imgs )))
             # this thread can die due to timeout waiting for a response from Azure
             # results in a warning from tensorflow about __del__
-            oimgs=     Parallel(n_jobs=nc)(delayed(img2txt          )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+            oimgs=     Parallel(n_jobs=nc)(delayed(img2txt            )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+            ret  = []
             if not (len(oimgs) <= 1):
-                ret  = Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs)))
+                ret.append(Parallel(n_jobs=nc)(delayed(oimgs[0].append)(oimgs[i]                  ) for i in range(1,len(oimgs))))
             else:
                 if not (len(oimgs) == 0):
-                    ret  = oimgs[0]
+                    ret.append(oimgs[0])
             # key phrases or entity extractions
-            ret  = [ret,cognitive(const.EE  ,ret   ,inst,testing)]
+            ret.append(cognitive(const.EE  ,ret[0],inst,testing))
             # sentiment and scores
-            ret  = [ret,cognitive(const.SENT,ret[0],inst,testing)]
+            ret.append(cognitive(const.SENT,ret[0],inst,testing))
         else:
             ret  = img2txt(wtyp,pdfs,inst,testing)
     return ret
@@ -1445,12 +1452,12 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                         # we continue until all sequences of predictions have been exhausted while noting that each
                         # successive sequence is more important than the last, as we are getting deeper into code blocks
                         ret[i] = {
-                            "-".join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
+                            const.SEP.join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
                             np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
                             for k in range(0,lp-(ngram-1))
                                  }
                     else:
-                        ret[i] = {"-".join(keys):np.asarray(prow).prod()}
+                        ret[i] = {const.SEP.join(keys):np.asarray(prow).prod()}
                     rkeys  = np.asarray(list(ret[i].keys()))
                     rvals  = list(ret[i].values())
                     rvals  = np.asarray(rvals) / max(rvals)
@@ -1520,7 +1527,7 @@ def build_kg(inst,dat=[],brn={},splits=2):
         # make the predictions using this model
         model= load_model(mdl)
         # make sure to get the right subset of the data
-        l    = list(map(int,lbl.split("-")))
+        l    = list(map(int,lbl.split(const.SEP)))
         # number of cpu cores
         nc   = mp.cpu_count()
         # make the predictions
@@ -1567,13 +1574,13 @@ def append_kg(ret={},dat={}):
 ## Purpose:   Create a knowledge graph
 ##
 ############################################################################
-def create_kg(inst,dat=[],splits=2):
+def create_kg(inst,dat=[],splits=2,permu=[]):
     ret  = {const.V:[],const.E:[]}
     if not (inst == None or inst < 0 or len(dat) == 0 or splits < 2):
         # number of cpu cores
         nc   = mp.cpu_count()
         # generate the brains
-        brns = brain(dat)
+        brns = brain(dat,splits,permu)
         # generate the vertices and edges
         bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
         rret = ret
