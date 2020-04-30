@@ -94,7 +94,7 @@ def cognitive(wtyp=const.OCR,pdfs=["/home/robert/data/files/kg.pdf"],inst=0,test
 ## Purpose:   Write a knowledge graph
 ##
 ############################################################################
-def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,testing=True):
+def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True,testing=True):
     ret  = []
     lcol = len(coln)
     lkg  = len(kgdat)
@@ -105,16 +105,20 @@ def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,testing=True):
             try:
                 # write the graph to memory
                 if stem in [const.V,const.E]:
-                    ret  = [data.write_kg(stem,inst,coln,k,g) for k in kgdat]
+                    ret  = [data.write_kg(stem,inst,coln,k,g,drop) for k in kgdat]
                 else:
                     if stem == const.ENTS:
                         # single row processing in the function call
-                        ret  = data.write_kg(stem,inst,coln,kgdat,g)
+                        ret  = data.write_kg(stem,inst,coln,kgdat,g,drop)
                     else:
-                        # just a placeholder for the moment
-                        # call the appropriate function in the future
-                        # then append things to the graph using property tags
-                        ret  = None
+                        if stem == const.CONS:
+                            # single row processing in the function call
+                            ret  = data.write_kg(stem,inst,coln,kgdat,g,drop)
+                        else:
+                            # just a placeholder for the moment
+                            # call the appropriate function in the future
+                            # then append things to the graph using property tags
+                            ret  = None
             except Exception as err:
                 ret  = [str(err)]
         else:

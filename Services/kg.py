@@ -14,7 +14,7 @@
 ##
 ############################################################################
 
-from data                                           import url_kg
+from data                                           import url_kg,read_kg
 from services                                       import kg
 from ai                                             import create_kg,extendglove,thought
 from ocr                                            import ocr_testing
@@ -50,8 +50,8 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     #
     # use an explicit dict to make sure that the order is preserved
     coln = [("col"+str(i),(i-1)) for i in range(1,p+1)]
-    # create the data for the sample knowledge graph
-    kgdat= create_kg(inst,dat,s)
+    # create the data for the sample knowledge graph (all brains)
+    kgdat= create_kg(inst,dat,s,[[int(i) for i in np.asarray(coln)[:,1]]])
     # populate the knowledge graph into the remote DB
     #
     # instantiate a JanusGraph object
@@ -60,8 +60,8 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     conn = DriverRemoteConnection(url_kg(inst),'g')
     # get the remote graph traversal
     g    = graph.traversal().withRemote(conn)
-    # force an ordering on the columns always
-    print(kg(const.V,inst,coln,kgdat,g,testing))
+    # we only want to process the right brain
+    print(kg(const.V,inst,coln,kgdat,g,False,testing))
     # after building the knowledge graph, use the output of ocr to test the GloVe write
     #
     # call cognitive to produce the ocr output
@@ -75,10 +75,7 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     rdat = extendglove(oret[0][0],gfl)
     rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
     # write the glove output to the knowledge graph
-    print(kg(const.ENTS,inst,coln,rdat,g,testing))
-    # drop the graph
-    g.E().drop().iterate()
-    g.V().drop().iterate()
+    print(kg(const.ENTS,inst,coln,rdat,g,True,testing))
     # close the connection
     conn.close()
     # test the thought function with the default number of predictions 3
