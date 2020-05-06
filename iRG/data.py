@@ -35,6 +35,8 @@ from nn                                             import dbn
 # read the default json config file
 cfg  = config.cfg()
 
+np.random.seed(12345)
+
 ############################################################################
 ##
 ## Purpose:   Get the URL to the knowledge graph
@@ -80,7 +82,8 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
         # column keys and values
         ckeys= np.asarray(coln)[:,0]
         cvals= np.asarray(coln)[:,1]
-        try:
+        #try:
+        if True:
             if g == None:
                 drop = True
                 # depending upon what I decide to pass as arguments,
@@ -133,14 +136,27 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
                     cdat = [k for k,x in enumerate(list(dat[0].keys())) if x in ckeys]
                     ndat = [[datv[j][i][0] for i in cdat] for j in range(0,len(dat))]
                     # add the data for this file
-                    ret["dat"].append(np.median(ndat,axis=0))
+                    #
+                    # the data has the markov property so that
+                    # each data point is the sum of the previous
+                    # data point and zero-mean white noise
+                    # but our data is almost certainly to not be zero mean so
+                    # we will generate the data using the sample median and variance
+                    #
+                    # median
+                    md   = np.median(ndat,axis=0)
+                    # variance
+                    var  = np.var(ndat,axis=0)
+                    # the data
+                    ret["dat"].append(md )
+                    ret["dat"].append(var)
                 else:
                     ret["dat"].append([None])
             if drop:
                 # close the connection
                 conn.close()
-        except Exception as err:
-            ret  = str(err)
+        #except Exception as err:
+            #ret  = str(err)
     return ret
 
 ############################################################################
@@ -166,7 +182,7 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
                     if not (len(kgdat) <= 1):
                         g    = g.addV(ret[i]).property("id",kgdat[i])
                     else:
-                        ret.append(g.addV(ret[i]).property("id",kgdat[i]).next())
+                        ret.append(g.addV(cols[i]).property("id",kgdat[i]).next())
                         g    = ret[len(ret)-1]
                 else:
                     # add all of the other properties
@@ -184,23 +200,26 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
 ##
 ############################################################################
 def write_we(r=[],coln=[],kgdat=[],g=None):
+    lcol = len(coln)
+    lkg  = len(kgdat)
     ret  = False
-    if not (len(r) == 0 or len(coln) == 0 or len(kgdat) == 0 or g == None):
-        for i in range(0,len(coln)):
-            # id, vertex and GloVe constants of the current word
-            ids1 = r[i][0]
-            v1   = r[i][1]
-            c1   = kgdat[i][1]
-            for j in range(i+1,len(coln)):
-                # id, vertex and GloVe constants of the next words after the current one
-                ids2 = r[j][0]
-                v2   = r[j][1]
-                c2   = kgdat[j][1]
-                # create the ID
-                ids12= const.SEP.join((ids1,ids2))
-                # create the edge between the vertices in question
-                g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
-        ret  = True
+    if not (len(r) == 0 or lcol == 0 or lkg == 0 or g == None):
+        if lcol == lkg:
+            for i in range(0,len(coln)):
+                # id, vertex and GloVe constants of the current word
+                ids1 = r[i][0]
+                v1   = r[i][1]
+                c1   = kgdat[i][1]
+                for j in range(i+1,len(coln)):
+                    # id, vertex and GloVe constants of the next words after the current one
+                    ids2 = r[j][0]
+                    v2   = r[j][1]
+                    c2   = kgdat[j][1]
+                    # create the ID
+                    ids12= const.SEP.join((ids1,ids2))
+                    # create the edge between the vertices in question
+                    g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
+            ret  = True
     return ret
 
 ############################################################################
@@ -291,11 +310,10 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                     # to the graph already
                     #
                     # probe the graph to find a listing of all words and get the length
-                    awrds= g.V().out(const.E).values("word").toList()
-                    la   = len(np.unique(awrds))
-                    for phs in kgdat[0]:
+                    cols = [("word",0),("sentiment",1),("weight",2)]
+                    for k in range(0,len(kgdat[0])):
                         # add the words in each phrase to the graph
-                        for ph in phs:
+                        for ph in kgdat[0][k]:
                             # some of the phrases are length 0 ... skip them
                             if not (len(ph) == 0):
                                 # each phrase should be separated by a space
@@ -308,38 +326,26 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                                 if not (l == 1):
                                     for i in range(0,l-1):
                                         # the word in question
-                                        word1= words[i]
-                                        # probe the graph to see if these words are already directly connected
-                                        wrds = g.V().has("id",word1).out(const.E).values("word").toList()
-                                        # if length of words associated with the word in question is len 0
-                                        # then we can assume that the word was never added to the graph at all
-                                        # so we will just add it
-                                        if len(wrds) == 0:
-                                            ret  = [write_ve(const.V,[["word"]],[word1],g)]
-                                            # write the edges for these words just returned in ret
-                                            if not (ret == None):
-                                                # write the edges
-                                                if not write_we(ret,coln,kgdat,g):
-                                                    continue
-                                            else:
-                                                continue
-                                        # the word in question should also be the ID property
-                                        ids1 = word1
+                                        ret  = [write_ve(const.V,cols,["word",words[i],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                                        if ret == None:
+                                            continue
                                         # obtain the vertex ID associated with this word
-                                        v1   = g.V().has("id",ids1).valueMap(True)
-                                        # the weight property associated with this word
-                                        wt1  = g.V(v1).has("id",ids1).values("weight")
+                                        v1   = ret[0][1]
                                         for j in range(i+1,l):
                                             # the word in question
-                                            word2= words[j]
-                                            # the word in question should also be the ID property
-                                            ids2 = word2
+                                            ret  = [write_ve(const.V,cols,["word",words[j],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                                            if ret == None:
+                                                continue
                                             # obtain the vertex ID associated with this word
-                                            v2   = g.V().has("id",ids2).valueMap(True)
-                                            # the weight property associated with this word
-                                            wt2  = g.V(v2).has("id",ids2).values("weight")
-                                            if word2 in wrds:
-                                                g.V(v1).addE(const.E).to(v2).property("id",ids12).property("weight",wt1*wt2*(l/la)).next()
+                                            v2   = ret[0][1]
+                                            # create the ID
+                                            ids12= const.SEP.join((words[i],words[j]))
+                                            # add the edge
+                                            g.V(v1).addE(const.E).to(v2).property("id",ids12).property("weight",0.25).next()
+                                else:
+                                    ret  = [write_ve(const.V,cols,["word",words[0],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                    # write the graph to disk
+                    g.io(kg["fl"][0]).write().iterate()
                     # drop all of the data that was just loaded
                     if drop:
                         g.E().drop().iterate()
