@@ -341,7 +341,7 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                                             # create the ID
                                             ids12= const.SEP.join((words[i],words[j]))
                                             # add the edge
-                                            g.V(v1).addE(const.E).to(v2).property("id",ids12).property("weight",0.25).next()
+                                            g.V(v1).addE(const.E).to(v2).property("id",ids12).property("weight",kgdat[1][k][1]**2).next()
                                 else:
                                     ret  = [write_ve(const.V,cols,["word",words[0],kgdat[1][k][0],kgdat[1][k][1]],g)]
                     # write the graph to disk
