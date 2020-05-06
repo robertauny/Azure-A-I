@@ -10,7 +10,8 @@
 					"ocr"        : 1,
 					"keyPhrases" : 2,
 					"sentiment"  : 3,
-					"glove"      : 4
+					"glove"      : 4,
+					"ocrf"       : 5
 				}
 			},
 			"sources" : [
@@ -57,7 +58,7 @@
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -67,7 +68,7 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -77,7 +78,7 @@
 							"host" : "rammansentiment.cognitiveservices.azure.com",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -85,6 +86,14 @@
 						"connection" : {
 							"app"  : "glove",
 							"file" : "/home/robert/data/glove.6B.50d.txt"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "ocrf",
+							"files": [
+                                                                  "/home/robert/data/files/kg.pdf"
+                                                                 ]
 						}
 					}
 				]

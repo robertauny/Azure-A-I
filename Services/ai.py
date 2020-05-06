@@ -48,6 +48,8 @@ from nn import dbn,categoricals
 
 cfg  = config.cfg()
 
+np.random.seed(12345)
+
 ############################################################################
 ##
 ## Purpose:   Identify the cluster for the data row
@@ -355,19 +357,27 @@ def thought(inst=0,coln=[],preds=3):
                 # so what we will do is to manufacture a data point by taking the median of each
                 # column of the data defining the brain then predict the cluster for that data point
                 pt   = []
-                if not (dat1[0][0] == None):
+                if not (dat1[m][0] == None):
                     if not (len(dat1) <= 1):
                         dat  = dat1[m]
                         # if we have multiple medians (clusters), then combine them back into one data set
                         # then use the entire data set to find the median used to get the correct cluster
-                        if len(dat1) > 1:
-                            for d in dat1[1:len(dat1)]:
-                                dat  = np.vstack(dat,d)
-                        pt   = np.resize(np.median([row for row in dat[:,1:] if not (row == None)],axis=0),(1,len(dat[0])-1))
+                        if len(dat1) > 2:
+                            for d in dat1[1:(len(dat1)-1)]:
+                                dat  = np.vstack((dat,d))
+                            # note that we are getting data from the second column to the end
+                            # because in the regression models, we are only expecting a single output
+                            # with multiple inputs and the responses are in the first column
+                            pt   = np.resize(np.median([row for row in dat[:,1:] if not (len(row) == 0)],axis=0),(1,len(dat[0])-1))
+                        else:
+                            pt   = np.resize(np.asarray(dat)[1:],(1,len(dat)-1))
                     else:
                         # if only one median (cluster), then use it as the point to get the cluster
                         if not (len(dat1) == 0):
-                            pt   = np.resize(np.asarray(dat1)[:,1:],(1,len(dat1[0])-1))
+                            # note that we are getting data from the second column to the end
+                            # because in the regression models, we are only expecting a single output
+                            # with multiple inputs and the responses are in the first column
+                            pt   = np.resize(np.asarray(dat1)[0,1:],(1,len(dat1[0])-1))
                 if not (len(pt) == 0):
                     # load the clustering model and make the cluster prediction for this data point
                     mdl  = load_model(fl)
@@ -400,17 +410,21 @@ def thought(inst=0,coln=[],preds=3):
                             # to use when making the final (more specific) regression predictions preds
                             #
                             # making the requested number of predictions
+                            mpt  = dat1[0          ][0]
+                            vpt  = dat1[len(dat1)-1][0]
                             rdat = []
-                            for i in range(0,preds):
-                                npt  = rmdl.predict(pt)[0]
-                                rdat.append(npt)
-                                pt   = np.resize(npt,(1,len(npt)))
-                                #pt   = np.resize(np.median([row for row in np.append(pt,npt) if not (row == None)],axis=0),(1,len(pt[0])))
                             # using these data points, make the predictions using nnet
                             if os.path.exists(nnet) and os.path.getsize(nnet) > 0:
                                 # load the particular regression model for the predicted cluster
                                 rmdl         = load_model(nnet)
-                                ret[lbls[m]] = rmdl.predict(np.asarray(rdat))
+                                # markov property guarantees that the predictions will be
+                                # the sum of the mean (prediction of the median here) and gaussian noise
+                                # which we can do because the model gives the underlying subspace
+                                # which is just the best estimate of the data (or equilibrium distribution)
+                                prds         = rmdl.predict(np.asarray(pt))
+                                # the mean and variance are computed using theory from
+                                # A Predictive Model using the Markov Property
+                                ret[lbls[m]] = [prds[0][0] + np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)]
     return ret
 
 ############################################################################

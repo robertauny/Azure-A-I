@@ -16,7 +16,7 @@
 
 from data                                           import url_kg,read_kg
 from services                                       import kg
-from ai                                             import create_kg,extendglove,thought
+from ai                                             import create_kg,extendglove,thought,cognitive
 from ocr                                            import ocr_testing
 
 import constants as const
@@ -30,6 +30,8 @@ from gremlin_python.structure.graph                 import Graph
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 cfg  = config.cfg()
+
+np.random.seed(12345)
 
 ############################################################################
 ##
@@ -50,7 +52,7 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     #
     # use an explicit dict to make sure that the order is preserved
     coln = [("col"+str(i),(i-1)) for i in range(1,p+1)]
-    # create the data for the sample knowledge graph (all brains)
+    # create the data for the sample knowledge graph (only one brain)
     kgdat= create_kg(inst,dat,s,[[int(i) for i in np.asarray(coln)[:,1]]])
     # populate the knowledge graph into the remote DB
     #
@@ -75,7 +77,13 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     rdat = extendglove(oret[0][0],gfl)
     rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
     # write the glove output to the knowledge graph
-    print(kg(const.ENTS,inst,coln,rdat,g,True,testing))
+    print(kg(const.ENTS,inst,coln,rdat,g,False,testing))
+    # get the ocr data ... using the real way to get the ocr data here
+    typ  = cfg["instances"][inst]["src"]["types"]["ocrf"]
+    pdfs = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
+    cdat = cognitive(const.OCR,pdfs,inst,testing)
+    # write the ocr data to the graph
+    print(kg(const.CONS,inst,coln,cdat[1:],g,True,testing))
     # close the connection
     conn.close()
     # test the thought function with the default number of predictions 3

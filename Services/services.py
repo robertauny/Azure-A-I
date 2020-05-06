@@ -42,6 +42,8 @@ import config
 # get the default configuration
 cfg  = config.cfg()
 
+np.random.seed(12345)
+
 ############################################################################
 ##
 ## Purpose:   For each column in the passed data set, attempt to correct errors.
