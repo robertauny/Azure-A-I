@@ -14,7 +14,7 @@
 ##
 ############################################################################
 
-from keras.layers import Dense, Dropout, Input, Embedding
+from keras.layers import Dense,Dropout,Input,Embedding,BatchNormalization,Activation
 from keras.models import Sequential
 from keras.utils  import to_categorical
 
@@ -24,6 +24,33 @@ import numpy as np
 import os
 
 import constants as const
+
+############################################################################
+##
+## Purpose:   Deep belief network support function
+##
+############################################################################
+def layers(model=None,outp=1,shape=3,act=None,useact=False):
+    if not (model == None or outp < 1 or shape < 1 or act == None):
+        if not useact:
+            # encode the input data using the rectified linear unit
+            enc  = Dense(outp,input_shape=(shape,),activation=act)
+            # add the input layer to the model
+            model.add(enc)
+        else:
+            # encode the input data using the rectified linear unit
+            enc  = Dense(outp,input_shape=(shape,),use_bias=False)
+            # add the input layer to the model
+            model.add(enc)
+            # add batch normalization
+            enc  = BatchNormalization()
+            # add the input layer to the model
+            model.add(enc)
+            # add the activation
+            enc  = Activation(act)
+            # add the input layer to the model
+            model.add(enc)
+    return
 
 ############################################################################
 ##
@@ -43,6 +70,7 @@ def dbn(inputs=[]
        ,epochs=10
        ,embed=True
        ,encs=None
+       ,useact=False
        ,verbose=0):
     model= None
     if inputs.any() and outputs.any():
@@ -69,9 +97,7 @@ def dbn(inputs=[]
         # inputs have M columns and any number of rows, while output has M columns and any number of rows
         #
         # encode the input data using the rectified linear unit
-        enc  = Dense(M,input_shape=(M,),activation='relu')
-        # add the input layer to the model
-        model.add(enc)
+        layers(model,M,M,'relu',useact)
         # add other encodings that are being passed in the encs array
         if not (encs == None):
             if not (len(encs) == 0):
@@ -83,8 +109,7 @@ def dbn(inputs=[]
         if embed:
             p    = min(const.MAX_FEATURES,min(props,outputs.shape[len(outputs.shape)-1]))
             if M > p:
-                enc  = Dense(p,input_shape=(M,),activation='selu')
-                model.add(enc)
+                layers(model,p,M,'selu',useact)
                 props= p
                 M    = props
             if S > const.MAX_SPLITS:
@@ -110,9 +135,7 @@ def dbn(inputs=[]
             else:
                 dim  = S * odim
             # next layers using the scaled exponential linear unit (Gibbs distribution) are siblings
-            enc  = Dense(dim,input_shape=(odim,),activation='selu')
-            # add the layer to the model
-            model.add(enc)
+            layers(model,dim,odim,'selu',useact)
             # redefine the input and output dimensions for the binary layers
             odim = S * dim
             # next layers using the softmax are binary layers
@@ -129,27 +152,23 @@ def dbn(inputs=[]
             # so that the tuning through back propagation leads to the equilibrium distribution that can be color
             # coded into distinct regions of connected clusters ... see the writings for an example
             if not (J == M - 1):
-                #enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
-                enc  = Dense(odim,input_shape=(dim,),activation=rbmact)
+                #layers(model,odim,dim,'sigmoid',useact)
+                layers(model,odim,dim,rbmact,useact)
             else:
                 if not (dbnact == None or dbnout <= 0):
-                    enc  = Dense(odim,input_shape=(dim,),activation='sigmoid')
+                    layers(model,odim,dim,'sigmoid',useact)
                 else:
                     # add another layer to change the structure of the network if needed based on clusters
                     if not (clust <= 0):
-                        enc  = Dense(clust,input_shape=(dim,),activation=rbmact)
+                        layers(model,clust,dim,rbmact,useact)
                     else:
-                        enc  = Dense(odim ,input_shape=(dim,),activation=rbmact)
-            # add the layer to the model
-            model.add(enc)
+                        layers(model,odim ,dim,rbmact,useact)
         # add another layer for a different kind of model, such as a regression model
         if not (dbnact == None or dbnout <= 0):
             # preceding layers plus this layer now perform auto encoding
-            enc  = Dense(M,input_shape=(odim,),activation='selu')
-            model.add(enc)
+            layers(model,M,odim,'selu',useact)
             # requested model at the output layer of this RBM
-            enc  = Dense(dbnout,input_shape=(M,),activation=dbnact)
-            model.add(enc)
+            layers(model,dbnout,M,dbnact,useact)
         # optimize using the typical categorical cross entropy loss function with root mean square optimizer to find weights
         model.compile(loss=loss,optimizer=optimizer)
         # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
