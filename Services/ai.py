@@ -26,11 +26,15 @@ from keras.preprocessing.text     import Tokenizer
 from keras.preprocessing.sequence import pad_sequences
 
 from pdf2image                    import convert_from_bytes,convert_from_path
+from scipy                        import ndimage,misc
 from PIL                          import Image
+
+from datetime                     import datetime
 
 import requests
 import io
 import json
+import time
 
 import numpy  as np
 import pandas as pd
@@ -993,26 +997,63 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                     except Exception as err:
                         ftext.append(str(err))
             else:
-                # request headers. Important: content should be json as we are sending an array of json objects
-                hdrs["Content-Type"] = "application/json"
-                if wtyp in [const.EE,const.SENT]:
+                if wtyp == const.IMG:
+                    hdrs["Content-Type"] = "application/octet-stream"
                     try:
-                        ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
                         # get response from the server
-                        resp = requests.post(url,headers=hdrs,json=ijson)
+                        resp = requests.post(url,headers=hdrs,params=parms,data=docs)
                         resp.raise_for_status()
-                        # get json data to parse it later
-                        js   = resp.json()
-                        # all the lines from a page, including noise
-                        for doc in js["documents"]:
-                            keys = doc[wtyp]
-                            if wtyp == const.SENT:
-                                keys = [keys,doc["documentScores"][keys]]
-                            ftext.append(keys)
+                        # The recognized text isn't immediately available, so poll to wait for completion.
+                        anal = {}
+                        poll = True
+                        while poll:
+                            respf= requests.get(resp.headers["Operation-Location"],headers=hdrs)
+                            respf.raise_for_status()
+                            anal = respf.json()
+                            time.sleep(1)
+                            if "recognitionResults" in anal:
+                                poll = False
+                                # Extract the recognized text
+                                ltext= [line["text"] for line in anal["recognitionResults"][0]["lines"]]
+                            if ("status" in anal and anal["status"] == "Failed"):
+                                poll = False
+                                ltext= "Failed"
+                        ftext= np.append(ftext,ltext)
                     except Exception as err:
                         ftext.append(str(err))
                 else:
-                    ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                    if wtyp == const.OBJ:
+                        hdrs["Content-Type"] = "application/octet-stream"
+                        parms                = {"visualFeatures":"Categories,Description,Color"}
+                        # get response from the server
+                        resp = requests.post(url,headers=hdrs,params=parms,data=docs)
+                        resp.raise_for_status()
+                        # get json data to parse it later
+                        js   = resp.json()
+                        # only get the description and color from an image return
+                        ftext.append(js["description"]["tags"          ])
+                        ftext.append(js["color"      ]["dominantColors"])
+                    else:
+                        # request headers. Important: content should be json as we are sending an array of json objects
+                        hdrs["Content-Type"] = "application/json"
+                        if wtyp in [const.EE,const.SENT]:
+                            try:
+                                ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
+                                # get response from the server
+                                resp = requests.post(url,headers=hdrs,json=ijson)
+                                resp.raise_for_status()
+                                # get json data to parse it later
+                                js   = resp.json()
+                                # all the lines from a page, including noise
+                                for doc in js["documents"]:
+                                    keys = doc[wtyp]
+                                    if wtyp == const.SENT:
+                                        keys = [keys,doc["documentScores"][keys]]
+                                    ftext.append(keys)
+                            except Exception as err:
+                                ftext.append(str(err))
+                        else:
+                            ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)
@@ -1036,6 +1077,27 @@ def ocre(imgs=[]):
 
 ############################################################################
 ##
+## Purpose:  Rotate an image
+##
+############################################################################
+def rotate(img=None,deg=0,by=0):
+    ret  = []
+    if not (img == None or deg <= 0 or by <= 0 or by >= deg):
+        if (os.path.exists(img) and os.path.getsize(img) > 0):
+            rimg = ndimage.imread(img)
+        else:
+            rimg = img
+        for i in range(by,deg,by):
+            # rotate the image
+            rimg = ndimage.rotate(rimg,i)
+            # save the image
+            pil  = pil2array(Image.fromarray(rimg))
+            # add the addressable memory address to the return
+            ret.append(pil)
+    return ret
+
+############################################################################
+##
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
@@ -1044,23 +1106,62 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
     if not (wtyp == None or len(pdfs) == 0 or inst <= const.BVAL):
         # number of cpu cores
         nc   = mp.cpu_count()
-        if wtyp == const.OCR:
+        if wtyp in [const.OCR,const.IMG]:
             # converted images
-            imgs =     Parallel(n_jobs=nc)(delayed(convert_from_path  )(pdfs[i]                   ) for i in range(0,len(pdfs )))
-            pimgs=     Parallel(n_jobs=nc)(delayed(ocre               )(imgs[i]                   ) for i in range(0,len(imgs )))
-            # this thread can die due to timeout waiting for a response from Azure
-            # results in a warning from tensorflow about __del__
-            oimgs=     Parallel(n_jobs=nc)(delayed(img2txt            )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
-            ret  = []
-            if not (len(oimgs) <= 1):
-                ret.append(Parallel(n_jobs=nc)(delayed(oimgs[0].append)(oimgs[i]                  ) for i in range(1,len(oimgs))))
+            if wtyp == const.OCR:
+                # convert the data in the pdf into images using python image library format
+                imgs = Parallel(n_jobs=nc)(delayed(convert_from_path        )(pdfs[i]                   ) for i in range(0,len(pdfs )))
+                # save the images of the pdfs to addressable memory
+                pimgs= Parallel(n_jobs=nc)(delayed(ocre                     )(imgs[i]                   ) for i in range(0,len(imgs )))
+                # extract the text from the images
+                #
+                # this thread can die due to timeout waiting for a response from Azure
+                # results in a warning from tensorflow about __del__
+                oimgs= Parallel(n_jobs=nc)(delayed(img2txt                  )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+                ret  = []
+                if not (len(oimgs) <= 1):
+                    ret.append(Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs))))
+                else:
+                    if not (len(oimgs) == 0):
+                        ret.append(oimgs[0])
+                # key phrases or entity extractions
+                ret.append(cognitive(const.EE  ,ret[0],inst,testing))
+                # sentiment and scores
+                ret.append(cognitive(const.SENT,ret[0],inst,testing))
             else:
-                if not (len(oimgs) == 0):
-                    ret.append(oimgs[0])
-            # key phrases or entity extractions
-            ret.append(cognitive(const.EE  ,ret[0],inst,testing))
-            # sentiment and scores
-            ret.append(cognitive(const.SENT,ret[0],inst,testing))
+                if wtyp == const.IMG:
+                    ret  = {}
+                    # multiple rotations with different angle limits and increments
+                    angs = [[180,270,360],[30,45,60]]
+                    for i in range(0,len(pdfs)):
+                        imgs = Parallel(n_jobs=nc)(delayed(rotate)(pdfs[i],angs[0][j],angs[1][j]) for j in range(0,len(angs)))
+                        # read the data if we received a file path
+                        # otherwise, assume that we received the binary image data
+                        if os.path.exists(pdfs[i]) and os.path.getsize(pdfs[i]) > 0:
+                            # read the image as an array
+                            rimg = ndimage.imread(pdfs[i])
+                            # convert the image to a python image library form
+                            img  = Image.fromarray(rimg)
+                            # save the image to addressable memory
+                            pimg = pil2array(img)
+                            # append the original image and the rotated images together
+                            pimgs= np.append(pimg,imgs)
+                        else:
+                            # append the original image and the rotated images together
+                            pimgs= np.append(pdfs[i],imgs)
+                        # extract the text from the image
+                        oimgs           = [img2txt(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs))]
+                        # initialize the return to an empty dictionary
+                        rret            = {}
+                        # capture the text in the image
+                        rret[const.IMG] = [i[0] for i in oimgs if not len(i) == 0]
+                        # object detection
+                        rret[const.OBJ] = cognitive(const.OBJ,pimgs[0],inst,testing)
+                        # final return for this pdf
+                        ret [pdfs[i]  ] = rret
+                else:
+                    # placeholder for the future
+                    imgs = None
         else:
             ret  = img2txt(wtyp,pdfs,inst,testing)
     return ret
