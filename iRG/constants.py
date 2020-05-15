@@ -20,8 +20,14 @@ POST         = "post"
 STEM         = "stem"
 # all stems but only using vertices for now
 STEMS        = [V]
+# extension used when storing the knowledge graph files
 EXT          = ".xml"
+# optical character recognition
 OCR          = "ocr"
+# image processing
+IMG          = "ocri"
+# object detection
+OBJ          = "objd"
 # entity extraction
 EE           = "keyPhrases"
 # sentiment
