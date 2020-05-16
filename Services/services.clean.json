@@ -11,7 +11,10 @@
 					"keyPhrases" : 2,
 					"sentiment"  : 3,
 					"glove"      : 4,
-					"ocrf"       : 5
+					"ocrf"       : 5,
+					"ocri"       : 6,
+					"objd"       : 7,
+					"pill"       : 8
 				}
 			},
 			"sources" : [
@@ -58,7 +61,7 @@
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "account-key",
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -68,7 +71,7 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
-							"key"  : "account-key",
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -78,7 +81,7 @@
 							"host" : "rammansentiment.cognitiveservices.azure.com",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
-							"key"  : "account-key",
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -93,6 +96,51 @@
 							"app"  : "ocrf",
 							"files": [
                                                                   "/home/robert/data/files/kg.pdf"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "read/core/asyncBatchAnalyze",
+							"host" : "rammanimg.cognitiveservices.azure.com",
+							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "key",
+							"files": [
+                                                                  "/home/robert/data/files/IMG_0569.jpeg",
+                                                                  "/home/robert/data/files/watson-795.jpg",
+                                                                  "/home/robert/data/files/IMG_0570.jpg"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "analyze",
+							"host" : "rammanimg.cognitiveservices.azure.com",
+							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "key",
+							"files": [
+                                                                  "/home/robert/data/files/IMG_0569.jpeg",
+                                                                  "/home/robert/data/files/watson-795.jpg",
+                                                                  "/home/robert/data/files/IMG_0570.jpg"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "pill",
+							"host" : "datadiscovery.nlm.nih.gov",
+							"api"  : "gPOEgXbM0kVTzyqedG8Z8Hcvu",
+							"user" : "28wdq5b2fsqqmdrwk28l37708",
+							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
+							"db"   : "crzr-uvwg",
+                                                        "sel"  : [
+                                                                  "splshape_text as shape",
+                                                                  "splimprint    as imprint",
+                                                                  "splcolor_text as color",
+                                                                  "rxstring      as script",
+                                                                  "author        as maker" 
                                                                  ]
 						}
 					}

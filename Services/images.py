@@ -14,7 +14,7 @@
 ##
 ############################################################################
 
-from data                                           import url_kg,read_kg
+from data                                           import url_kg,read_kg,sodaget
 from services                                       import images
 from ai                                             import create_kg,extendglove,thought,cognitive
 
@@ -37,7 +37,7 @@ np.random.seed(12345)
 ## Purpose:   Process the image data
 ##
 ############################################################################
-def images_testing(inst=0,testing=False):
+def images_testing(inst=0,objd=False,testing=False):
     # getting constants from the JSON config file
     src  = cfg["instances"][inst]["src"]["index"]
     typ  = cfg["instances"][inst]["src"]["types"]["ocri"]
@@ -47,5 +47,8 @@ def images_testing(inst=0,testing=False):
     # first parameter is a list of images
     # second parameter is an integer instance of this code base that is being run
     # third parameter is a boolean value indicating whether (or not) we are testing
-    cdat = images(imgs,inst,testing)
+    cdat = images(imgs,inst,objd,testing)
     print(cdat)
+    # perform the query against the NIH database
+    sg   = sodaget(inst,cdat)
+    print(sg)

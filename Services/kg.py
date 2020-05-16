@@ -81,7 +81,7 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     # get the ocr data ... using the real way to get the ocr data here
     typ  = cfg["instances"][inst]["src"]["types"]["ocrf"]
     pdfs = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
-    cdat = cognitive(const.OCR,pdfs,inst,testing)
+    cdat = cognitive(const.OCR,pdfs,inst,False,testing)
     # write the ocr data to the graph
     print(kg(const.CONS,inst,coln,cdat[1:],g,True,testing))
     # close the connection

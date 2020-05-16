@@ -89,7 +89,7 @@ def cs(docs=["/home/robert/data/java/test/test.java"]
 ##
 ############################################################################
 def cognitive(wtyp=const.OCR,pdfs=["/home/robert/data/files/kg.pdf"],inst=0,testing=True):
-    return ai.cognitive(wtyp,pdfs,inst,testing)
+    return ai.cognitive(wtyp,pdfs,inst,False,testing)
 
 ############################################################################
 ##
@@ -125,4 +125,19 @@ def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True,testing=True)
                 ret  = [str(err)]
         else:
             ret  = [url]
+    return ret
+
+############################################################################
+##
+## Purpose:   Extract any image text along with other characteristics
+##
+############################################################################
+def images(imgs=["/home/robert/data/files/IMG_0569.jpeg","/home/robert/data/files/IMG_0570.jpg"],inst=0,objd=False,testing=True):
+    ret  = []
+    limg = len(imgs)
+    if not (limg == 0 or inst <= const.BVAL):
+        if not testing:
+            ret  = ai.cognitive(const.IMG,imgs,inst,objd,testing)
+        else:
+            ret  = [imgs,inst,testing]
     return ret

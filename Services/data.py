@@ -20,15 +20,18 @@ import os
 import sys
 import traceback
 
+from sodapy                                         import Socrata
+
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
+import pandas          as pd
 import numpy           as np
 import multiprocessing as mp
 
 import config
-import constants as const
+import constants       as const
 
 from nn                                             import dbn
 
@@ -36,6 +39,55 @@ from nn                                             import dbn
 cfg  = config.cfg()
 
 np.random.seed(12345)
+
+############################################################################
+##
+## Purpose:   Use SODAPy to get data
+##
+############################################################################
+def sodaget(inst=0,pill={}):
+    ret  = {}
+    if not (len(pill) == 0):
+        # ordering of the data elements in the JSON file
+        src  = cfg["instances"][inst]["src"]["index"]
+        typ  = cfg["instances"][inst]["src"]["types"]["pill"]
+        # NIH host
+        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+        # NIH DB
+        db   = cfg["instances"][inst]["sources"][src][typ]["connection"]["db"  ]
+        # generated NIH api token
+        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api" ]
+        # generated NIH username
+        user = cfg["instances"][inst]["sources"][src][typ]["connection"]["user"]
+        # generated NIH password
+        passw= cfg["instances"][inst]["sources"][src][typ]["connection"]["pass"]
+        if not (host == None or db == None or api == None):
+            # Unauthenticated client only works with public data sets. Note 'None'
+            # in place of application token, and no username or password:
+            cli  = Socrata(host,None)
+            # Example authenticated client (needed for non-public datasets):
+            #
+            # cli  = Socrata(host,api,userame=user,password=passw)
+            #
+            # results, returned as JSON from API
+            # converted to Python list of dictionaries by sodapy.
+            # 
+            # loop through the results in pill
+            for p in list(pill.items()):
+                # only a where clause for now
+                whr  = " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
+                qry  = "$where " + whr
+                # select data columns
+                sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
+                # build the query based upon the pills being sought
+                if not (sel == None):
+                    if not (len(sel) == 0):
+                        cols = ",".join(sel)
+                        qry  = "$select " + cols + qry
+                res       = cli.get(db,api,select=cols,where=whr)
+                # Convert to pandas DataFrame
+                ret[p[0]] = pd.DataFrame.from_records(res)
+    return ret
 
 ############################################################################
 ##
@@ -82,8 +134,7 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
         # column keys and values
         ckeys= np.asarray(coln)[:,0]
         cvals= np.asarray(coln)[:,1]
-        #try:
-        if True:
+        try:
             if g == None:
                 drop = True
                 # depending upon what I decide to pass as arguments,
@@ -155,8 +206,8 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
             if drop:
                 # close the connection
                 conn.close()
-        #except Exception as err:
-            #ret  = str(err)
+        except Exception as err:
+            ret  = str(err)
     return ret
 
 ############################################################################
