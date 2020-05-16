@@ -1031,8 +1031,8 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         # get json data to parse it later
                         js   = resp.json()
                         # only get the description and color from an image return
-                        ftext.append(js["description"]["tags"          ])
-                        ftext.append(js["color"      ]["dominantColors"])
+                        ftext.append(js["description"]["tags"       ])
+                        ftext.append(js["color"      ]["accentColor"])
                     else:
                         # request headers. Important: content should be json as we are sending an array of json objects
                         hdrs["Content-Type"] = "application/json"
@@ -1101,7 +1101,7 @@ def rotate(img=None,deg=0,by=0):
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
-def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
+def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
     ret  = None
     if not (wtyp == None or len(pdfs) == 0 or inst <= const.BVAL):
         # number of cpu cores
@@ -1125,9 +1125,9 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
                     if not (len(oimgs) == 0):
                         ret.append(oimgs[0])
                 # key phrases or entity extractions
-                ret.append(cognitive(const.EE  ,ret[0],inst,testing))
+                ret.append(cognitive(const.EE  ,ret[0],inst,objd,testing))
                 # sentiment and scores
-                ret.append(cognitive(const.SENT,ret[0],inst,testing))
+                ret.append(cognitive(const.SENT,ret[0],inst,objd,testing))
             else:
                 if wtyp == const.IMG:
                     ret  = {}
@@ -1150,15 +1150,20 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,testing=True):
                             # append the original image and the rotated images together
                             pimgs= np.append(pdfs[i],imgs)
                         # extract the text from the image
-                        oimgs           = [img2txt(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs))]
-                        # initialize the return to an empty dictionary
-                        rret            = {}
-                        # capture the text in the image
-                        rret[const.IMG] = [i[0] for i in oimgs if not len(i) == 0]
-                        # object detection
-                        rret[const.OBJ] = cognitive(const.OBJ,pimgs[0],inst,testing)
-                        # final return for this pdf
-                        ret [pdfs[i]  ] = rret
+                        oimgs= [img2txt(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs))]
+                        # default is to not use object detection
+                        if not objd:
+                            # capture the text in the image
+                            ret[pdfs[i]]    = [i[0] for i in oimgs if not len(i) == 0]
+                        else:
+                            # initialize the return to an empty dictionary
+                            rret            = {}
+                            # capture the text in the image
+                            rret[const.IMG] = [i[0] for i in oimgs if not len(i) == 0]
+                            # object detection
+                            rret[const.OBJ] = cognitive(const.OBJ,pimgs[0],inst,objd,testing)
+                            # final return for this pdf
+                            ret [pdfs[i]  ] = rret
                 else:
                     # placeholder for the future
                     imgs = None
