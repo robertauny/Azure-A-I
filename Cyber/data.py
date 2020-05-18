@@ -27,6 +27,7 @@ from gremlin_python.structure.graph                 import Graph
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
 
 import pandas          as pd
+import pandasql        as ps
 import numpy           as np
 import multiprocessing as mp
 
@@ -42,12 +43,21 @@ np.random.seed(12345)
 
 ############################################################################
 ##
+## Purpose:   Unique list because np.unique returns strange results
+##
+############################################################################
+def unique(l=[]):
+    return np.asarray(list(set(l)))
+
+############################################################################
+##
 ## Purpose:   Use SODAPy to get data
 ##
 ############################################################################
-def sodaget(inst=0,pill={}):
+def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
     ret  = {}
-    if not (len(pill) == 0):
+    lpill= len(pill)
+    if not (inst <= const.BVAL or lpill == 0):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["src"]["index"]
         typ  = cfg["instances"][inst]["src"]["types"]["pill"]
@@ -61,7 +71,7 @@ def sodaget(inst=0,pill={}):
         user = cfg["instances"][inst]["sources"][src][typ]["connection"]["user"]
         # generated NIH password
         passw= cfg["instances"][inst]["sources"][src][typ]["connection"]["pass"]
-        if not (host == None or db == None or api == None):
+        if not (host == None or db == None):
             # Unauthenticated client only works with public data sets. Note 'None'
             # in place of application token, and no username or password:
             cli  = Socrata(host,None)
@@ -72,21 +82,83 @@ def sodaget(inst=0,pill={}):
             # results, returned as JSON from API
             # converted to Python list of dictionaries by sodapy.
             # 
-            # loop through the results in pill
-            for p in list(pill.items()):
-                # only a where clause for now
-                whr  = " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
-                qry  = "$where " + whr
-                # select data columns
-                sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
-                # build the query based upon the pills being sought
-                if not (sel == None):
-                    if not (len(sel) == 0):
-                        cols = ",".join(sel)
-                        qry  = "$select " + cols + qry
-                res       = cli.get(db,api,select=cols,where=whr)
-                # Convert to pandas DataFrame
-                ret[p[0]] = pd.DataFrame.from_records(res)
+            # recursive loop through the results in pill
+            if not (lpill == 1):
+                nc   = mp.cpu_count()
+                ret  = Parallel(n_jobs=nc)(delayed(sodaget)(inst,{k:pill[k]},objd) for k in pill)
+            else:
+                # single pill will contain image values and might contain object detection values
+                keys = list(pill.  keys())[0]
+                vals = list(pill.values())[0]
+                # image values
+                p    = vals
+                if objd:
+                    p    = pill[keys][const.IMG]
+                if not (len(p) == 0):
+                    # object detection values
+                    o    = None
+                    if objd:
+                        o    = pill[keys][const.OBJ]
+                    # we will filter the terms found in the image
+                    # if there is only one unique term, then that is fine
+                    # but if there are more than one unique terms, then
+                    # we won't use the ones that are a single character
+                    # because too many results are returned that are not useful
+                    p1   = unique(p)
+                    if not (len(p1) == 1):
+                        p1   = [v for v in p1 if len(v) > 1]
+                    # only a where clause for now
+                    #
+                    # not using a simple " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
+                    # since we want to strip white space and treat strings of len = 1 differently
+                    spl      = "splimprint"
+                    whr1     = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + ";%'                             )"              for val in p1])
+                    whr2     = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + "'                               )"              for val in p1])
+                    whr3     = " OR ".join(["(" + spl + " LIKE '"   + str(val) + ";%'                             )"              for val in p1])
+                    if objd:
+                        clrs = "','".join(o[1])
+                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + ";%' AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
+                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + "'   AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
+                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val) + ";%' AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
+                    whr      = whr1 + " OR " + whr2 + " OR " + whr3
+                    qry  = "$where " + whr
+                    # select data columns
+                    sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
+                    # build the query based upon the pills being sought
+                    try:
+                        if not (sel == None):
+                            if not (len(sel) == 0):
+                                spl  = sel[spl]
+                                cols = ",".join([s + " AS " + sel[s] for s in sel])
+                                qry  = "$select " + cols + qry
+                                if not (lim <= 0):
+                                    res  = cli.get(db,app_token=api,select=cols,where=whr,limit=lim)
+                                else:
+                                    res  = cli.get(db,app_token=api,select=cols,where=whr)
+                            else:
+                                if not (lim <= 0):
+                                    res  = cli.get(db,app_token=api,where=whr,limit=lim)
+                                else:
+                                    res  = cli.get(db,app_token=api,where=whr)
+                        else:
+                            if not (lim <= 0):
+                                res  = cli.get(db,app_token=api,where=whr,limit=lim)
+                            else:
+                                res  = cli.get(db,app_token=api,where=whr)
+                        # Convert to pandas DataFrame
+                        ret[keys] = pd.DataFrame.from_records(res)
+                        # string column of the imprints in the image
+                        sret      = ret[keys][spl].to_string()
+                        # most frequently appearing response from the DB
+                        mret      = max(set(sret),key=sret.count)
+                        # row index of the most frequently appearing imprint
+                        row       = sret.index(mret)
+                        # row of data corresponding to the most frequently appearing imprint
+                        ret[keys] = ret[keys].to_numpy()[row]
+                    except Exception as err:
+                        ret[keys] = [str(err)]
+                else:
+                    ret[keys] = [None]
     return ret
 
 ############################################################################
@@ -317,7 +389,7 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                     fl   = "data/" + ret[0][0] + ext
                     g.io(fl).write().iterate()
                     # data to generate a neural network for the rows in the current cluster
-                    dat  = np.asarray(vert)[np.unique(crow)-1,1:]
+                    dat  = np.asarray(vert)[unique(crow)-1,1:]
                     # generate the model
                     mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
                               ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
