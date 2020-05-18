@@ -49,6 +49,7 @@ def images_testing(inst=0,objd=False,testing=False):
     # third parameter is a boolean value indicating whether (or not) we are testing
     cdat = images(imgs,inst,objd,testing)
     print(cdat)
-    # perform the query against the NIH database
-    sg   = sodaget(inst,cdat)
+    # perform the query against the NIH database with limit = 100 rows
+    #sg   = sodaget(inst,cdat,100)
+    sg   = sodaget(inst,cdat,objd)
     print(sg)

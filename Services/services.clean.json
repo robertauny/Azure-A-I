@@ -61,7 +61,7 @@
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : null,
 							"dir"  : "dir"
 						}
 					},
@@ -71,7 +71,7 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : null,
 							"dir"  : "dir"
 						}
 					},
@@ -81,7 +81,7 @@
 							"host" : "rammansentiment.cognitiveservices.azure.com",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
-							"key"  : "key",
+							"key"  : null,
 							"dir"  : "dir"
 						}
 					},
@@ -105,7 +105,7 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : null,
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
@@ -119,7 +119,7 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : null,
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
@@ -131,16 +131,19 @@
 						"connection" : {
 							"app"  : "pill",
 							"host" : "datadiscovery.nlm.nih.gov",
-							"api"  : "gPOEgXbM0kVTzyqedG8Z8Hcvu",
+							"api"  : null,
 							"user" : "28wdq5b2fsqqmdrwk28l37708",
 							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
 							"db"   : "crzr-uvwg",
-                                                        "sel"  : [
-                                                                  "splshape_text as shape",
-                                                                  "splimprint    as imprint",
-                                                                  "splcolor_text as color",
-                                                                  "rxstring      as script",
-                                                                  "author        as maker" 
+                                                        "sel"  : {
+                                                                  "splshape_text":"shape",
+                                                                  "splimprint"   :"imprint",
+                                                                  "splcolor_text":"color",
+                                                                  "splcolor"     :"color2",
+                                                                  "rxstring"     :"script"
+                                                                 },
+                                                        "angs" : [
+                                                                  [360,30]
                                                                  ]
 						}
 					}
