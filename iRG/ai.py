@@ -666,7 +666,7 @@ def glovemost(dat=[]):
         items= np.asarray(list(tok.word_index.items()))
         # get the glove keys and values
         keys = items[:,0]
-        uks  = np.unique(keys)
+        uks  = data.unique(keys)
         # number of clusters is same as the default defined by the splits and properties
         clust= len(uks)
         # must have more than one key, otherwise just return the one key
@@ -832,7 +832,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
         cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
         # lower bound on the number of clusters to seek has to be >= 2 as at least one error is assumed
-        #lo   = len(np.unique(cdat))
+        #lo   = len(data.unique(cdat))
         # calculate the means of each column, as we will use permutations of subsets of all columns
         # and the mean in those columns that are not included in the permutation to test if entropy
         # is increased or decreased as a result ... idea is to find the permutation of columns
@@ -918,7 +918,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         slbl = np.asarray(slbl)
         # cluster labels
         clus = slbl[:,0]
-        ucls = np.unique(clus)
+        ucls = data.unique(clus)
         # row numbers
         rows = slbl[:,1]
         # collect all data for each cluster and assign most numerously appearing value
@@ -1031,8 +1031,8 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         # get json data to parse it later
                         js   = resp.json()
                         # only get the description and color from an image return
-                        ftext.append(js["description"]["tags"       ])
-                        ftext.append(js["color"      ]["accentColor"])
+                        ftext.append(js["description"]["tags"          ])
+                        ftext.append(js["color"      ]["dominantColors"])
                     else:
                         # request headers. Important: content should be json as we are sending an array of json objects
                         hdrs["Content-Type"] = "application/json"
@@ -1131,10 +1131,14 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
             else:
                 if wtyp == const.IMG:
                     ret  = {}
+                    # ordering of the data elements in the JSON file
+                    src  = cfg["instances"][inst]["src"]["index"]
+                    typ  = cfg["instances"][inst]["src"]["types"]["pill"]
                     # multiple rotations with different angle limits and increments
-                    angs = [[180,270,360],[30,45,60]]
+                    #angs = [[180,270,360],[30,45,60]]
+                    angs = cfg["instances"][inst]["sources"][src][typ]["connection"]["angs"]
                     for i in range(0,len(pdfs)):
-                        imgs = Parallel(n_jobs=nc)(delayed(rotate)(pdfs[i],angs[0][j],angs[1][j]) for j in range(0,len(angs)))
+                        imgs = Parallel(n_jobs=nc)(delayed(rotate)(pdfs[i],angs[j][0],angs[j][1]) for j in range(0,len(angs)))
                         # read the data if we received a file path
                         # otherwise, assume that we received the binary image data
                         if os.path.exists(pdfs[i]) and os.path.getsize(pdfs[i]) > 0:
@@ -1434,7 +1438,7 @@ def create_kg_ve(inst=const.BVAL,dat=[],lbls=[],lbl=None,ve=None):
         else:
             # which cluster has been identified for storing the data
             clus = Parallel(n_jobs=nc)(delayed(split)(lbls[i]  ) for i in range(0,len(lbls)))
-            ucs  = np.unique(clus)
+            ucs  = data.unique(clus)
             # get the row number of the original data point
             rows = Parallel(n_jobs=nc)(delayed(split)(lbls[i],1) for i in range(0,len(lbls)))
             # only need to extract the cluster label to go along with the brain label that was passed in
