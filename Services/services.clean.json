@@ -14,6 +14,7 @@
 					"ocrf"       : 5,
 					"ocri"       : 6,
 					"objd"       : 7,
+					"objs"       : 7,
 					"pill"       : 8
 				}
 			},
@@ -61,7 +62,7 @@
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : null,
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -71,7 +72,7 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
-							"key"  : null,
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -81,7 +82,7 @@
 							"host" : "rammansentiment.cognitiveservices.azure.com",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
-							"key"  : null,
+							"key"  : "key",
 							"dir"  : "dir"
 						}
 					},
@@ -105,11 +106,14 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : null,
+							"key"  : "key",
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
-                                                                  "/home/robert/data/files/IMG_0570.jpg"
+                                                                  "/home/robert/data/files/IMG_0570.jpg",
+                                                                  "/home/robert/data/files/nospa.png",
+                                                                  "/home/robert/data/files/venoruton.png",
+                                                                  "/home/robert/data/files/zyrtec.png"
                                                                  ]
 						}
 					},
@@ -119,12 +123,16 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : null,
+							"key"  : "key",
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
-                                                                  "/home/robert/data/files/IMG_0570.jpg"
-                                                                 ]
+                                                                  "/home/robert/data/files/IMG_0570.jpg",
+                                                                  "/home/robert/data/files/nospa.png",
+                                                                  "/home/robert/data/files/venoruton.png",
+                                                                  "/home/robert/data/files/zyrtec.png"
+                                                                 ],
+                                                        "fold" : "/home/robert/data/files/images"
 						}
 					},
 					{
@@ -132,8 +140,8 @@
 							"app"  : "pill",
 							"host" : "datadiscovery.nlm.nih.gov",
 							"api"  : null,
-							"user" : "28wdq5b2fsqqmdrwk28l37708",
-							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
+							"user" : "generated-user",
+							"pass" : "generated-pass",
 							"db"   : "crzr-uvwg",
                                                         "sel"  : {
                                                                   "splshape_text":"shape",
@@ -143,7 +151,7 @@
                                                                   "rxstring"     :"script"
                                                                  },
                                                         "angs" : [
-                                                                  [360,30]
+                                                                  [45,45]
                                                                  ]
 						}
 					}
