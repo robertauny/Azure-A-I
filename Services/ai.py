@@ -35,6 +35,8 @@ import requests
 import io
 import json
 import time
+import cv2
+import imutils
 
 import numpy  as np
 import pandas as pd
@@ -1023,37 +1025,85 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         ftext.append(str(err))
                 else:
                     if wtyp == const.OBJ:
-                        hdrs["Content-Type"] = "application/octet-stream"
-                        parms                = {"visualFeatures":"Categories,Description,Color"}
-                        # get response from the server
-                        resp = requests.post(url,headers=hdrs,params=parms,data=docs)
-                        resp.raise_for_status()
-                        # get json data to parse it later
-                        js   = resp.json()
-                        # only get the description and color from an image return
-                        ftext.append(js["description"]["tags"          ])
-                        ftext.append(js["color"      ]["dominantColors"])
+                        try:
+                            hdrs["Content-Type"] = "application/octet-stream"
+                            parms                = {"visualFeatures":"Categories,Description,Color"}
+                            # get response from the server
+                            resp = requests.post(url,headers=hdrs,params=parms,data=docs)
+                            resp.raise_for_status()
+                            # get json data to parse it later
+                            js   = resp.json()
+                            # only get the description and color from an image return
+                            ftext.append(js["description"]["tags"                   ]   )
+                            ftext.append(js["color"      ]["dominantColorForeground"]   )
+                            ftext.append(js["color"      ]["dominantColorBackground"]   )
+                            ftext.append(js["color"      ]["dominantColors"         ][0])
+                            ftext.append(js["color"      ]["accentColor"            ]   )
+                        except Exception as err:
+                            ftext.append(str(err))
                     else:
-                        # request headers. Important: content should be json as we are sending an array of json objects
-                        hdrs["Content-Type"] = "application/json"
-                        if wtyp in [const.EE,const.SENT]:
-                            try:
-                                ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
-                                # get response from the server
-                                resp = requests.post(url,headers=hdrs,json=ijson)
-                                resp.raise_for_status()
-                                # get json data to parse it later
-                                js   = resp.json()
-                                # all the lines from a page, including noise
-                                for doc in js["documents"]:
-                                    keys = doc[wtyp]
-                                    if wtyp == const.SENT:
-                                        keys = [keys,doc["documentScores"][keys]]
-                                    ftext.append(keys)
-                            except Exception as err:
-                                ftext.append(str(err))
+                        if wtyp == const.SHP:
+                            # load the image and resize it to a smaller factor so that
+                            # the shapes can be approximated better
+                            image= cv2.imread(docs)
+                            rsz  = imutils.resize(image,width=300)
+                            # convert the resized image to grayscale, blur it slightly and threshold it
+                            gray = cv2.cvtColor(rsz,cv2.COLOR_BGR2GRAY)
+                            blur = cv2.GaussianBlur(gray,(5,5),0)
+                            thrsh= cv2.threshold(blur,60,255,cv2.THRESH_BINARY)[1]
+                            # find contours in the thresholded image and initialize the shape detector
+                            cnts = cv2.findContours(thrsh.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+                            cnts = imutils.grab_contours(cnts)
+                            ltext= []
+                            for cnt in cnts:
+                                peri = cv2.arcLength(cnt,True)
+                                appr = cv2.approxPolyDP(cnt,0.04*peri,True)
+                                if len(appr) == 3:
+                                    ltext.append("triangle")
+                                elif len(appr) == 4:
+                                    # compute the bounding box of the contour and use the
+                                    # bounding box to compute the aspect ratio
+                                    (x,y,w,h) = cv2.boundingRect(appr)
+                                    ar        = w / float(h)
+                                    # a square will have an aspect ratio that is approximately
+                                    # equal to one, otherwise, the shape is a rectangle
+                                    if ar >= 0.95 and ar <= 1.05:
+                                        ltext= ["square","round"]
+                                    else:
+                                        ltext= ["rectangle","capsule","oval"]
+                                elif len(appr) == 5:
+                                    ltext= ["pentagon","round"]
+                                elif len(appr) == 6:
+                                    ltext= ["hexagon" ,"round"]
+                                elif len(appr) == 7:
+                                    ltext= ["heptagon","round"]
+                                elif len(appr) == 8:
+                                    ltext= ["octagon" ,"round"]
+                                else:
+                                    # default shape
+                                    ltext.append("round")
+                            ftext.append(ltext[ltext.index(max(ltext,key=ltext.count))])
                         else:
-                            ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                            # request headers. Important: content should be json as we are sending an array of json objects
+                            hdrs["Content-Type"] = "application/json"
+                            if wtyp in [const.EE,const.SENT]:
+                                try:
+                                    ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
+                                    # get response from the server
+                                    resp = requests.post(url,headers=hdrs,json=ijson)
+                                    resp.raise_for_status()
+                                    # get json data to parse it later
+                                    js   = resp.json()
+                                    # all the lines from a page, including noise
+                                    for doc in js["documents"]:
+                                        keys = doc[wtyp]
+                                        if wtyp == const.SENT:
+                                            keys = [keys,doc["documentScores"][keys]]
+                                        ftext.append(keys)
+                                except Exception as err:
+                                    ftext.append(str(err))
+                            else:
+                                ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)
@@ -1166,6 +1216,8 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
                             rret[const.IMG] = [i[0] for i in oimgs if not len(i) == 0]
                             # object detection
                             rret[const.OBJ] = cognitive(const.OBJ,pimgs[0],inst,objd,testing)
+                            # shape detection
+                            rret[const.SHP] = cognitive(const.SHP,pdfs[i] ,inst,objd,testing)
                             # final return for this pdf
                             ret [pdfs[i]  ] = rret
                 else:
