@@ -99,64 +99,103 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                     o    = None
                     if objd:
                         o    = pill[keys][const.OBJ]
+                        s    = pill[keys][const.SHP]
                     # we will filter the terms found in the image
                     # if there is only one unique term, then that is fine
                     # but if there are more than one unique terms, then
                     # we won't use the ones that are a single character
                     # because too many results are returned that are not useful
                     p1   = unique(p)
-                    if not (len(p1) == 1):
-                        p1   = [v for v in p1 if len(v) > 1]
-                    # only a where clause for now
-                    #
-                    # not using a simple " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
-                    # since we want to strip white space and treat strings of len = 1 differently
-                    spl      = "splimprint"
-                    whr1     = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + ";%'                             )"              for val in p1])
-                    whr2     = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + "'                               )"              for val in p1])
-                    whr3     = " OR ".join(["(" + spl + " LIKE '"   + str(val) + ";%'                             )"              for val in p1])
-                    if objd:
-                        clrs = "','".join(o[1])
-                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + ";%' AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
-                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val) + "'   AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
-                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val) + ";%' AND splcolor_text IN ('{0}'))".format(clrs) for val in p1])
-                    whr      = whr1 + " OR " + whr2 + " OR " + whr3
-                    qry  = "$where " + whr
-                    # select data columns
-                    sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
-                    # build the query based upon the pills being sought
-                    try:
-                        if not (sel == None):
-                            if not (len(sel) == 0):
-                                spl  = sel[spl]
-                                cols = ",".join([s + " AS " + sel[s] for s in sel])
-                                qry  = "$select " + cols + qry
-                                if not (lim <= 0):
-                                    res  = cli.get(db,app_token=api,select=cols,where=whr,limit=lim)
+                    #if not (len(p1) == 1):
+                        #p1   = [v for v in p1 if len(v) > 1]
+                    if not (len(p1) == 0):
+                        # only a where clause for now
+                        #
+                        # not using a simple " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
+                        # since we want to strip white space and treat strings of len = 1 differently
+                        spl      = "splimprint"
+                        clr      = "splcolor_text"
+                        shp      = "splshape_text"
+                        whr1     = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ","") + ";%')" for val in p1])
+                        whr2     = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ","") + "'  )" for val in p1])
+                        whr3     = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ","") + ";%')" for val in p1])
+                        whr      = whr1 + " OR " + whr2 + " OR " + whr3
+                        qry  = "$where " + whr
+                        # select data columns
+                        sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
+                        # build the query based upon the pills being sought
+                        try:
+                            if not (sel == None):
+                                if not (len(sel) == 0):
+                                    spl  = sel[spl]
+                                    clr  = sel[clr]
+                                    shp  = sel[shp]
+                                    cols = ",".join([s + " AS " + sel[s] for s in sel])
+                                    qry  = "$select " + cols + qry
+                                    if not (lim <= 0):
+                                        res  = cli.get(db,app_token=api,select=cols,where=whr,limit=lim)
+                                    else:
+                                        res  = cli.get(db,app_token=api,select=cols,where=whr)
                                 else:
-                                    res  = cli.get(db,app_token=api,select=cols,where=whr)
+                                    if not (lim <= 0):
+                                        res  = cli.get(db,app_token=api,where=whr,limit=lim)
+                                    else:
+                                        res  = cli.get(db,app_token=api,where=whr)
                             else:
                                 if not (lim <= 0):
                                     res  = cli.get(db,app_token=api,where=whr,limit=lim)
                                 else:
                                     res  = cli.get(db,app_token=api,where=whr)
-                        else:
-                            if not (lim <= 0):
-                                res  = cli.get(db,app_token=api,where=whr,limit=lim)
+                            # Convert to pandas DataFrame
+                            ret[keys] = pd.DataFrame.from_records(res)
+                            # try to match the imprint on the medication
+                            if not (len(ret[keys]) <= 1):
+                                # if object detection is turned on
+                                if objd:
+                                    # try to check the color
+                                    clrs = np.append([o0.lower() for o0 in o[0]],[o[i].lower() for i in range(1,len(o))])
+                                    bret = [(a.lower() in clrs) for a in ret[keys][clr].to_list()]
+                                    iret = [i for i,b in enumerate(bret) if b]
+                                    # rows matching colors of the pills
+                                    if not (len(iret) <= 1):
+                                        ret[keys] = ret[keys].iloc[iret,0:len(sel)]
+                                        # try to check the shape
+                                        bret = [(a.lower() in s) for a in ret[keys][shp].to_list()]
+                                        iret = [i for i,b in enumerate(bret) if b]
+                                        # rows matching shapes of the pills
+                                        if not (len(iret) <= 1):
+                                            ret[keys] = ret[keys].iloc[iret,0:len(sel)]
+                                        else:
+                                            if not (len(iret) == 0):
+                                                ret[keys] = ret[keys].to_numpy()[iret]
+                                    else:
+                                        if not (len(iret) == 0):
+                                            ret[keys] = ret[keys].to_numpy()[iret]
+                                if not (len(ret[keys]) <= 1):
+                                    # string column of the imprints in the image
+                                    sret      = ret[keys][spl].to_list()
+                                    # most frequently appearing response from the DB
+                                    mret      = max(sret,key=sret.count)
+                                    # row index of the most frequently appearing imprint
+                                    row       = sret.index(mret)
+                                    # row of data corresponding to the most frequently appearing imprint
+                                    ret[keys] = ret[keys].to_numpy()[row]
+                                else:
+                                    if not (len(ret[keys]) == 0):
+                                        # row of data corresponding to the most frequently appearing imprint
+                                        ret[keys] = ret[keys].to_numpy()[0]
+                                    else:
+                                        ret[keys] = [None]
                             else:
-                                res  = cli.get(db,app_token=api,where=whr)
-                        # Convert to pandas DataFrame
-                        ret[keys] = pd.DataFrame.from_records(res)
-                        # string column of the imprints in the image
-                        sret      = ret[keys][spl].to_string()
-                        # most frequently appearing response from the DB
-                        mret      = max(set(sret),key=sret.count)
-                        # row index of the most frequently appearing imprint
-                        row       = sret.index(mret)
-                        # row of data corresponding to the most frequently appearing imprint
-                        ret[keys] = ret[keys].to_numpy()[row]
-                    except Exception as err:
-                        ret[keys] = [str(err)]
+                                if not (len(ret[keys]) == 0):
+                                    # row of data corresponding to the most frequently appearing imprint
+                                    ret[keys] = ret[keys].to_numpy()[0]
+                                else:
+                                    ret[keys] = [None]
+                        except Exception as err:
+                            ret[keys] = [str(err)]
+                    else:
+                        ret[keys] = [None]
                 else:
                     ret[keys] = [None]
     return ret
