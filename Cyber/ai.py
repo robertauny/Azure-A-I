@@ -15,7 +15,6 @@
 ############################################################################
 
 from joblib                       import Parallel,delayed
-from itertools                    import combinations,combinations_with_replacement
 from string                       import punctuation
 from math                         import ceil,log,exp
 
@@ -223,36 +222,6 @@ def unique(dat):
 
 ############################################################################
 ##
-## Purpose:   Permutations of a list of integers for use in labeling hierarchies
-##
-############################################################################
-def permute(dat=[],mine=True,l=3):
-    ret  = []
-    sz   = len(dat)
-    if not (sz == 0):
-        if mine:
-            # permute the array of indices beginning with the first element
-            for j in range(0,sz+1):
-                # all permutations of the array of indices
-                jdat = list(dat[j:])
-                jdat.extend(list(dat[:j]))
-                for i in range(0,sz):
-                    # only retain the sub arrays that are length >= 2
-                    tmp = [list(x) for x in combinations(jdat,i+2)]
-                    if len(tmp) > 0:
-                        ret.extend(tmp)
-        else:
-            # number of cpu cores
-            nc   = mp.cpu_count()
-            # permute the array of indices beginning with the first element
-            lsz  = l
-            if not (0 < lsz and lsz < min(3,sz)):
-                lsz  = 3
-            ret.extend(list(combinations(dat,lsz)))
-    return unique(ret)
-
-############################################################################
-##
 ## Purpose:   Knowledge brain of all data hierarchies and neural networks
 ##
 ############################################################################
@@ -265,7 +234,7 @@ def brain(dat=[],splits=2,permu=[]):
             perms= permu
         else:
             # get all permutations of the 
-            perms= permute(range(0,len(dat[0])))
+            perms= data.permute(range(0,len(dat[0])))
         # add all models to the return
         for perm in perms:
             # model label
@@ -828,7 +797,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         # produce regressors to segregate the data that amount to
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
-        perms= permute(range(0,ssz),False)
+        perms= data.permute(range(0,ssz),False)
         lmax = sys.maxint
         # initial entropy is something higher than otherwise possible
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
@@ -1801,7 +1770,7 @@ def ai_testing(M=500,N=2):
         print(g)
     else:
         print("GloVe: "+str(leng))
-    print(permute(range(0,len(ivals[0]))))
+    print(data.permute(range(0,len(ivals[0]))))
     print(brain(ivals))
     imgs = convert_from_path("/home/robert/data/files/kg.pdf")
     print(imgs)

@@ -15,6 +15,7 @@
 ############################################################################
 
 from joblib                                         import Parallel, delayed
+from itertools                                      import combinations,combinations_with_replacement
 
 import os
 import sys
@@ -48,6 +49,36 @@ np.random.seed(12345)
 ############################################################################
 def unique(l=[]):
     return np.asarray(list(set(l)))
+
+############################################################################
+##
+## Purpose:   Permutations of a list of integers for use in labeling hierarchies
+##
+############################################################################
+def permute(dat=[],mine=True,l=3):
+    ret  = []
+    sz   = len(dat)
+    if not (sz == 0):
+        if mine:
+            # permute the array of indices beginning with the first element
+            for j in range(0,sz+1):
+                # all permutations of the array of indices
+                jdat = list(dat[j:])
+                jdat.extend(list(dat[:j]))
+                for i in range(0,sz):
+                    # only retain the sub arrays that are length >= 2
+                    tmp = [list(x) for x in combinations(jdat,i+2)]
+                    if len(tmp) > 0:
+                        ret.extend(tmp)
+        else:
+            # number of cpu cores
+            nc   = mp.cpu_count()
+            # permute the array of indices beginning with the first element
+            lsz  = l
+            if not (0 < lsz and lsz < min(3,sz)):
+                lsz  = 3
+            ret.extend(list(combinations(dat,lsz)))
+    return unique(ret)
 
 ############################################################################
 ##
@@ -113,13 +144,17 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                         #
                         # not using a simple " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
                         # since we want to strip white space and treat strings of len = 1 differently
-                        spl      = "splimprint"
-                        clr      = "splcolor_text"
-                        shp      = "splshape_text"
-                        whr1     = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ","") + ";%')" for val in p1])
-                        whr2     = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ","") + "'  )" for val in p1])
-                        whr3     = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ","") + ";%')" for val in p1])
-                        whr      = whr1 + " OR " + whr2 + " OR " + whr3
+                        perms= [[p1[i].replace(" ",";") for i in inds] for inds in permute(range(0,len(p1)),mine=False,l=2)]
+                        spl  = "splimprint"
+                        clr  = "splcolor_text"
+                        shp  = "splshape_text"
+                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";") + ";%')" for val  in p1   ])
+                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";") + "'  )" for val  in p1   ])
+                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ",";") + ";%')" for val  in p1   ])
+                        whr  = whr1 + " OR " + whr2 + " OR " + whr3
+                        if not (len(perms) == 0):
+                            whr4 = " OR ".join(["(" + spl + "= '%"  + ";".join(perm)            +  "%')" for perm in perms])
+                            whr  = whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
                         qry  = "$where " + whr
                         # select data columns
                         sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
