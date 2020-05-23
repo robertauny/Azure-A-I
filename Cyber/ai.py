@@ -1012,46 +1012,49 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                             ftext.append(str(err))
                     else:
                         if wtyp == const.SHP:
-                            # load the image and resize it to a smaller factor so that
-                            # the shapes can be approximated better
-                            image= cv2.imread(docs)
-                            rsz  = imutils.resize(image,width=300)
-                            # convert the resized image to grayscale, blur it slightly and threshold it
-                            gray = cv2.cvtColor(rsz,cv2.COLOR_BGR2GRAY)
-                            blur = cv2.GaussianBlur(gray,(5,5),0)
-                            thrsh= cv2.threshold(blur,60,255,cv2.THRESH_BINARY)[1]
-                            # find contours in the thresholded image and initialize the shape detector
-                            cnts = cv2.findContours(thrsh.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-                            cnts = imutils.grab_contours(cnts)
-                            ltext= []
-                            for cnt in cnts:
-                                peri = cv2.arcLength(cnt,True)
-                                appr = cv2.approxPolyDP(cnt,0.04*peri,True)
-                                if len(appr) == 3:
-                                    ltext.append("triangle")
-                                elif len(appr) == 4:
-                                    # compute the bounding box of the contour and use the
-                                    # bounding box to compute the aspect ratio
-                                    (x,y,w,h) = cv2.boundingRect(appr)
-                                    ar        = w / float(h)
-                                    # a square will have an aspect ratio that is approximately
-                                    # equal to one, otherwise, the shape is a rectangle
-                                    if ar >= 0.95 and ar <= 1.05:
-                                        ltext= ["square","round"]
+                            try:
+                                # load the image and resize it to a smaller factor so that
+                                # the shapes can be approximated better
+                                image= cv2.imread(docs)
+                                rsz  = imutils.resize(image,width=300)
+                                # convert the resized image to grayscale, blur it slightly and threshold it
+                                gray = cv2.cvtColor(rsz,cv2.COLOR_BGR2GRAY)
+                                blur = cv2.GaussianBlur(gray,(5,5),0)
+                                thrsh= cv2.threshold(blur,60,255,cv2.THRESH_BINARY)[1]
+                                # find contours in the thresholded image and initialize the shape detector
+                                cnts = cv2.findContours(thrsh.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+                                cnts = imutils.grab_contours(cnts)
+                                ltext= []
+                                for cnt in cnts:
+                                    peri = cv2.arcLength(cnt,True)
+                                    appr = cv2.approxPolyDP(cnt,0.04*peri,True)
+                                    if len(appr) == 3:
+                                        ltext.extend(["triangle"])
+                                    elif len(appr) == 4:
+                                        # compute the bounding box of the contour and use the
+                                        # bounding box to compute the aspect ratio
+                                        (x,y,w,h) = cv2.boundingRect(appr)
+                                        ar        = w / float(h)
+                                        # a square will have an aspect ratio that is approximately
+                                        # equal to one, otherwise, the shape is a rectangle
+                                        if ar >= 0.95 and ar <= 1.05:
+                                            ltext.extend(["square","round"])
+                                        else:
+                                            ltext.extend(["rectangle","capsule","oval"])
+                                    elif len(appr) == 5:
+                                        ltext.extend(["pentagon","round"])
+                                    elif len(appr) == 6:
+                                        ltext.extend(["hexagon" ,"round"])
+                                    elif len(appr) == 7:
+                                        ltext.extend(["heptagon","round"])
+                                    elif len(appr) == 8:
+                                        ltext.extend(["octagon" ,"round"])
                                     else:
-                                        ltext= ["rectangle","capsule","oval"]
-                                elif len(appr) == 5:
-                                    ltext= ["pentagon","round"]
-                                elif len(appr) == 6:
-                                    ltext= ["hexagon" ,"round"]
-                                elif len(appr) == 7:
-                                    ltext= ["heptagon","round"]
-                                elif len(appr) == 8:
-                                    ltext= ["octagon" ,"round"]
-                                else:
-                                    # default shape
-                                    ltext.append("round")
-                            ftext.append(ltext[ltext.index(max(ltext,key=ltext.count))])
+                                        # default shape
+                                        ltext.extend(["round"])
+                                ftext= np.unique(ltext)
+                            except Exception as err:
+                                ftext.append(str(err))
                         else:
                             # request headers. Important: content should be json as we are sending an array of json objects
                             hdrs["Content-Type"] = "application/json"
@@ -1166,12 +1169,15 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
                             # convert the image to a python image library form
                             img  = Image.fromarray(rimg)
                             # save the image to addressable memory
-                            pimg = pil2array(img)
+                            pimgs= [pil2array(img)]
                             # append the original image and the rotated images together
-                            pimgs= np.append(pimg,imgs)
+                            for img in imgs:
+                                pimgs.extend(img)
                         else:
+                            pimgs= [pdfs[i]]
                             # append the original image and the rotated images together
-                            pimgs= np.append(pdfs[i],imgs)
+                            for img in imgs:
+                                pimgs.extend(img)
                         # extract the text from the image
                         oimgs= [img2txt(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs))]
                         # default is to not use object detection
