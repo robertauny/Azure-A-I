@@ -154,11 +154,11 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                         whr  = whr1 + " OR " + whr2 + " OR " + whr3
                         if not (len(perms) == 0):
                             whr4 = " OR ".join(["(" + spl + "= '%"  + ";".join(perm)            +  "%')" for perm in perms])
-                            whr  = whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
+                            whr  = whr + " OR " + whr4
                         qry  = "$where " + whr
                         # select data columns
                         sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
-                        # build the query based upon the pills being sought
+                        # build the query based upon the pills being sought and execute it using sodapy
                         try:
                             if not (sel == None):
                                 if not (len(sel) == 0):
