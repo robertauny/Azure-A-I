@@ -15,7 +15,8 @@
 					"ocri"       : 6,
 					"objd"       : 7,
 					"objs"       : 7,
-					"pill"       : 8
+					"pill"       : 8,
+					"wiki"       : 9
 				}
 			},
 			"sources" : [
@@ -62,7 +63,7 @@
 							"host" : "rammancog.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -72,7 +73,7 @@
 							"host" : "westus.api.cognitive.microsoft.com",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -82,7 +83,7 @@
 							"host" : "rammansentiment.cognitiveservices.azure.com",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"dir"  : "dir"
 						}
 					},
@@ -106,7 +107,7 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
@@ -123,7 +124,7 @@
 							"host" : "rammanimg.cognitiveservices.azure.com",
 							"api"  : "vision",
 							"ver"  : "v2.1",
-							"key"  : "key",
+							"key"  : "account-key",
 							"files": [
                                                                   "/home/robert/data/files/IMG_0569.jpeg",
                                                                   "/home/robert/data/files/watson-795.jpg",
@@ -140,8 +141,8 @@
 							"app"  : "pill",
 							"host" : "datadiscovery.nlm.nih.gov",
 							"api"  : null,
-							"user" : "generated-user",
-							"pass" : "generated-pass",
+							"user" : "28wdq5b2fsqqmdrwk28l37708",
+							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
 							"db"   : "crzr-uvwg",
                                                         "sel"  : {
                                                                   "splshape_text":"shape",
@@ -151,10 +152,20 @@
                                                                   "rxstring"     :"script"
                                                                  },
                                                         "angs" : [
-                                                                  [45,45]
+                                                                  [180,45]
                                                                  ]
 						}
-					}
+					},
+                                        {
+                                                "connection" : {
+                                                        "app"  : "wiki",
+                                                        "host" : null,
+                                                        "api"  : null,
+                                                        "ver"  : null,
+                                                        "key"  : null,
+                                                        "form" : "json"
+                                                }
+                                        }
 				]
 			]
 		}

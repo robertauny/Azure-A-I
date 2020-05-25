@@ -132,7 +132,7 @@ def kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True,testing=True)
 ## Purpose:   Extract any image text along with other characteristics
 ##
 ############################################################################
-def images(imgs=["/home/robert/data/files/IMG_0569.jpeg","/home/robert/data/files/IMG_0570.jpg"],inst=0,objd=False,testing=True):
+def images(imgs=["/home/robert/data/files/IMG_0569.jpeg","/home/robert/data/files/IMG_0570.jpg"],inst=0,objd=True,testing=True):
     ret  = []
     limg = len(imgs)
     if not (limg == 0 or inst <= const.BVAL):

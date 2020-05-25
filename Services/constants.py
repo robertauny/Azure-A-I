@@ -28,8 +28,10 @@ OCR          = "ocr"
 IMG          = "ocri"
 # object detection
 OBJ          = "objd"
-# object detection
+# shape detection
 SHP          = "objs"
+# shape detection
+WIK          = "wiki"
 # entity extraction
 EE           = "keyPhrases"
 # sentiment

@@ -36,6 +36,7 @@ import json
 import time
 import cv2
 import imutils
+import logging
 
 import numpy  as np
 import pandas as pd
@@ -54,6 +55,8 @@ from nn import dbn,categoricals
 cfg  = config.cfg()
 
 np.random.seed(12345)
+
+logging.disable(logging.WARNING)
 
 ############################################################################
 ##
@@ -994,9 +997,9 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         ftext.append(str(err))
                 else:
                     if wtyp == const.OBJ:
+                        hdrs["Content-Type"] = "application/octet-stream"
+                        parms                = {"visualFeatures":"Categories,Description,Color"}
                         try:
-                            hdrs["Content-Type"] = "application/octet-stream"
-                            parms                = {"visualFeatures":"Categories,Description,Color"}
                             # get response from the server
                             resp = requests.post(url,headers=hdrs,params=parms,data=docs)
                             resp.raise_for_status()
@@ -1056,26 +1059,44 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                             except Exception as err:
                                 ftext.append(str(err))
                         else:
-                            # request headers. Important: content should be json as we are sending an array of json objects
-                            hdrs["Content-Type"] = "application/json"
-                            if wtyp in [const.EE,const.SENT]:
-                                try:
-                                    ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
-                                    # get response from the server
-                                    resp = requests.post(url,headers=hdrs,json=ijson)
-                                    resp.raise_for_status()
-                                    # get json data to parse it later
-                                    js   = resp.json()
-                                    # all the lines from a page, including noise
-                                    for doc in js["documents"]:
-                                        keys = doc[wtyp]
-                                        if wtyp == const.SENT:
-                                            keys = [keys,doc["documentScores"][keys]]
-                                        ftext.append(keys)
-                                except Exception as err:
-                                    ftext.append(str(err))
+                            if wtyp == const.WIK:
+                                # request headers. Important: content should be json as we are sending an array of json objects
+                                hdrs["Content-Type"] = "application/json"
+                                # wikipedia url
+                                url  = "https://en.wikipedia.org/w/api.php?"        + \
+                                       "action=query&"                              + \
+                                       "origin=*&"                                  + \
+                                       "format=json&"                               + \
+                                       "generator=search&"                          + \
+                                       "gsrnamespace=0&"                            + \
+                                       "gsrlimit="   + lim                    + "&" + \
+                                       "gsrsearch='" + query.replace(" ","_") + "'"
+                                # get response from the server
+                                resp = requests.post(url,headers=hdrs,json=ijson)
+                                resp.raise_for_status()
+                                # get json data to parse it later
+                                js   = resp.json()
                             else:
-                                ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                                if wtyp in [const.EE,const.SENT]:
+                                    # request headers. Important: content should be json as we are sending an array of json objects
+                                    hdrs["Content-Type"] = "application/json"
+                                    try:
+                                        ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
+                                        # get response from the server
+                                        resp = requests.post(url,headers=hdrs,json=ijson)
+                                        resp.raise_for_status()
+                                        # get json data to parse it later
+                                        js   = resp.json()
+                                        # all the lines from a page, including noise
+                                        for doc in js["documents"]:
+                                            keys = doc[wtyp]
+                                            if wtyp == const.SENT:
+                                                keys = [keys,doc["documentScores"][keys]]
+                                            ftext.append(keys)
+                                    except Exception as err:
+                                        ftext.append(str(err))
+                                else:
+                                    ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)

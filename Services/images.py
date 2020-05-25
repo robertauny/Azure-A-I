@@ -37,7 +37,7 @@ np.random.seed(12345)
 ## Purpose:   Process the image data
 ##
 ############################################################################
-def images_testing(inst=0,objd=False,testing=False):
+def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
     # getting constants from the JSON config file
     src  = cfg["instances"][inst]["src"]["index"]
     typ  = cfg["instances"][inst]["src"]["types"]["ocri"]
@@ -51,5 +51,5 @@ def images_testing(inst=0,objd=False,testing=False):
     print(cdat)
     # perform the query against the NIH database with limit = 100 rows
     #sg   = sodaget(inst,cdat,100)
-    sg   = sodaget(inst,cdat,objd)
+    sg   = sodaget(inst,cdat,objd,lim,train)
     print(sg)
