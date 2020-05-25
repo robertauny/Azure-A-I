@@ -85,7 +85,7 @@ def permute(dat=[],mine=True,l=3):
 ## Purpose:   Use SODAPy to get data
 ##
 ############################################################################
-def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
+def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
     ret  = {}
     lpill= len(pill)
     if not (inst <= const.BVAL or lpill == 0):
@@ -116,7 +116,7 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
             # recursive loop through the results in pill
             if not (lpill == 1):
                 nc   = mp.cpu_count()
-                ret  = Parallel(n_jobs=nc)(delayed(sodaget)(inst,{k:pill[k]},objd) for k in pill)
+                ret  = Parallel(n_jobs=nc)(delayed(sodaget)(inst,{k:pill[k]},objd,lim,train) for k in pill)
             else:
                 # single pill will contain image values and might contain object detection values
                 keys = list(pill.  keys())[0]
@@ -144,17 +144,15 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                         #
                         # not using a simple " or ".join(["splimprint like '%" + str(val) + "%'" for val in p[1]])
                         # since we want to strip white space and treat strings of len = 1 differently
-                        perms= [[p1[i].replace(" ",";") for i in inds] for inds in permute(range(0,len(p1)),mine=False,l=2)]
                         spl  = "splimprint"
                         clr  = "splcolor_text"
                         shp  = "splshape_text"
-                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";") + ";%')" for val  in p1   ])
-                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";") + "'  )" for val  in p1   ])
-                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ",";") + ";%')" for val  in p1   ])
-                        whr  = whr1 + " OR " + whr2 + " OR " + whr3
-                        if not (len(perms) == 0):
-                            whr4 = " OR ".join(["(" + spl + "= '%"  + ";".join(perm)            +  "%')" for perm in perms])
-                            whr  = whr + " OR " + whr4
+                        rxs  = "rxstring"
+                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + ";%')" for val in p1])
+                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + "'  )" for val in p1])
+                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ",";")       + ";%')" for val in p1])
+                        whr4 = " OR ".join(["(" + spl + "= '"       + ";".join([i for i in str(val)]) + "'  )" for val in p1])
+                        whr  = whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
                         qry  = "$where " + whr
                         # select data columns
                         sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
@@ -165,6 +163,7 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                                     spl  = sel[spl]
                                     clr  = sel[clr]
                                     shp  = sel[shp]
+                                    rxs  = sel[rxs]
                                     cols = ",".join([s + " AS " + sel[s] for s in sel])
                                     qry  = "$select " + cols + qry
                                     if not (lim <= 0):
@@ -181,7 +180,8 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                                     res  = cli.get(db,app_token=api,where=whr,limit=lim)
                                 else:
                                     res  = cli.get(db,app_token=api,where=whr)
-                            # Convert to pandas DataFrame
+                            # Convert to pandas DataFrame and drop duplicates
+                            #ret[keys] = pd.DataFrame.from_records(res).drop_duplicates()
                             ret[keys] = pd.DataFrame.from_records(res)
                             # try to match the imprint on the medication
                             if not (len(ret[keys]) <= 1):
@@ -208,31 +208,39 @@ def sodaget(inst=const.BVAL,pill={},objd=False,lim=0):
                                             ret[keys] = ret[keys].to_numpy()[iret]
                                 if not (len(ret[keys]) <= 1):
                                     # string column of the imprints in the image
-                                    sret      = ret[keys][spl].to_list()
-                                    # most frequently appearing response from the DB
-                                    mret      = max(sret,key=sret.count)
-                                    # row index of the most frequently appearing imprint
-                                    row       = sret.index(mret)
-                                    # row of data corresponding to the most frequently appearing imprint
-                                    ret[keys] = ret[keys].to_numpy()[row]
+                                    sret      = ret[keys][rxs].to_list()
+                                    if train:
+                                        # row indices of all rx stirngs that are not NaN
+                                        rows      = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
+                                        # all remaining rows
+                                        if not (len(rows) == 0):
+                                            ret[keys] = ret[keys].iloc[rows,0:len(sel)]
+                                    else:
+                                        # most frequently appearing response from the DB
+                                        mret      = max(sret,key=sret.count)
+                                        # row index of the most frequently appearing imprint
+                                        row       = sret.index(mret)
+                                        # row of data corresponding to the most frequently appearing imprint
+                                        ret[keys] = ret[keys].iloc[row,0:len(sel)]
+                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                 else:
                                     if not (len(ret[keys]) == 0):
                                         # row of data corresponding to the most frequently appearing imprint
-                                        ret[keys] = ret[keys].to_numpy()[0]
+                                        ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                     else:
-                                        ret[keys] = [None]
+                                        ret[keys] = {None:None}
                             else:
                                 if not (len(ret[keys]) == 0):
                                     # row of data corresponding to the most frequently appearing imprint
-                                    ret[keys] = ret[keys].to_numpy()[0]
+                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                 else:
-                                    ret[keys] = [None]
+                                    ret[keys] = {None:None}
                         except Exception as err:
-                            ret[keys] = [str(err)]
+                            ret[keys] = {error:str(err)}
                     else:
-                        ret[keys] = [None]
+                        ret[keys] = {None:None}
                 else:
-                    ret[keys] = [None]
+                    ret[keys] = {None:None}
     return ret
 
 ############################################################################
