@@ -36,6 +36,7 @@ import json
 import time
 import cv2
 import imutils
+import logging
 
 import numpy  as np
 import pandas as pd
@@ -54,6 +55,8 @@ from nn import dbn,categoricals
 cfg  = config.cfg()
 
 np.random.seed(12345)
+
+logging.disable(logging.WARNING)
 
 ############################################################################
 ##
@@ -994,9 +997,9 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         ftext.append(str(err))
                 else:
                     if wtyp == const.OBJ:
+                        hdrs["Content-Type"] = "application/octet-stream"
+                        parms                = {"visualFeatures":"Categories,Description,Color"}
                         try:
-                            hdrs["Content-Type"] = "application/octet-stream"
-                            parms                = {"visualFeatures":"Categories,Description,Color"}
                             # get response from the server
                             resp = requests.post(url,headers=hdrs,params=parms,data=docs)
                             resp.raise_for_status()
@@ -1056,26 +1059,49 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                             except Exception as err:
                                 ftext.append(str(err))
                         else:
-                            # request headers. Important: content should be json as we are sending an array of json objects
-                            hdrs["Content-Type"] = "application/json"
-                            if wtyp in [const.EE,const.SENT]:
+                            if wtyp == const.WIK:
+                                # request headers. Important: content should be json as we are sending an array of json objects
+                                hdrs["Content-Type"] = "application/json"
                                 try:
-                                    ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
-                                    # get response from the server
-                                    resp = requests.post(url,headers=hdrs,json=ijson)
-                                    resp.raise_for_status()
-                                    # get json data to parse it later
-                                    js   = resp.json()
-                                    # all the lines from a page, including noise
-                                    for doc in js["documents"]:
-                                        keys = doc[wtyp]
-                                        if wtyp == const.SENT:
-                                            keys = [keys,doc["documentScores"][keys]]
-                                        ftext.append(keys)
+                                    for term in docs.split():
+                                        # wikipedia url
+                                        url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + term
+                                        # get response from the server
+                                        resp = requests.get(url,headers=hdrs)
+                                        resp.raise_for_status()
+                                        # get json data to parse it later
+                                        js   = resp.json()
+                                        typ  = js["type"]
+                                        if (typ == "standard"):
+                                            ext  = js["extract"]
+                                            ftext.append(ext)
+                                            desc = js["description"]
+                                            ftext.append(desc)
+                                        else:
+                                            ftext.append(term)
                                 except Exception as err:
                                     ftext.append(str(err))
                             else:
-                                ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                                if wtyp in [const.EE,const.SENT]:
+                                    # request headers. Important: content should be json as we are sending an array of json objects
+                                    hdrs["Content-Type"] = "application/json"
+                                    try:
+                                        ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
+                                        # get response from the server
+                                        resp = requests.post(url,headers=hdrs,json=ijson)
+                                        resp.raise_for_status()
+                                        # get json data to parse it later
+                                        js   = resp.json()
+                                        # all the lines from a page, including noise
+                                        for doc in js["documents"]:
+                                            keys = doc[wtyp]
+                                            if wtyp == const.SENT:
+                                                keys = [keys,doc["documentScores"][keys]]
+                                            ftext.append(keys)
+                                    except Exception as err:
+                                        ftext.append(str(err))
+                                else:
+                                    ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)
@@ -1210,11 +1236,14 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
 def dappend(doc=None):
     ret  = None
     if not (doc == None):
-        if os.path.exists(doc) and os.path.getsize(doc) > 0:
-            f    = open(doc)
-            # should just be a line of text
-            ret  = f.read()
-            f.close()
+        if not (type(doc) == type(str)):
+            ret  = doc
+        else:
+            if os.path.exists(doc) and os.path.getsize(doc) > 0:
+                f    = open(doc)
+                # should just be a line of text
+                ret  = f.read()
+                f.close()
     return ret
 
 ############################################################################
@@ -1290,16 +1319,17 @@ def blocks(tok=None):
 ##
 ############################################################################
 def extendglove(docs=[],gdoc=None,splits=2,props=2):
-    ret  = {}
+    gdat = {}
     if not (len(docs) == 0 or gdoc == None):
-        if os.path.exists(gdoc) and os.path.getsize(gdoc) > 0:
-            # number of cpu cores
-            nc   = mp.cpu_count()
+        # gdoc might be a dictionary containing the glove data
+        # or it might be a file path that contains the glove data
+        if not (type(gdoc) == type({})):
+            gdb  = os.path.exists(gdoc) and os.path.getsize(gdoc) > 0
+        else:
+            gdb  = False
+        if len(gdoc) > 0 or gdb:
             # append the text of all docs together into a string
-            if os.path.exists(docs[0]) and os.path.getsize(docs[0]) > 0:
-                txts = [dappend(d) for d in docs]
-            else:
-                txts = docs
+            txts = [dappend(d) for d in docs]
             # tokenize the lines in the array and convert to sequences of integers
             #
             # instantiate a default Tokenizer object without limiting the number of tokens
@@ -1309,9 +1339,12 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
-            f    = open(gdoc)
-            gdat = {list(wvec(line).keys())[0]:list(wvec(line).values())[0] for line in f.readlines()}
-            f.close()
+            if gdb:
+                f    = open(gdoc)
+                gdat = {list(wvec(line).keys())[0]:list(wvec(line).values())[0] for line in f.readlines()}
+                f.close()
+            else:
+                gdat = gdoc
             # we will pad the original sequences in a certain way so as to make them align with
             # the expanded set of words from the passed in GloVe data set then
             # use the word index to embed the document data into the pretrained GloVe word vectors
@@ -1354,7 +1387,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 gkeys= list(gmat.keys())
                 gvals= list(gmat.values())
                 # number of clusters is different than the default defined by the splits and properties
-                clust= len(gmat[gkeys[0]])-1
+                clust= max(len(gmat[gkeys[0]])-1,2)
                 #
                 s    = splits
                 # we want to find the value p such that s**(2*p) gives the same number
@@ -1371,7 +1404,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # 
                 # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
                 # can consist of one unique value for each row of constants
-                ovals= to_categorical(np.sum(gvals,axis=1),num_classes=clust)
+                ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
                 # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
                 # of a plane ... i.e. each row of constants defines an element of a conditional specification
                 #
@@ -1408,7 +1441,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
                 ivals= np.asarray(gvals)
                 # create the model using the inputs
-                model= dbn(ivals,ovals,splits=s,props=p,clust=clust)
+                model= dbn(ivals,ovals,splits=s,props=p,clust=(clust+1))
                 # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
                 # the corpus ... these words (and by extension, their values) carry information about the words that don't appear
                 # in the glove data ... the mean will carry all information about these words as well
@@ -1427,7 +1460,13 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # predict the right values and add them to the output
                 for word,i in tok.word_index.items():
                     if not (word in gkeys):
-                        gdat[word] = model.predict(np.reshape(gd[word],(1,clust+1)))
+                        if len(gd[word]) < clust:
+                            vec    = np.append(gd[word],np.zeros(clust-len(gd[word])+1))
+                        elif len(gd[word]) > clust:
+                            vec    = gd[word][0:(clust+1)]
+                        else:
+                            vec    = gd[word]
+                        gdat[word] = model.predict(np.reshape(vec,(1,clust+1)))[0]
     return gdat
 
 ############################################################################
@@ -1440,10 +1479,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
     ret  = []
     if not (len(docs) == 0 and ngrams <= 1):
         # collect the text of all docs together into an array
-        if os.path.exists(docs[0]) and os.path.getsize(docs[0]) > 0:
-            txts = [dappend(d) for d in docs]
-        else:
-            txts = docs
+        txts = [dappend(d) for d in docs]
         # tokenize the lines in the array and convert to sequences of integers
         #
         # instantiate a default Tokenizer object without limiting the number of tokens
@@ -1471,7 +1507,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
         blks = blocks(tok)
         # we will make the glove data set a function of the top uwrd words
         uwrd = len(tok.word_index.keys())
-        if (0 < words and words < uwrd):
+        if (0 < words):
             uwrd = words
         # calculate the constants for each word in the corpus using the GloVe methodology
         gdat = glove(tok,uwrd)

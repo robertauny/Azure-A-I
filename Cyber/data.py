@@ -117,6 +117,8 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
             if not (lpill == 1):
                 nc   = mp.cpu_count()
                 ret  = Parallel(n_jobs=nc)(delayed(sodaget)(inst,{k:pill[k]},objd,lim,train) for k in pill)
+                # reformat the output
+                ret  = {list(r.keys())[0]:list(r.values())[0] for r in ret}
             else:
                 # single pill will contain image values and might contain object detection values
                 keys = list(pill.  keys())[0]
@@ -175,72 +177,70 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                         res  = cli.get(db,app_token=api,where=whr,limit=lim)
                                     else:
                                         res  = cli.get(db,app_token=api,where=whr)
-                            else:
-                                if not (lim <= 0):
-                                    res  = cli.get(db,app_token=api,where=whr,limit=lim)
-                                else:
-                                    res  = cli.get(db,app_token=api,where=whr)
-                            # Convert to pandas DataFrame and drop duplicates
-                            #ret[keys] = pd.DataFrame.from_records(res).drop_duplicates()
-                            ret[keys] = pd.DataFrame.from_records(res)
-                            # try to match the imprint on the medication
-                            if not (len(ret[keys]) <= 1):
-                                # if object detection is turned on
-                                if objd:
-                                    # try to check the color
-                                    clrs = np.append([o0.lower() for o0 in o[0]],[o[i].lower() for i in range(1,len(o))])
-                                    bret = [(a.lower() in clrs) for a in ret[keys][clr].to_list()]
-                                    iret = [i for i,b in enumerate(bret) if b]
-                                    # rows matching colors of the pills
-                                    if not (len(iret) <= 1):
-                                        ret[keys] = ret[keys].iloc[iret,0:len(sel)]
-                                        # try to check the shape
-                                        bret = [(a.lower() in s) for a in ret[keys][shp].to_list()]
+                                # Convert to pandas DataFrame and drop duplicates
+                                #ret[keys] = pd.DataFrame.from_records(res).drop_duplicates()
+                                ret[keys] = pd.DataFrame.from_records(res)
+                                # try to match the imprint on the medication
+                                if not (len(ret[keys]) <= 1):
+                                    # if object detection is turned on
+                                    if objd:
+                                        # try to check the color
+                                        clrs = np.append([o0.lower() for o0 in o[0]],[o[i].lower() for i in range(1,len(o))])
+                                        bret = [(a.lower() in clrs) for a in ret[keys][clr].to_list()]
                                         iret = [i for i,b in enumerate(bret) if b]
-                                        # rows matching shapes of the pills
+                                        # rows matching colors of the pills
                                         if not (len(iret) <= 1):
                                             ret[keys] = ret[keys].iloc[iret,0:len(sel)]
+                                            # try to check the shape
+                                            bret = [(a.lower() in s) for a in ret[keys][shp].to_list()]
+                                            iret = [i for i,b in enumerate(bret) if b]
+                                            # rows matching shapes of the pills
+                                            if not (len(iret) <= 1):
+                                                ret[keys] = ret[keys].iloc[iret,0:len(sel)]
+                                            else:
+                                                if not (len(iret) == 0):
+                                                    ret[keys] = ret[keys].to_numpy()[iret]
                                         else:
                                             if not (len(iret) == 0):
                                                 ret[keys] = ret[keys].to_numpy()[iret]
+                                    if not (len(ret[keys]) <= 1):
+                                        # string column of the imprints in the image
+                                        sret      = ret[keys][rxs].to_list()
+                                        if train:
+                                            # row indices of all rx stirngs that are not NaN
+                                            rows      = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
+                                            # all remaining rows
+                                            if not (len(rows) == 0):
+                                                ret[keys] = ret[keys].iloc[rows,0:len(sel)]
+                                            ret[keys] = {sel[key]:ret[keys][sel[key]].to_list() for key in list(sel.keys())}
+                                        else:
+                                            # most frequently appearing response from the DB
+                                            mret      = max(sret,key=sret.count)
+                                            # row index of the most frequently appearing imprint
+                                            row       = sret.index(mret)
+                                            # row of data corresponding to the most frequently appearing imprint
+                                            ret[keys] = ret[keys].iloc[row,0:len(sel)]
+                                            ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                     else:
-                                        if not (len(iret) == 0):
-                                            ret[keys] = ret[keys].to_numpy()[iret]
-                                if not (len(ret[keys]) <= 1):
-                                    # string column of the imprints in the image
-                                    sret      = ret[keys][rxs].to_list()
-                                    if train:
-                                        # row indices of all rx stirngs that are not NaN
-                                        rows      = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
-                                        # all remaining rows
-                                        if not (len(rows) == 0):
-                                            ret[keys] = ret[keys].iloc[rows,0:len(sel)]
-                                    else:
-                                        # most frequently appearing response from the DB
-                                        mret      = max(sret,key=sret.count)
-                                        # row index of the most frequently appearing imprint
-                                        row       = sret.index(mret)
-                                        # row of data corresponding to the most frequently appearing imprint
-                                        ret[keys] = ret[keys].iloc[row,0:len(sel)]
-                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                        if not (len(ret[keys]) == 0):
+                                            # row of data corresponding to the most frequently appearing imprint
+                                            ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                        else:
+                                            ret[keys] = {sel[key]:None for key in list(sel.keys())}
                                 else:
                                     if not (len(ret[keys]) == 0):
                                         # row of data corresponding to the most frequently appearing imprint
                                         ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                     else:
-                                        ret[keys] = {None:None}
+                                        ret[keys] = {sel[key]:None for key in list(sel.keys())}
                             else:
-                                if not (len(ret[keys]) == 0):
-                                    # row of data corresponding to the most frequently appearing imprint
-                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
-                                else:
-                                    ret[keys] = {None:None}
+                                ret[keys] = {"error":"No configured columns"}
                         except Exception as err:
-                            ret[keys] = {error:str(err)}
+                            ret[keys] = {"error":str(err)}
                     else:
-                        ret[keys] = {None:None}
+                        ret[keys] = {"error":"No UNIQUE pills"}
                 else:
-                    ret[keys] = {None:None}
+                    ret[keys] = {"error":"No pills"}
     return ret
 
 ############################################################################
