@@ -159,10 +159,10 @@
                                         {
                                                 "connection" : {
                                                         "app"  : "wiki",
-                                                        "host" : null,
-                                                        "api"  : null,
-                                                        "ver"  : null,
-                                                        "key"  : null,
+                                                        "host" : "null",
+                                                        "api"  : "null",
+                                                        "ver"  : "null",
+                                                        "key"  : "null",
                                                         "form" : "json"
                                                 }
                                         }
