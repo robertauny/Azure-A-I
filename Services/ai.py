@@ -633,7 +633,7 @@ def glovemost(dat=[]):
         # instantiate a default Tokenizer object without limiting the number of tokens
         tok  = Tokenizer()
         # create "texts" from the data
-        txts = [word.translate(None,punctuation).replace(" ","").lower() for word in dat]
+        txts = [word.translate(str.maketrans('','',punctuation)).replace(" ","").lower() for word in dat]
         # tokenize the data
         tok.fit_on_texts(txts)
         # tokenized keys and values with values corresponding to key rank in the corpus
@@ -688,7 +688,7 @@ def glovemost(dat=[]):
             # we will return the most probable of all predictions
             ret  = []
             for row in preds:
-                wrds = [word for word in dat if word.translate(None,punctuation).replace(" ","").lower() in \
+                wrds = [word for word in dat if word.translate(str.maketrans('','',punctuation)).replace(" ","").lower() in \
                                                 uks[[i for i,val in enumerate(row) if val == max(row)]]]
                 if not (len(wrds) == 0):
                     ret.extend(wrds)
@@ -1063,22 +1063,23 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                                 # request headers. Important: content should be json as we are sending an array of json objects
                                 hdrs["Content-Type"] = "application/json"
                                 try:
-                                    for term in docs.split():
-                                        # wikipedia url
-                                        url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + term
-                                        # get response from the server
-                                        resp = requests.get(url,headers=hdrs)
-                                        resp.raise_for_status()
-                                        # get json data to parse it later
-                                        js   = resp.json()
-                                        typ  = js["type"]
-                                        if (typ == "standard"):
-                                            ext  = js["extract"]
-                                            ftext.append(ext)
-                                            desc = js["description"]
-                                            ftext.append(desc)
-                                        else:
-                                            ftext.append(term)
+                                    for term in docs:
+                                        for i in term.split():
+                                            # wikipedia url
+                                            url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + i
+                                            # get response from the server
+                                            resp = requests.get(url,headers=hdrs)
+                                            resp.raise_for_status()
+                                            # get json data to parse it later
+                                            js   = resp.json()
+                                            typ  = js["type"]
+                                            if (typ == "standard"):
+                                                ext  = js["extract"    ].replace(",","")
+                                                ftext.append(ext)
+                                                desc = js["description"].replace(",","")
+                                                ftext.append(desc)
+                                            else:
+                                                ftext.append(term)
                                 except Exception as err:
                                     ftext.append(str(err))
                             else:
@@ -1183,7 +1184,6 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
                     src  = cfg["instances"][inst]["src"]["index"]
                     typ  = cfg["instances"][inst]["src"]["types"]["pill"]
                     # multiple rotations with different angle limits and increments
-                    #angs = [[180,270,360],[30,45,60]]
                     angs = cfg["instances"][inst]["sources"][src][typ]["connection"]["angs"]
                     for i in range(0,len(pdfs)):
                         imgs = Parallel(n_jobs=nc)(delayed(rotate)(pdfs[i],angs[j][0],angs[j][1]) for j in range(0,len(angs)))
@@ -1806,7 +1806,7 @@ def ai_testing(M=500,N=2):
     # glove file
     gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
     # test glove output
-    g    = extendglove(["README.txt","README.txt"],gfl)
+    g    = extendglove(["README.txt","README.txt"],gfl[0])
     leng = len(g)
     if leng <= 1000:
         print(g)

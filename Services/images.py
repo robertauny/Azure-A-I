@@ -15,17 +15,24 @@
 ############################################################################
 
 from joblib                                         import Parallel,delayed
+from string                                         import punctuation
+from math                                           import ceil,log,exp
+
+from keras.utils                                    import to_categorical
 
 from data                                           import url_kg,read_kg,sodaget
 from services                                       import images,kg
 from ai                                             import create_kg,extendglove,thought,cognitive
+from nn                                             import dbn
 
 import constants as const
 
 import config
+import data
 
 import numpy           as np
 import multiprocessing as mp
+import _pickle         as pickle
 
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
@@ -67,39 +74,70 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
         # image keys and values
         files= list(sg.keys  ())
         vals = list(sg.values())
-        # number of cpu cores
-        nc   = mp.cpu_count()
+        # number of clusters
+        nc   = len(files)
         # GloVe configurations
         typ  = cfg["instances"][inst]["src"]["types"]["glove"]
         gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
         # for each image file, get all wikipedia files using the scripts returned
         rdat = None
+        inp  = []
+        out  = []
+        ent  = []
         for fl in files:
-            # all of the scripts
-            scrs = sg[fl][sel["rxstring"]]
-            if not (scrs == None):
-                # remove all scripts that are None
-                inds = [i for i,x in enumerate(scrs) if not (x == None)]
-                if not (len(inds) == 0):
-                    # capture the remaining scripts
-                    scrs = list(np.asarray(scrs)[inds])
-                    # extract the entities from the scripts for gathering the wikipedia pages
-                    ents = cognitive(const.EE,scrs,inst,objd,testing)
-                    # each ents return is an array of entity arrays; search wikipedia for the entity
-                    wikis= []
-                    for ent in ents:
-                        # tie each of the returns from the OCR imprint extraction to the entities in the script string
-                        rdat = extendglove(np.append(cdat[fl][const.IMG],ent),rdat if not (rdat == None) else gfl)
-                        # grab the wikipedia data
-                        ret  = Parallel(n_jobs=nc)(delayed(cognitive)(const.WIK,e,inst,objd,testing) for e in ent)
-                        for r in ret:
-                            wikis.extend(r)
-                    # call extendglove to produce the GloVe output and transform it to an array
-                    # with the first term in each row being the key and all other terms are values
-                    rdat = extendglove(wikis,rdat if not (rdat == None) else gfl)
-                # write the glove output to the knowledge graph
-                #rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
-                #print(kg(const.ENTS,inst,coln,rdat,g,False,testing))
+            if "error" not in list(sg[fl].keys())        and \
+                sel["splimprint"] in list(sg[fl].keys()) and \
+                sg[fl][sel["rxstring"]] not in [None]:
+                # the scripts
+                scrs = sg[fl][sel["rxstring"]].translate(str.maketrans('','',punctuation)).lower().split()
+                # everything that will be added to the glove data set
+                impr = sg[fl][sel["splimprint"]].translate(str.maketrans('','',punctuation)).replace(" ","").lower()
+                ents = list(np.append(impr,data.unique(np.append(cdat[fl][const.IMG],scrs))))
+                ent.extend(ents)
+                # each ents return is an array of entity arrays; search wikipedia for the entity
+                # tie each of the returns from the OCR imprint extraction to the entities in the script string
+                rdat = extendglove(ents ,rdat if not (rdat == None) else gfl[0])
+                # grab the wikipedia data
+                wikis= cognitive(const.WIK,scrs,inst,objd,testing)
+                # add the wikipedia data to the extended glove data set
+                rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
+                # associate the inputs with the outputs for building the model used when predicting
+                for s in np.unique(cdat[fl][const.IMG]):
+                    s    = s.translate(str.maketrans('','',punctuation)).replace(" ","").lower()
+                    inp.append(rdat[s])
+                    out.append(np.min(rdat[impr]))
+        # build and save the model using the inputs and outputs
+        s    = 2
+        p    = int(ceil(log(len(inp[0]),s)/2.0))
+        odat = to_categorical(out,num_classes=nc)
+        # generate the cluster model
+        mdl  = dbn(np.asarray(inp),odat,splits=s,props=p,clust=nc)
+        # save the cluster model to a local file
+        mdl.save(gfl[2])
+        # limit the data
+        rdat = [(k,v) for k,v in list(rdat.items()) if k in ent]
+        # write the extended glove data to a file for later recall
+        with open(gfl[1],"w+") as f:
+            for k,v in rdat:
+                f.write(str(k))
+                for i in range(0,len(v)):
+                    f.write(" %lf" % v[i])
+                f.write("\n")
+            f.close()
+        if False:
+            # write the glove output to the knowledge graph
+            #
+            # keys and values in the GloVe dataset
+            keys = list(list(rdat)[i][0] for i in range(0,len(rdat)))
+            vals = list(list(rdat)[i][1] for i in range(0,len(rdat)))
+            # use an explicit dict to make sure that the order is preserved
+            coln = [(keys[i],i) for i in range(0,len(keys))]
+            # create the data for the sample knowledge graph (only one brain)
+            kgdat= create_kg(inst,vals,s)
+            # populate the knowledge graphs with the data
+            k1   = kg(const.V   ,inst,coln,kgdat,g,False,testing)
+            # write the glove output to the knowledge graph
+            k2   = kg(const.ENTS,inst,coln,rdat ,g,True ,testing)
     else:
         print(cdat)
         print(sg)

@@ -74,7 +74,7 @@ def kg_testing(inst=0,M=10,N=5,testing=False):
     gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
     # call extendglove to produce the GloVe output and transform it to an array
     # with the first term in each row being the key and all other terms are values
-    rdat = extendglove(oret[0][0],gfl)
+    rdat = extendglove(oret[0][0],gfl[0])
     rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
     # write the glove output to the knowledge graph
     print(kg(const.ENTS,inst,coln,rdat,g,False,testing))
