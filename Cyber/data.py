@@ -181,8 +181,9 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                     else:
                                         res  = cli.get(db,app_token=api,where=whr)
                                 # Convert to pandas DataFrame and drop duplicates
-                                #ret[keys] = pd.DataFrame.from_records(res).drop_duplicates()
                                 ret[keys] = pd.DataFrame.from_records(res)
+                                if train:
+                                    ret[keys] = ret[keys].drop_duplicates()
                                 # try to match the imprint on the medication
                                 if not (len(ret[keys]) <= 1):
                                     # if object detection is turned on
@@ -212,10 +213,17 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                         if train:
                                             # row indices of all rx stirngs that are not NaN
                                             rows      = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
-                                            # all remaining rows
-                                            if not (len(rows) == 0):
-                                                ret[keys] = ret[keys].iloc[rows,0:len(sel)]
-                                            ret[keys] = {sel[key]:ret[keys][sel[key]].to_list() for key in list(sel.keys())}
+                                            # all remaining rows while taking only the first element
+                                            # as this should correspond to the imprint of the original image
+                                            if not (len(rows) <= 1):
+                                                ret[keys] = ret[keys].iloc[rows[0],0:len(sel)]
+                                                ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                            else:
+                                                if not (len(rows) == 0):
+                                                    ret[keys] = ret[keys].iloc[rows[0],0:len(sel)]
+                                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                                else:
+                                                    ret[keys] = {sel[key]:ret[keys][sel[key]].to_list()[0] for key in list(sel.keys())}
                                         else:
                                             # most frequently appearing response from the DB
                                             mret      = max(sret,key=sret.count)
@@ -227,13 +235,13 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                     else:
                                         if not (len(ret[keys]) == 0):
                                             # row of data corresponding to the most frequently appearing imprint
-                                            ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                            ret[keys] = {sel[key]:ret[keys][sel[key]].to_list()[0] for key in list(sel.keys())}
                                         else:
                                             ret[keys] = {sel[key]:None for key in list(sel.keys())}
                                 else:
                                     if not (len(ret[keys]) == 0):
                                         # row of data corresponding to the most frequently appearing imprint
-                                        ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                        ret[keys] = {sel[key]:ret[keys][sel[key]].to_list()[0] for key in list(sel.keys())}
                                     else:
                                         ret[keys] = {sel[key]:None for key in list(sel.keys())}
                             else:
