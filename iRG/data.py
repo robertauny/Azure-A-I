@@ -20,6 +20,7 @@ from itertools                                      import combinations,combinat
 import os
 import sys
 import traceback
+import logging
 
 from sodapy                                         import Socrata
 
@@ -41,6 +42,8 @@ from nn                                             import dbn
 cfg  = config.cfg()
 
 np.random.seed(12345)
+
+logging.disable(logging.WARNING)
 
 ############################################################################
 ##
