@@ -1,5 +1,5 @@
 BVAL         = -1
-MAX_FEATURES = 3
+MAX_FEATURES = 5
 MAX_SPLITS   = 3
 V            = "vertices"
 E            = "edges"
