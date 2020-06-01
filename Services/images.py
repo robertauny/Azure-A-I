@@ -117,7 +117,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                     # add the wikipedia data to the extended glove data set
                     rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
             # limit the data and revert the keys back to having the original imprints when possible
-            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(ent),len(v))))])) for k,v in list(rdat.items()) if k in ent]
+            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in kimpr]
             # write the extended glove data to a file for later recall
             with open(gfl[1],"w+") as f:
                 for k,v in rdat:
