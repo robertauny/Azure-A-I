@@ -16,6 +16,7 @@
 
 from joblib                                         import Parallel, delayed
 from itertools                                      import combinations,combinations_with_replacement
+from string                                         import punctuation
 
 import os
 import sys
@@ -51,7 +52,13 @@ logging.disable(logging.WARNING)
 ##
 ############################################################################
 def unique(l=[]):
-    return np.asarray(list(set(l)))
+    s    = l
+    if type(s[0]) == type([]):
+        s    = [tuple(t) for t in s]
+    ret  = list(set(s))
+    if type(s[0]) == type([]):
+        ret  = [list(t) for t in ret]
+    return np.asarray(ret)
 
 ############################################################################
 ##
@@ -209,29 +216,26 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                                 ret[keys] = ret[keys].to_numpy()[iret]
                                     if not (len(ret[keys]) <= 1):
                                         # string column of the imprints in the image
-                                        sret      = ret[keys][rxs].to_list()
-                                        if train:
-                                            # row indices of all rx stirngs that are not NaN
-                                            rows      = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
-                                            # all remaining rows while taking only the first element
-                                            # as this should correspond to the imprint of the original image
-                                            if not (len(rows) <= 1):
+                                        sret = ret[keys][rxs].to_list()
+                                        # row indices of all rx stirngs that are not NaN
+                                        rows = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
+                                        if not (len(rows) <= 1):
+                                            if train:
+                                                # all remaining rows while taking only the first element
+                                                # as this should correspond to the imprint of the original image
+                                                rows = rows[0]
+                                            # if we are not training, then return all matching rows of the imprints found
+                                            ret[keys] = ret[keys].iloc[rows,0:len(sel)]
+                                            if not (type(rows) == type(0)):
+                                                ret[keys] = {sel[key]:ret[keys][sel[key]].to_numpy()[range(0,len(rows))] for key in list(sel.keys())}
+                                            else:
+                                                ret[keys] = {sel[key]:ret[keys][sel[key]]                                for key in list(sel.keys())}
+                                        else:
+                                            if not (len(rows) == 0):
                                                 ret[keys] = ret[keys].iloc[rows[0],0:len(sel)]
                                                 ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
                                             else:
-                                                if not (len(rows) == 0):
-                                                    ret[keys] = ret[keys].iloc[rows[0],0:len(sel)]
-                                                    ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
-                                                else:
-                                                    ret[keys] = {sel[key]:ret[keys][sel[key]].to_list()[0] for key in list(sel.keys())}
-                                        else:
-                                            # most frequently appearing response from the DB
-                                            mret      = max(sret,key=sret.count)
-                                            # row index of the most frequently appearing imprint
-                                            row       = sret.index(mret)
-                                            # row of data corresponding to the most frequently appearing imprint
-                                            ret[keys] = ret[keys].iloc[row,0:len(sel)]
-                                            ret[keys] = {sel[key]:ret[keys][sel[key]] for key in list(sel.keys())}
+                                                ret[keys] = {sel[key]:ret[keys][sel[key]].to_list()[0] for key in list(sel.keys())}
                                     else:
                                         if not (len(ret[keys]) == 0):
                                             # row of data corresponding to the most frequently appearing imprint
@@ -347,25 +351,37 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
                 # parse the data set into what we want, assuming that the label
                 # consists of instance, brain, cluster and row numbers
                 if not (len(dat) == 0):
-                    datk = [list(dat[j].keys()  ) for j in range(0,len(dat))]
+                    datk = unique([list(dat[j].keys()) for j in range(0,len(dat))])[0]
                     datv = [list(dat[j].values()) for j in range(0,len(dat))]
-                    cdat = [k for k,x in enumerate(list(dat[0].keys())) if x in ckeys]
-                    ndat = [[datv[j][i][0] for i in cdat] for j in range(0,len(dat))]
-                    # add the data for this file
-                    #
-                    # the data has the markov property so that
-                    # each data point is the sum of the previous
-                    # data point and zero-mean white noise
-                    # but our data is almost certainly to not be zero mean so
-                    # we will generate the data using the sample median and variance
-                    #
-                    # median
-                    md   = np.median(ndat,axis=0)
-                    # variance
-                    var  = np.var(ndat,axis=0)
-                    # the data
-                    ret["dat"].append(md )
-                    ret["dat"].append(var)
+                    cdat = []
+                    for k,x in enumerate(datk):
+                        for key in ckeys:
+                            if str(x).translate(str.maketrans('','',punctuation)).lower() in key:
+                                cdat.append(k)
+                    if not (len(cdat) == 0):
+                        ndat = []
+                        for j in range(0,len(dat)):
+                            row  = []
+                            for i in cdat:
+                                row.append(datv[j][i][0])
+                            ndat.append(row)
+                        # add the data for this file
+                        #
+                        # the data has the markov property so that
+                        # each data point is the sum of the previous
+                        # data point and zero-mean white noise
+                        # but our data is almost certainly to not be zero mean so
+                        # we will generate the data using the sample median and variance
+                        #
+                        # median
+                        md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
+                        # variance
+                        var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
+                        # the data
+                        ret["dat"].append(md )
+                        ret["dat"].append(var)
+                    else:
+                        ret["dat"].append([None])
                 else:
                     ret["dat"].append([None])
             if drop:
@@ -403,11 +419,11 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
                 else:
                     # add all of the other properties
                     if i == len(kgdat)-1:
-                        ret.append(g.property(cols[i-1],kgdat[i]).next())
+                        ret.append(g.property(cols[i-1],str(kgdat[i])).next())
                         # get the beginning of the graph
                         g    = ret[len(ret)-1]
                     else:
-                        g    = g.property(cols[i-1],kgdat[i])
+                        g    = g.property(cols[i-1],str(kgdat[i]))
     return ret
 
 ############################################################################
