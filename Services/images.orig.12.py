@@ -245,11 +245,15 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                     # either we didn't get anything so that pred = {}
                                     # or we got something that might be {"error":"error string"}
                                     if not (len(pred) == 0 or "error" in pred):
-                                        # string column of the imprints in the image
-                                        sret = [a.translate(str.maketrans('','',punctuation)).lower() for a in list(sg[fl][sel["splimprint"]])]
-                                        if pred["pred"] in sret:
+                                        # get the key (cluster label)  matching the predicted data row identifying the cluster median
+                                        lbl  = [k for j,k in enumerate(gik) if any(pred) in giv[j]]
+                                        if not (len(lbl) == 0):
+                                            # find the most frequently appearing key (imprint) and make it the label
+                                            lbl  = almost(lbl)
+                                            # string column of the imprints in the image
+                                            sret = list(sg[fl][sel["splimprint"]])
                                             # row index of the most frequently appearing imprint
-                                            row  = sret.index(pred["pred"])
+                                            row  = sret.index(lbl)
                                             # row of data corresponding to the most frequently appearing imprint
                                             for key in sel:
                                                 ret[fl][sel[key]] = sg[fl][sel[key]][row]

@@ -38,7 +38,7 @@ np.random.seed(12345)
 ## Purpose:   Generate a knowledge graph
 ##
 ############################################################################
-def kg_testing(inst=0,M=10,N=5,testing=False):
+def kg_testing(inst=1,M=10,N=5,testing=False):
     # number of data points and properties
     m    = M
     p    = N
