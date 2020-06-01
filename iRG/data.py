@@ -354,32 +354,38 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
                     datk = unique([list(dat[j].keys()) for j in range(0,len(dat))])[0]
                     datv = [list(dat[j].values()) for j in range(0,len(dat))]
                     cdat = []
-                    for k,x in enumerate(datk):
-                        for key in ckeys:
+                    ddat = []
+                    for k,key in enumerate(ckeys):
+                        for d,x in enumerate(datk):
                             if str(x).translate(str.maketrans('','',punctuation)).lower() in key:
                                 cdat.append(k)
+                                ddat.append(d)
+                                break
                     if not (len(cdat) == 0):
-                        ndat = []
-                        for j in range(0,len(dat)):
-                            row  = []
-                            for i in cdat:
-                                row.append(datv[j][i][0])
-                            ndat.append(row)
-                        # add the data for this file
-                        #
-                        # the data has the markov property so that
-                        # each data point is the sum of the previous
-                        # data point and zero-mean white noise
-                        # but our data is almost certainly to not be zero mean so
-                        # we will generate the data using the sample median and variance
-                        #
-                        # median
-                        md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
-                        # variance
-                        var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
-                        # the data
-                        ret["dat"].append(md )
-                        ret["dat"].append(var)
+                        if len(cdat) == len(ckeys):
+                            ndat = []
+                            for j in range(0,len(dat)):
+                                row  = []
+                                for i in ddat:
+                                    row.append(datv[j][i][0])
+                                ndat.append(row)
+                            # add the data for this file
+                            #
+                            # the data has the markov property so that
+                            # each data point is the sum of the previous
+                            # data point and zero-mean white noise
+                            # but our data is almost certainly to not be zero mean so
+                            # we will generate the data using the sample median and variance
+                            #
+                            # median
+                            md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
+                            # variance
+                            var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
+                            # the data
+                            ret["dat"].append(md )
+                            ret["dat"].append(var)
+                        else:
+                            ret  = read_kg(inst,np.asarray(coln)[cdat],None)
                     else:
                         ret["dat"].append([None])
                 else:
