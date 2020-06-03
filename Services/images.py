@@ -17,13 +17,14 @@
 from joblib                                         import Parallel,delayed
 from string                                         import punctuation
 from math                                           import ceil,log,exp
+from PIL                                            import ImageDraw,Image
 
 from keras.utils                                    import to_categorical
 from keras.models                                   import load_model
 
 from data                                           import url_kg,read_kg,sodaget
 from services                                       import images,kg
-from ai                                             import create_kg,extendglove,thought,cognitive,wvec,almost
+from ai                                             import create_kg,extendglove,thought,cognitive,wvec,almost,glovemost
 from nn                                             import dbn
 
 import constants as const
@@ -84,6 +85,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
             inp  = []
             out  = []
             ent  = []
+            cent = []
             kimpr= {}
             for fl in files:
                 if "error" not in list(sg[fl].keys())        and \
@@ -117,7 +119,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                     # add the wikipedia data to the extended glove data set
                     rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
             # limit the data and revert the keys back to having the original imprints when possible
-            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in kimpr]
+            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in ent]
             # write the extended glove data to a file for later recall
             with open(gfl[1],"w+") as f:
                 for k,v in rdat:
@@ -170,26 +172,20 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                    (not type(sg[fl][sel["rxstring"]]) == type(None)):
                     # start the return for this file
                     ret[fl]  = {sel[key]:None for key in list(sel.keys())}
-                    # transformed keys in the sg output to be matched
-                    skeys    = []
-                    for i in sg[fl][sel["splimprint"]]:
-                        spl  = "|".join(p for p in punc if p in i)
-                        impr = i.lower()
-                        if not (len(spl) == 0):
-                            impr = re.split(spl,impr)
-                            impr = "".join(impr)
-                        skeys.append(impr)
                     # if nothing else, we will return the most frequently appearing data
-                    #
-                    # string column of the imprints in the image
-                    sret     = list(sg[fl][sel["rxstring"]])
-                    # most frequently appearing response from the DB
-                    mret     = almost(sret)
-                    # row index of the most frequently appearing imprint
-                    row      = sret.index(mret)
+                    if not (type(sg[fl][sel["rxstring"]]) == type("")):
+                        # string column of the imprints in the image
+                        sret = list(sg[fl][sel["rxstring"]])
+                        # most frequently appearing response from the DB
+                        gm   = glovemost(sret)
+                        # row index of the most frequently appearing imprint
+                        row  = sret.index(gm)
                     # row of data corresponding to the most frequently appearing imprint
                     for key in sel:
-                        ret[fl][sel[key]] = sg[fl][sel[key]][row]
+                        if (type(sg[fl][sel[key]]) == type("")):
+                            ret[fl][sel[key]] = sg[fl][sel[key]]
+                        else:
+                            ret[fl][sel[key]] = sg[fl][sel[key]][row]
                     # now we will start to see if we can make a prediction
                     #
                     # for each file predicted
@@ -242,24 +238,42 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                         pred = thought(inst,coln,preds=0)
                                         if not (len(pred) == 0 or "error" in pred):
                                             break
+                                    # string column of the imprints in the image
+                                    sret = [a.translate(str.maketrans('','',punctuation)).lower() for a in list(sg[fl][sel["splimprint"]])]
+                                    # use GloVe to calculate the most frequently appearing imprint
+                                    gm   = glovemost(sret)
                                     # either we didn't get anything so that pred = {}
                                     # or we got something that might be {"error":"error string"}
                                     if not (len(pred) == 0 or "error" in pred):
-                                        # string column of the imprints in the image
-                                        sret = [a.translate(str.maketrans('','',punctuation)).lower() for a in list(sg[fl][sel["splimprint"]])]
                                         if pred["pred"] in sret:
                                             # row index of the most frequently appearing imprint
                                             row  = sret.index(pred["pred"])
-                                            # row of data corresponding to the most frequently appearing imprint
-                                            for key in sel:
-                                                ret[fl][sel[key]] = sg[fl][sel[key]][row]
-                                            # no need to go further just break
-                                            cont = False
-                                            break
+                                        else:
+                                            # use glove to find make a prediction using the sret data
+                                            row  = sret.index(gm)
+                                    else:
+                                        # use glove to find make a prediction using the sret data
+                                        row  = sret.index(gm)
+                                    # row of data corresponding to the most frequently appearing imprint
+                                    for key in sel:
+                                        if (type(sg[fl][sel[key]]) == type("")):
+                                            ret[fl][sel[key]] = sg[fl][sel[key]]
+                                        else:
+                                            ret[fl][sel[key]] = sg[fl][sel[key]][row]
+                                    # no need to go further just break
+                                    cont = False
+                                    break
                         else:
                             break
                 else:
                     ret[fl] = sg[fl]
+                # draw the image with the predicted medication
+                if not ("error" in ret[fl]):
+                    if not (ret[fl][sel["rxstring"]] == None):
+                        img  = Image.open(fl)
+                        draw = ImageDraw.Draw(img)
+                        draw.text((10,10),ret[fl][sel["rxstring"]],(0,0,0))
+                        img.show()
     except Exception as err:
         ret["error"] = str(err)
     return ret

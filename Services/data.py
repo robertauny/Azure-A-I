@@ -249,13 +249,13 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                     else:
                                         ret[keys] = {sel[key]:None for key in list(sel.keys())}
                             else:
-                                ret[keys] = {"error":"No configured columns"}
+                                ret[keys] = {"error":"No configured DB columns"}
                         except Exception as err:
                             ret[keys] = {"error":str(err)}
                     else:
-                        ret[keys] = {"error":"No UNIQUE pills"}
+                        ret[keys] = {"error":"No UNIQUE imprints read"}
                 else:
-                    ret[keys] = {"error":"No pills"}
+                    ret[keys] = {"error":"No imprints read"}
     return ret
 
 ############################################################################
@@ -329,67 +329,70 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
             lbl  = const.SEP.join(map(str,lbl))
             # read all files matching the current pattern determined by lbl
             fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind(const.SEP)] == lbl} for r,d,f in os.walk(home+"/data/")]
-            for fl in fls:
-                # file keys and values
-                fkeys= list(fl.keys())
-                fvals= list(fl.values())
-                # add the file from which the data came
-                ret["fl"].append(home+"/data/"+fvals[0])
-                # add the label for this file
-                ret["labels"].append(fkeys[0])
-                # add the neural network for this file
-                ret["nns"].append("models/"+fkeys[0]+".h5")
-                if drop:
-                    # read the data for this file
-                    g.io(ret["fl"][0]).read().iterate()
-                # get the data set
-                dat  = g.V().hasLabel(fkeys[0]).valueMap(True).toList()
-                if drop:
-                    # drop all of the data that was just loaded
-                    g.E().drop().iterate()
-                    g.V().drop().iterate()
-                # parse the data set into what we want, assuming that the label
-                # consists of instance, brain, cluster and row numbers
-                if not (len(dat) == 0):
-                    datk = unique([list(dat[j].keys()) for j in range(0,len(dat))])[0]
-                    datv = [list(dat[j].values()) for j in range(0,len(dat))]
-                    cdat = []
-                    ddat = []
-                    for k,key in enumerate(ckeys):
-                        for d,x in enumerate(datk):
-                            if str(x).translate(str.maketrans('','',punctuation)).lower() in key:
-                                cdat.append(k)
-                                ddat.append(d)
-                                break
-                    if not (len(cdat) == 0):
-                        if len(cdat) == len(ckeys):
-                            ndat = []
-                            for j in range(0,len(dat)):
-                                row  = []
-                                for i in ddat:
-                                    row.append(datv[j][i][0])
-                                ndat.append(row)
-                            # add the data for this file
-                            #
-                            # the data has the markov property so that
-                            # each data point is the sum of the previous
-                            # data point and zero-mean white noise
-                            # but our data is almost certainly to not be zero mean so
-                            # we will generate the data using the sample median and variance
-                            #
-                            # median
-                            md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
-                            # variance
-                            var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
-                            # the data
-                            ret["dat"].append(md )
-                            ret["dat"].append(var)
+            if not (len(fls) == 0 or len(fls[0]) == 0):
+                for fl in fls:
+                    # file keys and values
+                    fkeys= list(fl.keys())
+                    fvals= list(fl.values())
+                    # add the file from which the data came
+                    ret["fl"].append(home+"/data/"+fvals[0])
+                    # add the label for this file
+                    ret["labels"].append(fkeys[0])
+                    # add the neural network for this file
+                    ret["nns"].append("models/"+fkeys[0]+".h5")
+                    if drop:
+                        # read the data for this file
+                        g.io(ret["fl"][0]).read().iterate()
+                    # get the data set
+                    dat  = g.V().hasLabel(fkeys[0]).valueMap(True).toList()
+                    if drop:
+                        # drop all of the data that was just loaded
+                        g.E().drop().iterate()
+                        g.V().drop().iterate()
+                    # parse the data set into what we want, assuming that the label
+                    # consists of instance, brain, cluster and row numbers
+                    if not (len(dat) == 0):
+                        datk = unique([list(dat[j].keys()) for j in range(0,len(dat))])[0]
+                        datv = [list(dat[j].values()) for j in range(0,len(dat))]
+                        cdat = []
+                        ddat = []
+                        for k,key in enumerate(ckeys):
+                            for d,x in enumerate(datk):
+                                if str(x).translate(str.maketrans('','',punctuation)).lower() in key:
+                                    cdat.append(k)
+                                    ddat.append(d)
+                                    break
+                        if not (len(cdat) == 0):
+                            if len(cdat) == len(ckeys):
+                                ndat = []
+                                for j in range(0,len(dat)):
+                                    row  = []
+                                    for i in ddat:
+                                        row.append(datv[j][i][0])
+                                    ndat.append(row)
+                                # add the data for this file
+                                #
+                                # the data has the markov property so that
+                                # each data point is the sum of the previous
+                                # data point and zero-mean white noise
+                                # but our data is almost certainly to not be zero mean so
+                                # we will generate the data using the sample median and variance
+                                #
+                                # median
+                                md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
+                                # variance
+                                var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
+                                # the data
+                                ret["dat"].append(md )
+                                ret["dat"].append(var)
+                            else:
+                                ret  = read_kg(inst,np.asarray(coln)[cdat],None)
                         else:
-                            ret  = read_kg(inst,np.asarray(coln)[cdat],None)
+                            ret["dat"].append([None])
                     else:
                         ret["dat"].append([None])
-                else:
-                    ret["dat"].append([None])
+            else:
+                ret["dat"].append([None])
             if drop:
                 # close the connection
                 conn.close()
