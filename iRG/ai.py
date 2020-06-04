@@ -1258,14 +1258,13 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
 def dappend(doc=None):
     ret  = None
     if not (doc == None):
-        if not (type(doc) == type("")):
-            ret  = doc
+        if os.path.exists(doc) and os.path.getsize(doc) > 0:
+            f    = open(doc)
+            # should just be a line of text
+            ret  = f.read()
+            f.close()
         else:
-            if os.path.exists(doc) and os.path.getsize(doc) > 0:
-                f    = open(doc)
-                # should just be a line of text
-                ret  = f.read()
-                f.close()
+            ret  = doc
     return ret
 
 ############################################################################

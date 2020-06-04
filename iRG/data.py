@@ -163,8 +163,7 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                         whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + ";%')" for val in p1])
                         whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + "'  )" for val in p1])
                         whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ",";")       + ";%')" for val in p1])
-                        whr4 = " OR ".join(["(" + spl + "= '"       + ";".join([i for i in str(val)]) + "'  )" for val in p1])
-                        whr  = whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
+                        whr  = whr1 + " OR " + whr2 + " OR " + whr3
                         qry  = "$where " + whr
                         # select data columns
                         sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
