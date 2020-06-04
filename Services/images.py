@@ -91,6 +91,8 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                 if "error" not in list(sg[fl].keys())        and \
                     sel["splimprint"] in list(sg[fl].keys()) and \
                    (not type(sg[fl][sel["rxstring"]]) == type(None)):
+                    imprs= []
+                    impr = []
                     # the scripts
                     if type(sg[fl][sel["rxstring"]]) in [type([]),type(np.asarray([]))]:
                         for i in range(0,len(sg[fl][sel["rxstring"]])):
@@ -119,7 +121,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                     # add the wikipedia data to the extended glove data set
                     rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
             # limit the data and revert the keys back to having the original imprints when possible
-            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in ent]
+            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in kimpr]
             # write the extended glove data to a file for later recall
             with open(gfl[1],"w+") as f:
                 for k,v in rdat:
@@ -257,9 +259,13 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                     # row of data corresponding to the most frequently appearing imprint
                                     for key in sel:
                                         if (type(sg[fl][sel[key]]) == type("")):
-                                            ret[fl][sel[key]] = sg[fl][sel[key]]
+                                            if sg[fl][sel["splshape_text"]]      == ret[fl][sel["splshape_text"]] and \
+                                               sg[fl][sel["splcolor_text"]]      == ret[fl][sel["splcolor_text"]]:
+                                                ret[fl][sel[key]] = sg[fl][sel[key]]
                                         else:
-                                            ret[fl][sel[key]] = sg[fl][sel[key]][row]
+                                            if sg[fl][sel["splshape_text"]][row] == ret[fl][sel["splshape_text"]] and \
+                                               sg[fl][sel["splcolor_text"]][row] == ret[fl][sel["splcolor_text"]]:
+                                                ret[fl][sel[key]] = sg[fl][sel[key]][row]
                                     # no need to go further just break
                                     cont = False
                                     break
@@ -273,6 +279,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                         img  = Image.open(fl)
                         draw = ImageDraw.Draw(img)
                         draw.text((10,10),ret[fl][sel["rxstring"]],(0,0,0))
+                        img.save(fl[0:fl.rfind(".")]+"_PRED"+fl[fl.rfind("."):len(fl)])
                         img.show()
     except Exception as err:
         ret["error"] = str(err)
