@@ -22,7 +22,7 @@ from PIL                                            import ImageDraw,Image
 from keras.utils                                    import to_categorical
 from keras.models                                   import load_model
 
-from data                                           import url_kg,read_kg,sodaget
+from data                                           import url_kg,read_kg,sodaget,permute
 from services                                       import images,kg
 from ai                                             import create_kg,extendglove,thought,cognitive,wvec,almost,glovemost
 from nn                                             import dbn
@@ -44,6 +44,22 @@ from gremlin_python.driver.driver_remote_connection import DriverRemoteConnectio
 cfg  = config.cfg()
 
 np.random.seed(12345)
+
+############################################################################
+##
+## Purpose:   Process the image data
+##
+############################################################################
+def permutes(lk=const.MAX_FEATURES):
+    ret  = []
+    if not (lk <= const.MAX_FEATURES):
+        perma= permute(range(0,lk),False,const.MAX_FEATURES)
+        for a in perma:
+            ret.append(a)
+            #permb= permute(a)
+            #for b in permb:
+                #ret.append(b)
+    return ret
 
 ############################################################################
 ##
@@ -121,7 +137,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                     # add the wikipedia data to the extended glove data set
                     rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
             # limit the data and revert the keys back to having the original imprints when possible
-            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(const.MAX_FEATURES,min(len(kimpr),len(v))))])) for k,v in list(rdat.items()) if k in kimpr]
+            rdat = [(kimpr[k] if k in list(kimpr.keys()) else k,list(np.asarray(v)[range(0,min(len(kimpr),len(v)))])) for k,v in list(rdat.items()) if k in kimpr]
             # write the extended glove data to a file for later recall
             with open(gfl[1],"w+") as f:
                 for k,v in rdat:
@@ -144,7 +160,8 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
             # use an explicit dict to make sure that the order is preserved
             coln = [(keys[i],i) for i in range(0,len(keys))]
             # create the data for the sample knowledge graph (only one brain)
-            kgdat= create_kg(inst,vals,2)
+            perms= permutes(len(keys))
+            kgdat= create_kg(inst,vals,2,perms)
             # populate the knowledge graphs with the data
             k1   = kg(const.V,inst,coln,kgdat,g,True,testing)
             # see the extended glove data
@@ -210,6 +227,8 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                 if not (len(nspl) == 0):
                                     nimpr= re.split(nspl,nimpr)
                                     nimpr= "".join(nimpr)
+                                # if this (possibly) partial imprint matches part
+                                # of a transformed full imprint taken from the current imprint
                                 if impr in nimpr:
                                     # taking the constants just obtained, we can use the key to get the right
                                     # model and make a prediction about the right cluster for this key that
@@ -229,17 +248,15 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                     #
                                     # keys in gik are in the same ordering as when they were written during training
                                     # so there is no need to try to figure out the ordering before constructing coln for thought
-                                    inds = list(range(0,min(const.MAX_FEATURES,len(gik))))
+                                    perms= permutes(len(gik))
                                     pred = {}
-                                    for j in inds:
-                                        dump = [d for d in inds]
-                                        ind  = [dump.pop(j)]
-                                        ind.extend(dump)
-                                        coln = [(gik[k],k) for k in ind]
-                                        # call thought to get the data values for comparison
-                                        pred = thought(inst,coln,preds=0)
-                                        if not (len(pred) == 0 or "error" in pred):
-                                            break
+                                    for perm in perms:
+                                        if key in np.asarray(gik)[perm]:
+                                            coln = [(gik[k],k) for k in perm]
+                                            # call thought to get the data values for comparison
+                                            pred = thought(inst,coln,preds=0)
+                                            if not (len(pred) == 0 or "error" in pred):
+                                                break
                                     # string column of the imprints in the image
                                     sret = [a.translate(str.maketrans('','',punctuation)).lower() for a in list(sg[fl][sel["splimprint"]])]
                                     # use GloVe to calculate the most frequently appearing imprint
@@ -257,15 +274,15 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                                         # use glove to find make a prediction using the sret data
                                         row  = sret.index(gm)
                                     # row of data corresponding to the most frequently appearing imprint
-                                    for key in sel:
-                                        if (type(sg[fl][sel[key]]) == type("")):
+                                    for k in sel:
+                                        if (type(sg[fl][sel[k]]) == type("")):
                                             if sg[fl][sel["splshape_text"]]      == ret[fl][sel["splshape_text"]] and \
                                                sg[fl][sel["splcolor_text"]]      == ret[fl][sel["splcolor_text"]]:
-                                                ret[fl][sel[key]] = sg[fl][sel[key]]
+                                                ret[fl][sel[k]] = sg[fl][sel[k]]
                                         else:
                                             if sg[fl][sel["splshape_text"]][row] == ret[fl][sel["splshape_text"]] and \
                                                sg[fl][sel["splcolor_text"]][row] == ret[fl][sel["splcolor_text"]]:
-                                                ret[fl][sel[key]] = sg[fl][sel[key]][row]
+                                                ret[fl][sel[k]] = sg[fl][sel[k]][row]
                                     # no need to go further just break
                                     cont = False
                                     break

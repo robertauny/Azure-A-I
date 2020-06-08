@@ -45,7 +45,7 @@ def kg_testing(inst=1,M=10,N=5,testing=False):
     if p > const.MAX_FEATURES:
         p    = const.MAX_FEATURES
     # define the number of splits of each property
-    s    = p
+    s    = p if p <= const.MAX_SPLITS else const.MAX_SPLITS
     # uniformly sample values between 0 and 1 as the data set
     dat  = np.random.sample(size=(m,p))
     # create column names (normally obtained by var.dtype.names)
