@@ -19,6 +19,7 @@ from keras.models import Sequential
 from keras.utils  import to_categorical
 
 from tensorflow   import set_random_seed
+from math         import log,ceil
 
 import numpy as np
 import os
@@ -110,10 +111,7 @@ def dbn(inputs=[]
             p    = min(const.MAX_FEATURES,min(props,outputs.shape[len(outputs.shape)-1]))
             if M > p:
                 layers(model,p,M,'selu',useact)
-                props= p
-                M    = props
-            if S > const.MAX_SPLITS:
-                S    = const.MAX_SPLITS
+                M    = int(ceil(log(p,S)/2.0))
         # add the rest of the layers according to the writings
         #
         # output dimension (odim) is initially S (number of splits in first level of hierarchy)
