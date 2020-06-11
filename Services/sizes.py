@@ -1,5 +1,5 @@
 #!/usr/bin/python3
-# /tmp/test3.py
+# /tmp/sizes.py
 
 import os
 import requests
@@ -58,10 +58,9 @@ def sizes(wtyp=const.OCR,inst=0,dr=None):
                                 bbp        = bb.split(",")
                                 bbh        = abs(int(bbp[0])-int(bbp[1]))
                                 bbl        = abs(int(bbp[2])-int(bbp[3]))
-                                ret["bb" ] = [ret["bb"][0],ret["bb"][1],bbp[2]      ,bbp[3]      ] if 0 < bbl and bbl < ret["bbl"] else ret["bb" ]
-                                ret["bb" ] = [bbp[0]      ,bbp[1]      ,ret["bb"][2],ret["bb"][3]] if 0 < bbh and bbh < ret["bbh"] else ret["bb" ]
-                                ret["bbh"] =  bbh                                                  if 0 < bbh and bbh < ret["bbh"] else ret["bbh"]
-                                ret["bbl"] =  bbl                                                  if 0 < bbl and bbl < ret["bbl"] else ret["bbl"]
+                                ret["bb" ] = bbp if (0 < bbh and bbh < ret["bbh"]) and (0 < bbl and bbl < ret["bbl"]) and bbh * bbl < ret["bbh"] * ret["bbl"] else ret["bb" ]
+                                ret["bbh"] = bbh if  0 < bbh and bbh < ret["bbh"]                                                                             else ret["bbh"]
+                                ret["bbl"] = bbl                                     if 0 < bbl and bbl < ret["bbl"]                                          else ret["bbl"]
                     f.close()
                 except Exception as err:
                     print(str(err))
