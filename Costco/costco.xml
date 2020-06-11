@@ -5,11 +5,11 @@
 <!--
         <host>localhost</host>
 -->
-        <host>rammanmysql.mysql.database.azure.com</host>
+        <host>host</host>
         <port>3306</port>
-        <db>costcodb</db>
-        <user>costco@rammanmysql</user>
-        <pass>1c02$T3C04</pass>
+        <db>db</db>
+        <user>user</user>
+        <pass>pass</pass>
         <jar>/opt/mysql/mysql-connector-java-5.1.35-bin.jar</jar>
         <class>com.mysql.jdbc.Driver</class>
     </mysql>
