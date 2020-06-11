@@ -34,10 +34,10 @@
 				},
 				{
 					"connection" : {
-						"host" : "rammanmysql.mysql.database.azure.com",
+						"host" : "host",
 						"port" : "3306",
-						"db"   : "costcodb",
-						"acc"  : "costco@rammanmysql",
+						"db"   : "db",
+						"acc"  : "user",
 						"key"  : "account-key",
 						"app"  : "cyber",
 						"sec"  : "true",
@@ -60,7 +60,7 @@
 					{
 						"connection" : {
 							"app"  : "ocr",
-							"host" : "rammancog.cognitiveservices.azure.com",
+							"host" : "host",
 							"api"  : "vision",
 							"ver"  : "v2.1",
 							"key"  : "account-key",
@@ -70,7 +70,7 @@
 					{
 						"connection" : {
 							"app"  : "keyPhrases",
-							"host" : "westus.api.cognitive.microsoft.com",
+							"host" : "host",
 							"api"  : "text/analytics",
 							"ver"  : "v2.1",
 							"key"  : "account-key",
@@ -80,7 +80,7 @@
 					{
 						"connection" : {
 							"app"  : "sentiment",
-							"host" : "rammansentiment.cognitiveservices.azure.com",
+							"host" : "host",
 							"api"  : "text/analytics",
 							"ver"  : "v3.0-preview.1",
 							"key"  : "account-key",
@@ -108,7 +108,7 @@
 					{
 						"connection" : {
 							"app"  : "read/core/asyncBatchAnalyze",
-							"host" : "rammanimg.cognitiveservices.azure.com",
+							"host" : "host",
 							"api"  : "vision",
 							"ver"  : "v2.1",
 							"key"  : "account-key",
@@ -126,7 +126,7 @@
 					{
 						"connection" : {
 							"app"  : "analyze",
-							"host" : "rammanimg.cognitiveservices.azure.com",
+							"host" : "host",
 							"api"  : "vision",
 							"ver"  : "v2.1",
 							"key"  : "account-key",
@@ -147,8 +147,8 @@
 							"app"  : "pill",
 							"host" : "datadiscovery.nlm.nih.gov",
 							"api"  : null,
-							"user" : "28wdq5b2fsqqmdrwk28l37708",
-							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
+							"user" : "genuser",
+							"pass" : "genpass",
 							"db"   : "crzr-uvwg",
                                                         "sel"  : {
                                                                   "splshape_text":"shape",
