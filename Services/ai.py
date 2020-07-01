@@ -4,7 +4,7 @@
 ##
 ## File:      ai.py
 ##
-## Purpose:   Other A-I and machine learning functions needed for iRG and cyber security.
+## Purpose:   Other A-I and machine learning functions needed.
 ##
 ## Parameter: N/A
 ##
