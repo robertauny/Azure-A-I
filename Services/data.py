@@ -52,12 +52,14 @@ logging.disable(logging.WARNING)
 ##
 ############################################################################
 def unique(l=[]):
-    s    = l
-    if type(s[0]) == type([]):
-        s    = [tuple(t) for t in s]
-    ret  = list(set(s))
-    if type(s[0]) == type([]):
-        ret  = [list(t) for t in ret]
+    ret  = []
+    if not (len(l) == 0):
+        s    = l
+        if type(s[0]) == type([]):
+            s    = [tuple(t) for t in s]
+        ret  = list(set(s))
+        if type(s[0]) == type([]):
+            ret  = [list(t) for t in ret]
     return np.asarray(ret)
 
 ############################################################################
@@ -133,21 +135,15 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                 # single pill will contain image values and might contain object detection values
                 keys = list(pill.  keys())[0]
                 vals = list(pill.values())[0]
-                # image values
-                p    = vals
-                if objd:
-                    p    = pill[keys][const.IMG]
-                if not (len(p) == 0):
-                    # object detection values
-                    o    = None
-                    if objd:
-                        o    = pill[keys][const.OBJ]
-                        s    = pill[keys][const.SHP]
+                if not (len(vals) == 0):
                     # we will filter the terms found in the image
                     # if there is only one unique term, then that is fine
                     # but if there are more than one unique terms, then
                     # we won't use the ones that are a single character
                     # because too many results are returned that are not useful
+                    #
+                    # image values
+                    p    = pill[keys][const.IMG] if objd else vals
                     p1   = unique(p)
                     #if not (len(p1) == 1):
                         #p1   = [v for v in p1 if len(v) > 1]
@@ -160,10 +156,16 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                         clr  = "splcolor_text"
                         shp  = "splshape_text"
                         rxs  = "rxstring"
-                        whr1 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + ";%')" for val in p1])
-                        whr2 = " OR ".join(["(" + spl + " LIKE '%;" + str(val).replace(" ",";")       + "'  )" for val in p1])
-                        whr3 = " OR ".join(["(" + spl + " LIKE '"   + str(val).replace(" ",";")       + ";%')" for val in p1])
-                        whr  = whr1 + " OR " + whr2 + " OR " + whr3
+                        whr1 = " OR ".join(["(" + spl + " LIKE '%;%" + str(val).replace(" ",";") + "%;%')" for val in p1])
+                        whr2 = " OR ".join(["(" + spl + " LIKE '%;%" + str(val).replace(" ",";") + "'   )" for val in p1])
+                        whr3 = " OR ".join(["(" + spl + " LIKE '"    + str(val).replace(" ",";") + "%;%')" for val in p1])
+                        whr4 = " OR ".join(["(" + spl + "    = '"    + str(val).replace(" ",";") + "'   )" for val in p1])
+                        whr  =                whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
+                        whr1 = " OR ".join(["(" + spl + " LIKE '%;%" + str(val).replace(" ","" ) + "%;%')" for val in p1])
+                        whr2 = " OR ".join(["(" + spl + " LIKE '%;%" + str(val).replace(" ","" ) + "'   )" for val in p1])
+                        whr3 = " OR ".join(["(" + spl + " LIKE '"    + str(val).replace(" ","" ) + "%;%')" for val in p1])
+                        whr4 = " OR ".join(["(" + spl + "    = '"    + str(val).replace(" ","" ) + "'   )" for val in p1])
+                        whr  = whr + " OR " + whr1 + " OR " + whr2 + " OR " + whr3 + " OR " + whr4
                         qry  = "$where " + whr
                         # select data columns
                         sel  = cfg["instances"][inst]["sources"][src][typ]["connection"]["sel"]
@@ -188,12 +190,14 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                         res  = cli.get(db,app_token=api,where=whr)
                                 # Convert to pandas DataFrame and drop duplicates
                                 ret[keys] = pd.DataFrame.from_records(res)
-                                if train:
+                                if not train:
                                     ret[keys] = ret[keys].drop_duplicates()
                                 # try to match the imprint on the medication
                                 if not (len(ret[keys]) <= 1):
                                     # if object detection is turned on
                                     if objd:
+                                        o    = pill[keys][const.OBJ]
+                                        s    = pill[keys][const.SHP]
                                         # try to check the color
                                         clrs = np.append([o0.lower() for o0 in o[0]],[o[i].lower() for i in range(1,len(o))])
                                         bret = [(a.lower() in clrs) for a in ret[keys][clr].to_list()]
@@ -205,24 +209,23 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                             bret = [(a.lower() in s) for a in ret[keys][shp].to_list()]
                                             iret = [i for i,b in enumerate(bret) if b]
                                             # rows matching shapes of the pills
-                                            if not (len(iret) <= 1):
-                                                ret[keys] = ret[keys].iloc[iret,0:len(sel)]
-                                            else:
-                                                if not (len(iret) == 0):
-                                                    ret[keys] = ret[keys].to_numpy()[iret]
+                                            ret[keys] = ret[keys].iloc[iret,0:len(sel)]
                                         else:
                                             if not (len(iret) == 0):
-                                                ret[keys] = ret[keys].to_numpy()[iret]
+                                                ret[keys] = ret[keys].iloc[iret,0:len(sel)]
                                     if not (len(ret[keys]) <= 1):
                                         # string column of the imprints in the image
                                         sret = ret[keys][rxs].to_list()
+                                        # if not training then try to further de-dup
+                                        if not train:
+                                            usret     = unique(sret)
+                                            rows      = [sret.index(u) for u in usret if not str(u).lower() == "nan"]
+                                            if not (len(rows) == 0):
+                                                ret[keys] = ret[keys].iloc[rows,0:len(sel)]
+                                                sret      = list(np.asarray(sret)[rows])
                                         # row indices of all rx stirngs that are not NaN
                                         rows = [i for i,val in enumerate(sret) if not (len(str(val)) == 0 or str(val).lower() == "nan")]
                                         if not (len(rows) <= 1):
-                                            if train:
-                                                # all remaining rows while taking only the first element
-                                                # as this should correspond to the imprint of the original image
-                                                rows = rows[0]
                                             # if we are not training, then return all matching rows of the imprints found
                                             ret[keys] = ret[keys].iloc[rows,0:len(sel)]
                                             if not (type(rows) == type(0)):
