@@ -10,19 +10,35 @@
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Dec. 28, 2019
+## Date:      Nov. 22, 2021
 ##
 ############################################################################
+
+import csv
+import sys
+
+import multiprocessing as mp
+import numpy           as np
+
+import constants       as const
+
+ver  = sys.version.split()[0]
+
+if ver == const.constants.VER:
+    from            keras.models                            import Sequential,load_model,Model
+    from            keras.utils.np_utils                    import to_categorical
+    from            keras.preprocessing.text                import Tokenizer
+    from            keras.preprocessing.sequence            import pad_sequences
+
+else:
+    from tensorflow.keras.models                            import Sequential,load_model,Model
+    from tensorflow.keras.utils                             import to_categorical
+    from tensorflow.keras.preprocessing.text                import Tokenizer
+    from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
 from joblib                       import Parallel,delayed
 from string                       import punctuation
 from math                         import ceil,log,exp
-
-from keras.utils                  import to_categorical
-from keras.models                 import load_model
-
-from keras.preprocessing.text     import Tokenizer
-from keras.preprocessing.sequence import pad_sequences
 
 from pdf2image                    import convert_from_bytes,convert_from_path
 from scipy                        import ndimage,misc
@@ -38,15 +54,11 @@ import cv2
 import imutils
 import logging
 
-import numpy  as np
 import pandas as pd
 
-import multiprocessing as mp
 import os
-import sys
 
 import config
-import constants as const
 import nn
 import data
 
@@ -80,9 +92,9 @@ def store(dat=[],typ=None):
 ## Purpose:   Cluster number
 ##
 ############################################################################
-def prefix(i=const.BVAL):
-    ret  = const.BVAL
-    if not (i <= const.BVAL):
+def prefix(i=const.constants.BVAL):
+    ret  = const.constants.BVAL
+    if not (i <= const.constants.BVAL):
         ret  = i + 1
     return ret
 
@@ -91,13 +103,13 @@ def prefix(i=const.BVAL):
 ## Purpose:   Cluster label and row number appended together
 ##
 ############################################################################
-def append(i=const.BVAL,n=const.BVAL,m=const.BVAL):
+def append(i=const.constants.BVAL,n=const.constants.BVAL,m=const.constants.BVAL):
     ret  = None
-    if not (i <= const.BVAL or n <= const.BVAL or m <= const.BVAL):
+    if not (i <= const.constants.BVAL or n <= const.constants.BVAL or m <= const.constants.BVAL):
         n   += 1 # note that this modifies the passed in value for all to see
         m   += (i+1) # note that this modifies the passed in value for all to see
-        ret  = str(n) + const.SEP + str(m)
-        #ret  = str(n+1) + const.SEP + str(m)
+        ret  = str(n) + const.constants.SEP + str(m)
+        #ret  = str(n+1) + const.constants.SEP + str(m)
     return ret
 
 ############################################################################
@@ -152,7 +164,7 @@ def extend1(dat1=[],dat2=[]):
 def split(dat=[],ind=0):
     ret  = None
     if not (len(dat) == 0 or ind < 0 or ind > len(dat)-1):
-        ret  = dat.split(const.SEP)[ind]
+        ret  = dat.split(const.constants.SEP)[ind]
     return ret
 
 ############################################################################
@@ -293,7 +305,7 @@ def brain(dat=[],splits=2,permu=[]):
                       ,dbnact="tanh"
                       ,dbnout=p)
             # regression model
-            rfl  = "models/" + "".join(lbl.split(const.SEP)) + ".h5"
+            rfl  = "models/" + "".join(lbl.split(const.constants.SEP)) + ".h5"
             mdl.save(rfl)
             # add the current label and model to the return
             ret.append({"label":lbl,"model":fl,"rmodel":rfl})
@@ -321,7 +333,7 @@ def thought(inst=0,coln=[],preds=3):
             lbls = df["labels"]
             for m in range(0,len(lbls)):
                 # beginning and end indices in the label string that need to be removed to find the brain
-                b    = lbls[m].find(const.SEP) + 1
+                b    = lbls[m].find(const.constants.SEP) + 1
                 e    = lbls[m].rfind(ext) - 1
                 # file for the clustering model
                 fl   = str("models/"+lbls[m][b:e]+".h5")
@@ -372,12 +384,12 @@ def thought(inst=0,coln=[],preds=3):
                                     # where the brain is obtained as the set of values in the dictionary
                                     # coln and make the number of requested predictions preds ... this network
                                     # is also defined by the labels when we remove the instance found before
-                                    # the first const.SEP in the label and the cluster, which is found when removing characters
-                                    # after the last const.SEP in the label ... then we just squeeze the remaining
+                                    # the first const.constants.SEP in the label and the cluster, which is found when removing characters
+                                    # after the last const.constants.SEP in the label ... then we just squeeze the remaining
                                     # characters and prepend with the "models/" directory and add the ".h5" file ext
                                     #
                                     # then get the column indices of the original data set that defines this brain
-                                    cols = lbls[m][b:e].split(const.SEP)
+                                    cols = lbls[m][b:e].split(const.constants.SEP)
                                     # load the regression model for this brain so we can make the predictions
                                     # of the next input data points that will be seen beyond the current data set
                                     rfl  = str("models/"+"".join(cols)+".h5")
@@ -387,7 +399,7 @@ def thought(inst=0,coln=[],preds=3):
                                         # so we load the model and make the predictions preds ... after making the
                                         # requested number of predictions, we use the main clustering model that has
                                         # almost the same name as the regression model, except we don't squeeze the remaining
-                                        # characters since we leave the const.SEP in between ... we predict the cluster of the
+                                        # characters since we leave the const.constants.SEP in between ... we predict the cluster of the
                                         # resulting predictions from the regression model so that we know which cluster model
                                         # to use when making the final (more specific) regression predictions preds
                                         #
@@ -464,23 +476,12 @@ def numbers(dat=[],pre=0):
 
 ############################################################################
 ##
-## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+## Purpose:   Calculation of the conditional specification elements
 ##
 ############################################################################
-def glove(tok=None,words=0):
-    ret  = {}
-    # expecting that the corpus is already tokenized and integers are fit to the text
-    if not (tok == None or words <= const.BVAL):
-        # we will make each marginal distribution a function of uwrd words
-        uwrd = len(tok.word_index.keys())
-        if (0 < words and words < uwrd):
-            uwrd = words
-        # add the prior as the calculation of the probabilities of the top uwrd words
-        #
-        # calculation of the conditional specification elements carries all information about the distribution
-        #
-        # prior and the last element to make the dot products be the log probability of co-occurrence
-        probs= []
+def calcprobs(tok=None,uwrd=0):
+    probs= []
+    if not (tok == None or uwrd == 0):
         # dictionary of all words in the corpus
         ditem= dict(tok.word_index.items())
         # items of the top uwrd words from the dictionary
@@ -499,6 +500,27 @@ def glove(tok=None,words=0):
                 lprob= exp(max(probs))
             # add the last value to the dictionary
             probs.append(lprob)
+    return probs
+
+############################################################################
+##
+## Purpose:  Implementation of Global Vectors for Word Representation (GloVe)
+##
+############################################################################
+def glove(tok=None,words=0):
+    ret  = {}
+    # expecting that the corpus is already tokenized and integers are fit to the text
+    if not (tok == None or words <= const.constants.BVAL):
+        # we will make each marginal distribution a function of uwrd words
+        uwrd = len(tok.word_index.keys())
+        if (0 < words and words < uwrd):
+            uwrd = words
+        # add the prior as the calculation of the probabilities of the top uwrd words
+        #
+        # calculation of the conditional specification elements carries all information about the distribution
+        #
+        # prior and the last element to make the dot products be the log probability of co-occurrence
+        probs= calcprobs(tok,uwrd)
         # each marginal is defined by a set of constants in such a way that the inner product of one set of
         # constants with another gives the probability of word-word co-occurrence of the words defining the marginals
         #
@@ -549,6 +571,8 @@ def glove(tok=None,words=0):
         #
         # total number of appearances for all words
         tot  = sum(tok.word_counts.values())
+        # dictionary of all words in the corpus
+        ditem= dict(tok.word_index.items())
         # start the process of generating glove marginals for the data set that's been tokenized
         for word,ind in tok.word_index.items():
             wcnt = ditem[word]
@@ -823,7 +847,8 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         # auto-encoders, as we are using all of the input data elements
         # in the definition of the outputs
         perms= data.permute(range(0,ssz),False)
-        lmax = sys.maxint
+        #lmax = sys.maxint
+        lmax = sys.maxsize
         # initial entropy is something higher than otherwise possible
         cdt  = np.asarray(Parallel(n_jobs=nc)(delayed(chars)(dat[i],ssz) for i in range(0,sz)))
         cdat = [cdt[i,0].lower() for i in range(0,len(cdt)) if cdt[i,0].isalpha()]
@@ -910,7 +935,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
         # get the labels
         lbls = label(odat)
         # split the labels to know the available clusters
-        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)(const.SEP) for i in range(0,len(lbls)))
+        slbl = Parallel(n_jobs=nc)(delayed(lbls[i].split)(const.constants.SEP) for i in range(0,len(lbls)))
         slbl = np.asarray(slbl)
         # cluster labels
         clus = slbl[:,0]
@@ -952,9 +977,9 @@ def pil2array(pil=None):
 ##            Other text analytics
 ##
 ############################################################################
-def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
+def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=True):
     ret  = []
-    if not (wtyp == None or len(docs) == 0 or inst <= const.BVAL):
+    if not (wtyp == None or len(docs) == 0 or inst <= const.constants.BVAL):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["src"]["index"]
         typ  = cfg["instances"][inst]["src"]["types"][wtyp]
@@ -975,7 +1000,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
         parms= {"language":"unk","detectOrientation":"true"}
         if not testing:
             ftext= []
-            if wtyp == const.OCR:
+            if wtyp == const.constants.OCR:
                 hdrs["Content-Type"] = "application/octet-stream"
                 for i in docs:
                     try:
@@ -993,7 +1018,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                     except Exception as err:
                         ftext.append(str(err))
             else:
-                if wtyp == const.IMG:
+                if wtyp == const.constants.IMG:
                     hdrs["Content-Type"] = "application/octet-stream"
                     try:
                         # get response from the server
@@ -1018,7 +1043,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                     except Exception as err:
                         ftext.append(str(err))
                 else:
-                    if wtyp == const.OBJ:
+                    if wtyp == const.constants.OBJ:
                         hdrs["Content-Type"] = "application/octet-stream"
                         parms                = {"visualFeatures":"Categories,Description,Color"}
                         try:
@@ -1036,7 +1061,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                         except Exception as err:
                             ftext.append(str(err))
                     else:
-                        if wtyp == const.SHP:
+                        if wtyp == const.constants.SHP:
                             try:
                                 # load the image and resize it to a smaller factor so that
                                 # the shapes can be approximated better
@@ -1081,7 +1106,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                             except Exception as err:
                                 ftext.append(str(err))
                         else:
-                            if wtyp == const.WIK:
+                            if wtyp == const.constants.WIK:
                                 # request headers. Important: content should be json as we are sending an array of json objects
                                 hdrs["Content-Type"] = "application/json"
                                 try:
@@ -1105,7 +1130,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                                 except Exception as err:
                                     ftext.append(str(err))
                             else:
-                                if wtyp in [const.EE,const.SENT]:
+                                if wtyp in [const.constants.EE,const.constants.SENT]:
                                     # request headers. Important: content should be json as we are sending an array of json objects
                                     hdrs["Content-Type"] = "application/json"
                                     try:
@@ -1118,7 +1143,7 @@ def img2txt(wtyp=const.OCR,docs=[],inst=const.BVAL,testing=True):
                                         # all the lines from a page, including noise
                                         for doc in js["documents"]:
                                             keys = doc[wtyp]
-                                            if wtyp == const.SENT:
+                                            if wtyp == const.constants.SENT:
                                                 keys = [keys,doc["documentScores"][keys]]
                                             ftext.append(keys)
                                     except Exception as err:
@@ -1172,14 +1197,14 @@ def rotate(img=None,deg=0,by=0):
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
-def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
+def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=False,testing=True):
     ret  = None
-    if not (wtyp == None or len(pdfs) == 0 or inst <= const.BVAL):
+    if not (wtyp == None or len(pdfs) == 0 or inst <= const.constants.BVAL):
         # number of cpu cores
         nc   = mp.cpu_count()
-        if wtyp in [const.OCR,const.IMG]:
+        if wtyp in [const.constants.OCR,const.constants.IMG]:
             # converted images
-            if wtyp == const.OCR:
+            if wtyp == const.constants.OCR:
                 # convert the data in the pdf into images using python image library format
                 imgs = Parallel(n_jobs=nc)(delayed(convert_from_path        )(pdfs[i]                   ) for i in range(0,len(pdfs )))
                 # save the images of the pdfs to addressable memory
@@ -1196,11 +1221,11 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
                     if not (len(oimgs) == 0):
                         ret.append(oimgs[0])
                 # key phrases or entity extractions
-                ret.append(cognitive(const.EE  ,ret[0],inst,objd,testing))
+                ret.append(cognitive(const.constants.EE  ,ret[0],inst,objd,testing))
                 # sentiment and scores
-                ret.append(cognitive(const.SENT,ret[0],inst,objd,testing))
+                ret.append(cognitive(const.constants.SENT,ret[0],inst,objd,testing))
             else:
-                if wtyp == const.IMG:
+                if wtyp == const.constants.IMG:
                     ret  = {}
                     # ordering of the data elements in the JSON file
                     src  = cfg["instances"][inst]["src"]["index"]
@@ -1236,13 +1261,13 @@ def cognitive(wtyp=const.OCR,pdfs=[],inst=const.BVAL,objd=False,testing=True):
                             # initialize the return to an empty dictionary
                             rret            = {}
                             # capture the text in the image
-                            rret[const.IMG] = [i[0] for i in oimgs if not len(i) == 0]
+                            rret[const.constants.IMG] = [i[0] for i in oimgs if not len(i) == 0]
                             # object detection
-                            rret[const.OBJ] = cognitive(const.OBJ,pimgs[0],inst,objd,testing)
+                            rret[const.constants.OBJ] = cognitive(const.constants.OBJ,pimgs[0],inst,objd,testing)
                             # shape detection
-                            rret[const.SHP] = cognitive(const.SHP,pdfs[i] ,inst,objd,testing)
+                            rret[const.constants.SHP] = cognitive(const.constants.SHP,pdfs[i] ,inst,objd,testing)
                             # final return for this pdf
-                            ret [pdfs[i]  ] = rret
+                            ret [pdfs[i]  ]           = rret
                 else:
                     # placeholder for the future
                     imgs = None
@@ -1287,7 +1312,7 @@ def wvec(line=None):
 ## Purpose:  Aid in parallel expansion of the data from a pretrained GloVe model
 ##
 ############################################################################
-def expand(gm=[],pm=[],ind=const.BVAL):
+def expand(gm=[],pm=[],ind=const.constants.BVAL):
     ret  = gm
     if not (len(pm) == 0):
         ret.append(pm)
@@ -1339,7 +1364,7 @@ def blocks(tok=None):
 ##           that will be used to extend a sparse data set of words
 ##
 ############################################################################
-def extendglove(docs=[],gdoc=None,splits=2,props=2):
+def extendglove(docs=[],gdoc=None,splits=2,props=2,opt=True):
     gdat = {}
     if not (len(docs) == 0 or gdoc == None):
         # gdoc might be a dictionary containing the glove data
@@ -1349,14 +1374,6 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
         else:
             gdb  = False
         if len(gdoc) > 0 or gdb:
-            # append the text of all docs together into a string
-            txts = [dappend(d) for d in docs]
-            # tokenize the lines in the array and convert to sequences of integers
-            #
-            # instantiate a default Tokenizer object without limiting the number of tokens
-            tok  = Tokenizer()
-            # tokenize the data
-            tok.fit_on_texts(txts)
             # get the data from the pretrained GloVe word vectors
             # the data will consist of a word in the first position
             # which is followed by a sequence of integers
@@ -1366,6 +1383,14 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 f.close()
             else:
                 gdat = gdoc
+            # append the text of all docs together into a string
+            txts = [dappend(d) for d in docs]
+            # tokenize the lines in the array and convert to sequences of integers
+            #
+            # instantiate a default Tokenizer object without limiting the number of tokens
+            tok  = Tokenizer()
+            # tokenize the data
+            tok.fit_on_texts(txts)
             # we will pad the original sequences in a certain way so as to make them align with
             # the expanded set of words from the passed in GloVe data set then
             # use the word index to embed the document data into the pretrained GloVe word vectors
@@ -1407,87 +1432,145 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2):
                 # gmat keys and values
                 gkeys= list(gmat.keys())
                 gvals= list(gmat.values())
-                # number of clusters is different than the default defined by the splits and properties
-                clust= max(len(gmat[gkeys[0]])-1,2)
-                #
-                s    = splits
-                # we want to find the value p such that s**(2*p) gives the same number
-                # of potential clusters as there are found in glove, as indicated by the number of constants
-                # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
-                p    = int(ceil(log(clust,s)/2.0))
-                # we need values to turn into labels when training
-                # one-hot encode the integer labels as its required for the softmax
-                #
-                # the goal is to build a model with clust=clust outputs such that when clust inputs are passed in, we get a
-                # word in the glove data set associated to the clust constants ... furthermore, when the model constants are
-                # used in dot product with the constants of any word from the glove data set, we get the average log probability
-                # of the word from glove with any other arbitrary word from glove
-                # 
-                # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
-                # can consist of one unique value for each row of constants
-                ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
-                # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
-                # of a plane ... i.e. each row of constants defines an element of a conditional specification
-                #
-                # words are associated with constants that can be dot product with constants of other words to obtain word-word
-                # co-occurrence probabilities
-                #
-                # recall from the theory of random fields, that given a conditional specification, we seek a realizing
-                # global probability distribution such that each of the global's conditionals, given a word in the glove
-                # data set, is an element in the specification
-                #
-                # the DBN neural network can be used to find the global realizing distribution
-                #
-                # at this point, we have one-hot encoded each of the unique words in the glove data set that matched a word from
-                # our corpus ... we use the constants of the conditional distributions in the glove data set as inputs to the DBN
-                # that will find a distribution that has as its output the set of words that have been one-hot encoded ... i.e.
-                # we will have found constants that can be used in dot product with constants of the conditionals to find the
-                # average log probability of co-occurrence with any word appearing in both the corpus and glove data sets
-                #
-                # the result being that we will have found a set of constants (synaptic weights) of a network that identifies
-                # the word used to define a conditional distribution in the specification of the realizing distribution .. or
-                # more succinctly stated, with the neural network, we can identify if the inputs define
-                # a set of synaptic weights for a distribution in the conditional specification
-                #
-                # after generating the model, we should have a set of constants (weights) that number the same as those
-                # in the glove data file ... since we predict the word when using the associated constants of a word in the glove
-                # data file, then we only need for the dot product of the constants from the model with those of the
-                # constants in the data files to give us the log of the probability of the word-word co-occurrence
-                #
-                # however, the realizing distribution is a model of all words that gives you one particular word, when
-                # a certain set of constants are used as inputs ... thus we can use the output of the model as the
-                # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
-                # of any arbitrary word in the glove data set when dot product with the constants associated to another word
-                #
-                # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
-                ivals= np.asarray(gvals)
-                # create the model using the inputs
-                model= dbn(ivals,ovals,splits=s,props=p,clust=(clust+1))
-                # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
-                # the corpus ... these words (and by extension, their values) carry information about the words that don't appear
-                # in the glove data ... the mean will carry all information about these words as well
-                #
-                # however, we will instead generate a glove data set for these words, then use the global distribution (random field),
-                # found from values of elements in the conditional specification associated to words that do appear in the corpus,
-                # to predict the generated glove data set
-                #
-                # recall that the global distribution carries information about its marginals so that certain inputs will give a word
-                # used to define an element of its conditional specification ... i.e. we get the values of the glove data set used
-                # to build the global distribution ... this is exactly what we want ... start with a generated glove data set and
-                # map this data set to elements of the conditional specification used to the build the global
-                #
-                # generate the glove data set
-                gd   = glove(tok,clust+1)
-                # predict the right values and add them to the output
-                for word,i in tok.word_index.items():
-                    if not (word in gkeys):
-                        if len(gd[word]) < clust:
-                            vec    = np.append(gd[word],np.zeros(clust-len(gd[word])+1))
-                        elif len(gd[word]) > clust:
-                            vec    = gd[word][0:(clust+1)]
+                if not opt:
+                    # number of clusters is different than the default defined by the splits and properties
+                    clust= max(len(gmat[gkeys[0]])-1,2)
+                    #
+                    s    = splits
+                    # we want to find the value p such that s**(2*p) gives the same number
+                    # of potential clusters as there are found in glove, as indicated by the number of constants
+                    # found in a row of gdat (minus one accounts for the word) ... only need to use the first line for counting
+                    p    = int(ceil(log(clust,s)/2.0))
+                    # we need values to turn into labels when training
+                    # one-hot encode the integer labels as its required for the softmax
+                    #
+                    # the goal is to build a model with clust=clust outputs such that when clust inputs are passed in, we get a
+                    # word in the glove data set associated to the clust constants ... furthermore, when the model constants are
+                    # used in dot product with the constants of any word from the glove data set, we get the average log probability
+                    # of the word from glove with any other arbitrary word from glove
+                    # 
+                    # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
+                    # can consist of one unique value for each row of constants
+                    ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
+                    # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
+                    # of a plane ... i.e. each row of constants defines an element of a conditional specification
+                    #
+                    # words are associated with constants that can be dot product with constants of other words to obtain word-word
+                    # co-occurrence probabilities
+                    #
+                    # recall from the theory of random fields, that given a conditional specification, we seek a realizing
+                    # global probability distribution such that each of the global's conditionals, given a word in the glove
+                    # data set, is an element in the specification
+                    #
+                    # the DBN neural network can be used to find the global realizing distribution
+                    #
+                    # at this point, we have one-hot encoded each of the unique words in the glove data set that matched a word from
+                    # our corpus ... we use the constants of the conditional distributions in the glove data set as inputs to the DBN
+                    # that will find a distribution that has as its output the set of words that have been one-hot encoded ... i.e.
+                    # we will have found constants that can be used in dot product with constants of the conditionals to find the
+                    # average log probability of co-occurrence with any word appearing in both the corpus and glove data sets
+                    #
+                    # the result being that we will have found a set of constants (synaptic weights) of a network that identifies
+                    # the word used to define a conditional distribution in the specification of the realizing distribution .. or
+                    # more succinctly stated, with the neural network, we can identify if the inputs define
+                    # a set of synaptic weights for a distribution in the conditional specification
+                    #
+                    # after generating the model, we should have a set of constants (weights) that number the same as those
+                    # in the glove data file ... since we predict the word when using the associated constants of a word in the glove
+                    # data file, then we only need for the dot product of the constants from the model with those of the
+                    # constants in the data files to give us the log of the probability of the word-word co-occurrence
+                    #
+                    # however, the realizing distribution is a model of all words that gives you one particular word, when
+                    # a certain set of constants are used as inputs ... thus we can use the output of the model as the
+                    # global realizing distribution ... and the global distribution gives the mean log probability of co-occurrence
+                    # of any arbitrary word in the glove data set when dot product with the constants associated to another word
+                    #
+                    # input values to the model are the values associated to the words that appear in both our corpus and the glove data set
+                    ivals= np.asarray(gvals)
+                    # create the model using the inputs
+                    model= dbn(ivals,ovals,splits=s,props=p,clust=(clust+1))
+                    # for all words that don't appear in the glove data, we could just take the mean of the glove data for words that appear in
+                    # the corpus ... these words (and by extension, their values) carry information about the words that don't appear
+                    # in the glove data ... the mean will carry all information about these words as well
+                    #
+                    # however, we will instead generate a glove data set for these words, then use the global distribution (random field),
+                    # found from values of elements in the conditional specification associated to words that do appear in the corpus,
+                    # to predict the generated glove data set
+                    #
+                    # recall that the global distribution carries information about its marginals so that certain inputs will give a word
+                    # used to define an element of its conditional specification ... i.e. we get the values of the glove data set used
+                    # to build the global distribution ... this is exactly what we want ... start with a generated glove data set and
+                    # map this data set to elements of the conditional specification used to the build the global
+                    #
+                    # generate the glove data set
+                    gd   = glove(tok,clust+1)
+                    # predict the right values and add them to the output
+                    for word,i in tok.word_index.items():
+                        if not (word in gkeys):
+                            if len(gd[word]) < clust:
+                                vec    = np.append(gd[word],np.zeros(clust-len(gd[word])+1))
+                            elif len(gd[word]) > clust:
+                                vec    = gd[word][0:(clust+1)]
+                            else:
+                                vec    = gd[word]
+                            gdat[word] = model.predict(np.reshape(vec,(1,clust+1)))[0]
+                else:
+                    # we will make each marginal distribution a function of uwrd words
+                    uwrd = len(tok.word_index.keys())
+                    # add the prior as the calculation of the probabilities of the top uwrd words
+                    #
+                    # calculation of the conditional specification elements carries all information about the distribution
+                    #
+                    # prior and the last element to make the dot products be the log probability of co-occurrence
+                    #
+                    # fudging a bit for this problem ... what we really need is every combination of word-word
+                    # co-occurrence, but we are settling for co-occurrences between current word and next in the list
+                    # since all words in the corpus are assumed to have positive co-occurrence with every other word,
+                    # then we can get a better estimate of co-occurrence between any 2 words by means of the product
+                    # measure as an ideal estimate, with words in the corpus separated by N words having a probability
+                    # that is estimated by a product of N-1 values each between [0,1] ... thus using the following word
+                    # in the corpus will give an upper bound on the estimated probability
+                    probs= calcprobs(tok,uwrd)
+                    # for each document, we will find all words that appear in the pretrained
+                    # glove model and use those words to estimate constants for each non-appearing word
+                    for txts in docs:
+                        # tokenize the lines in the array and convert to sequences of integers
+                        #
+                        # instantiate a default Tokenizer object without limiting the number of tokens
+                        ntok = Tokenizer()
+                        # tokenize the data
+                        ntok.fit_on_texts(txts)
+                        toks = list(ntok.word_index.items())
+                        # use a bit of linear algebra to find the right glove values
+                        isin = []
+                        isni = []
+                        for i,row in enumerate(toks):
+                            word,j = row
+                            if not (word in gkeys):
+                                isni.append(i)
+                            else:
+                                isin.append(i)
+                        # only attempt this method if we have enough info
+                        if len(isni) >= 2 and len(isni) < len(toks):
+                            p    = []
+                            m    = []
+                            for i in isni:
+                                for j in isin:
+                                    minij= min(i,j)
+                                    maxij= max(i,j)
+                                    # log of a product is the sum of the logs
+                                    p.append(np.sum(probs[minij:min(maxij+1,len(toks))]))
+                                    m.append(gdat[toks[j][0]])
+                                gdat[toks[i][0]] = np.linalg.inv(np.transpose(m)@m).dot(np.transpose(m)).dot(p)
                         else:
-                            vec    = gd[word]
-                        gdat[word] = model.predict(np.reshape(vec,(1,clust+1)))[0]
+                            gd   = extendglove(docs,gdoc,splits,props,False)
+                            for word in list(gd.keys()):
+                                if not (word in gkeys):
+                                    gdat[word] = gd[word]
+                                    # reset gmat keys and values
+                                    gmat[word] = gdat[word]
+                                    gkeys      = list(gmat.keys())
+                                    gvals      = list(gmat.values())
     return gdat
 
 ############################################################################
@@ -1660,12 +1743,12 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
                         # we continue until all sequences of predictions have been exhausted while noting that each
                         # successive sequence is more important than the last, as we are getting deeper into code blocks
                         ret[i] = {
-                            const.SEP.join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
+                            const.constants.SEP.join([keys[j] for j in range(k,lp) if prow[j] in np.sort(prow[range(k,lp)])[range(0,ngram)]]): \
                             np.sort(prow[range(k,lp)])[range(0,ngram)].prod()
                             for k in range(0,lp-(ngram-1))
                                  }
                     else:
-                        ret[i] = {const.SEP.join(keys):np.asarray(prow).prod()}
+                        ret[i] = {const.constants.SEP.join(keys):np.asarray(prow).prod()}
                     rkeys  = np.asarray(list(ret[i].keys()))
                     rvals  = list(ret[i].values())
                     rvals  = np.asarray(rvals) / max(rvals)
@@ -1695,12 +1778,12 @@ def edges(clus=None,rows=[]):
 ## Purpose:   Create vertices and edges of a knowledge graph
 ##
 ############################################################################
-def create_kg_ve(inst=const.BVAL,dat=[],lbls=[],lbl=None,ve=None):
+def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None):
     ret  = None
-    if not (inst <= const.BVAL or len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
+    if not (inst <= const.constants.BVAL or len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
         # number of cpu cores
         nc   = mp.cpu_count()
-        if ve == const.V:
+        if ve == const.constants.V:
             # only need to append the unique id defined by the row label to the data row
             # this is the set of vertices for each data point in the data set
             ret  = Parallel(n_jobs=nc)(delayed(extend)(str(inst)+'-'+lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
@@ -1722,20 +1805,20 @@ def create_kg_ve(inst=const.BVAL,dat=[],lbls=[],lbl=None,ve=None):
 ##
 ############################################################################
 def build_kg(inst,dat=[],brn={},splits=2):
-    ret  = {const.V:[],const.E:[]}
+    ret  = {const.constants.V:[],const.constants.E:[]}
     if not (inst == None  or
             inst < 0      or
             len(dat) == 0 or
             brn == {}     or
             splits < 2):
         # get the nn model for this brain
-        mdl  = brn[const.MDL]
+        mdl  = brn[const.constants.MDL]
         # get the nn label for this brain
-        lbl  = brn[const.LBL]
+        lbl  = brn[const.constants.LBL]
         # make the predictions using this model
         model= load_model(mdl)
         # make sure to get the right subset of the data
-        l    = list(map(int,lbl.split(const.SEP)))
+        l    = list(map(int,lbl.split(const.constants.SEP)))
         # number of cpu cores
         nc   = mp.cpu_count()
         # make the predictions
@@ -1745,11 +1828,11 @@ def build_kg(inst,dat=[],brn={},splits=2):
         # generate the labels for the data
         lbls = label(preds)
         # create the vertices
-        v    = create_kg_ve(inst,dat,lbls,lbl,const.V)
+        v    = create_kg_ve(inst,dat,lbls,lbl,const.constants.V)
         # create the edges
-        e    = create_kg_ve(inst,dat,lbls,lbl,const.E)
-        ret[const.V] = v
-        ret[const.E] = e
+        e    = create_kg_ve(inst,dat,lbls,lbl,const.constants.E)
+        ret[const.constants.V] = v
+        ret[const.constants.E] = e
     return ret 
 
 ############################################################################
@@ -1760,31 +1843,31 @@ def build_kg(inst,dat=[],brn={},splits=2):
 def append_kg(ret={},dat={}):
     v    = []
     e    = []
-    if not (ret == {} or dat == {} or len(dat[const.V]) == 0 or len(dat[const.E]) == 0):
+    if not (ret == {} or dat == {} or len(dat[const.constants.V]) == 0 or len(dat[const.constants.E]) == 0):
         # vertices
-        rv   = ret[const.V]
-        dv   = dat[const.V]
+        rv   = ret[const.constants.V]
+        dv   = dat[const.constants.V]
         if not (len(rv) == 0):
             v    = extend(rv,dv)
         else:
             v    = dv
         # edges
-        re   = ret[const.E]
-        de   = dat[const.E]
+        re   = ret[const.constants.E]
+        de   = dat[const.constants.E]
         if not (len(re) == 0):
             e    = extend(re,de)
         else:
             e    = de
-    return {const.V:v,const.E:e}
+    return {const.constants.V:v,const.constants.E:e}
 
 ############################################################################
 ##
 ## Purpose:   Create a knowledge graph
 ##
 ############################################################################
-def create_kg(inst=const.BVAL,dat=[],splits=2,permu=[]):
-    ret  = {const.V:[],const.E:[]}
-    if not (inst <= const.BVAL or len(dat) == 0 or splits < 2):
+def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[]):
+    ret  = {const.constants.V:[],const.constants.E:[]}
+    if not (inst <= const.constants.BVAL or len(dat) == 0 or splits < 2):
         # number of cpu cores
         nc   = mp.cpu_count()
         # generate the brains
@@ -1797,12 +1880,12 @@ def create_kg(inst=const.BVAL,dat=[],splits=2,permu=[]):
 
 # *************** TESTING *****************
 
-def ai_testing(M=500,N=2):
+def ai_testing(M=500,N=3):
     # number of data points, properties and splits
     m    = M
     p    = N
-    if p > const.MAX_FEATURES:
-        p    = const.MAX_FEATURES
+    if p > const.constants.MAX_FEATURES:
+        p    = const.constants.MAX_FEATURES
     #s    = p + 1
     s    = p
     # uniformly sample values between 0 and 1
@@ -1812,16 +1895,16 @@ def ai_testing(M=500,N=2):
     kg   = create_kg(0,ivals,s)
     print(kg[0])
     # test ocr
-    o    = ocr(["/home/robert/data/files/kg.pdf"],0)
-    print(o)
+    #o    = ocr(["/home/robert/data/files/kg.pdf"],0)
+    #print(o)
     # create column names (normally obtained by var.dtype.names)
+    inst = 0
     coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
     # test the thought function with the default number of predictions 3
-    print(thought(inst,coln))
+    print(thought(inst,list(coln.items())))
     # get the default configuration
     cfg  = config.cfg()
     # ordering of the data elements in the JSON file
-    inst = 0
     src  = cfg["instances"][inst]["src"]["index"]
     typ  = cfg["instances"][inst]["src"]["types"]["glove"]
     # glove file
@@ -1835,27 +1918,27 @@ def ai_testing(M=500,N=2):
         print("GloVe: "+str(leng))
     print(data.permute(range(0,len(ivals[0]))))
     print(brain(ivals))
-    imgs = convert_from_path("/home/robert/data/files/kg.pdf")
-    print(imgs)
-    for img in imgs:
-        pil2 = pil2array(img)
+    #imgs = convert_from_path("/home/robert/data/files/kg.pdf")
+    #print(imgs)
+    #for img in imgs:
+        #pil2 = pil2array(img)
         #print(pil2)
-    src,typ,key,host,url,hdrs,parms = cognitive(docs=imgs,inst=0)
-    print(src)
-    print(typ)
-    print(key)
-    print(host)
-    print(url)
-    print(hdrs)
-    print(parms)
+    #src,typ,key,host,url,hdrs,parms = cognitive(docs=imgs,inst=0)
+    #print(src)
+    #print(typ)
+    #print(key)
+    #print(host)
+    #print(url)
+    #print(hdrs)
+    #print(parms)
     # we need values to turn into labels when training
     # one-hot encode the integer labels as its required for the softmax
-    ovals= nn.categoricals(M,s,p)
+    ovals= np.asarray(nn.categoricals(M,s,p))
     # generate the model for using the test values for training
     model = dbn(ivals,ovals,splits=s,props=p)
     if not (model == None):
         # generate some test data for predicting using the model
-        ovals= np.random.sample(size=(m/10,p))
+        ovals= np.random.sample(size=(np.int8(m/10),p))
         # encode and decode values
         pvals= model.predict(ovals)
         # look at the original values and the predicted values
