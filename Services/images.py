@@ -10,7 +10,7 @@
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      May 06, 2020
+## Date:      Nov. 22, 2021
 ##
 ############################################################################
 
@@ -19,8 +19,12 @@ from string                                         import punctuation
 from math                                           import ceil,log,exp
 from PIL                                            import ImageDraw,Image
 
-from keras.utils                                    import to_categorical
-from keras.models                                   import load_model
+if ver == const.constants.VER:
+    from            keras.models                            import Sequential,load_model,Model
+    from            keras.utils.np_utils                    import to_categorical
+else:
+    from tensorflow.keras.models                            import Sequential,load_model,Model
+    from tensorflow.keras.utils                             import to_categorical
 
 from data                                           import url_kg,read_kg,sodaget,permute
 from services                                       import images,kg
@@ -50,10 +54,10 @@ np.random.seed(12345)
 ## Purpose:   Process the image data
 ##
 ############################################################################
-def permutes(lk=const.MAX_FEATURES):
+def permutes(lk=const.constants.MAX_FEATURES):
     ret  = []
-    if not (lk <= const.MAX_FEATURES):
-        perma= permute(range(0,lk),False,const.MAX_FEATURES)
+    if not (lk <= const.constants.MAX_FEATURES):
+        perma= permute(range(0,lk),False,const.constants.MAX_FEATURES)
         for a in perma:
             ret.append(a)
             #permb= permute(a)
@@ -127,13 +131,13 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                             imprs       = re.split(simpr,sg[fl][sel["splimprint"]].lower())
                             impr        = "".join(imprs)
                             kimpr[impr] = sg[fl][sel["splimprint"]]
-                    ents = list(np.append(imprs,np.append(impr,data.unique(np.append(cdat[fl][const.IMG],scrs)))))
+                    ents = list(np.append(imprs,np.append(impr,data.unique(np.append(cdat[fl][const.constants.IMG],scrs)))))
                     ent.extend(ents)
                     # each ents return is an array of entity arrays; search wikipedia for the entity
                     # tie each of the returns from the OCR imprint extraction to the entities in the script string
                     rdat = extendglove(ents ,rdat if not (rdat == None) else gfl[0])
                     # grab the wikipedia data
-                    wikis= cognitive(const.WIK,scrs,inst,objd,testing)
+                    wikis= cognitive(const.constants.WIK,scrs,inst,objd,testing)
                     # add the wikipedia data to the extended glove data set
                     rdat = extendglove(wikis,rdat if not (rdat == None) else gfl[0])
             # limit the data and revert the keys back to having the original imprints when possible
@@ -163,7 +167,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
             perms= permutes(len(keys))
             kgdat= create_kg(inst,vals,2,perms)
             # populate the knowledge graphs with the data
-            k1   = kg(const.V,inst,coln,kgdat,g,True,testing)
+            k1   = kg(const.constants.V,inst,coln,kgdat,g,True,testing)
             # see the extended glove data
             ret  = rdat
         else:
@@ -209,7 +213,7 @@ def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
                     #
                     # for each file predicted
                     cont = True
-                    for i in cdat[fl][const.IMG]:
+                    for i in cdat[fl][const.constants.IMG]:
                         if cont:
                             # transformation of this imprint to match how it would have been stored
                             spl  = "|".join(p for p in punc if p in i)

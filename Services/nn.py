@@ -133,7 +133,7 @@ def dbnlayers(model=None,outp=const.constants.OUTP,shape=None,act=None,useact=Fa
 ############################################################################
 def dbn(inputs=[]
        ,outputs=[]
-       ,sfl=const.constants.SFL
+       ,sfl=None#const.constants.SFL
        ,splits=const.constants.SPLITS
        ,props=const.constants.PROPS
        ,clust=const.constants.BVAL
@@ -219,7 +219,7 @@ def dbn(inputs=[]
             p    = min(const.constants.MAX_FEATURES,props)#if not op.any() else min(const.constants.MAX_FEATURES,min(props,op.shape[len(op.shape)-1]))
             if M > p:
                 dbnlayers(model,p,M,'tanh' if ver == const.constants.VER else 'selu',useact)
-                M    = max(int(ceil(log(p,S)/2.0)),p)
+                M    = min(max(1,int(ceil(log(p,S)/2.0))),p)
                 # project the outputs into the lower dimensional subspace
                 #op   = np.asarray(op)[:,:(S**(2*p))]
         # add the rest of the layers according to the writings
@@ -294,15 +294,23 @@ def dbn(inputs=[]
             vpct = 1.0 - (const.constants.TRAIN_PCT if hasattr(const.constants,"TRAIN_PCT") else 0.8)
             x    = ip.astype(np.single)
             y    = op.astype(np.single)
-            if ver == const.constants.VER:
-                model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose,callbacks=[chkpt],validation_split=vpct)
+            if vpct * len(x) <= 1:
+                # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
+                # fit the model using the flattened inputs and outputs
+                if ver == const.constants.VER:
+                    model.fit(x=ip,y=op,nb_epoch =epochs,verbose=verbose)
+                else:
+                    model.fit(x=ip,y=op,   epochs=epochs,verbose=verbose)
             else:
-                model.fit(x=x,y=y,   epochs=epochs,verbose=verbose,callbacks=[chkpt],validation_split=vpct)
-            # file type extension
-            flt  = sfl[ sfl.rfind("."):]
-            # save the model
-            nsfl = fln + "_" + dt + flt
-            model.save(nsfl)
+                if ver == const.constants.VER:
+                    model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose,callbacks=[chkpt],validation_split=vpct)
+                else:
+                    model.fit(x=x,y=y,   epochs=epochs,verbose=verbose,callbacks=[chkpt],validation_split=vpct)
+                # file type extension
+                flt  = sfl[ sfl.rfind("."):]
+                # save the model
+                nsfl = fln + "_" + dt + flt
+                model.save(nsfl)
         else:
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
@@ -781,7 +789,7 @@ class NN():
 ## Purpose:   Testing
 ##
 ############################################################################
-def nn_testing(dfl="csv/patients.csv",tfl="csv/medications.csv",jfl="csv/procedures.csv"):
+def nn_testing(M=500,N=3,dfl="/home/robert/data/csv/patients.csv",tfl="/home/robert/data/csv/medications.csv",jfl="/home/robert/data/csv/procedures.csv"):
     ret  = {"orig":None,"mod":None,"smth":None}
     if (os.path.exists(dfl) and os.stat(dfl).st_size > 0) and \
        (os.path.exists(tfl) and os.stat(tfl).st_size > 0) and \
@@ -797,9 +805,9 @@ def nn_testing(dfl="csv/patients.csv",tfl="csv/medications.csv",jfl="csv/procedu
         # test the base NN
         #
         # uniformly sample values between 0 and 1
-        m    = 500
-        s    = 3
-        p    = 3
+        m    = M
+        p    = min(const.constants.MAX_FEATURES,N)
+        s    = p
         ivals= np.random.sample(size=(m,p))
         ovals= categoricals(m,s,p)
         # generate the clustering model for using the test values for training

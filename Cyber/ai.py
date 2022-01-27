@@ -46,6 +46,10 @@ from PIL                          import Image
 
 from datetime                     import datetime
 
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+
 import requests
 import io
 import json
@@ -254,7 +258,7 @@ def brain(dat=[],splits=2,permu=[]):
         # add all models to the return
         for perm in perms:
             # model label
-            lbl  = '-'.join(map(str,perm))
+            lbl  = const.constants.SEP.join(map(str,perm))
             # number of data points, properties and splits
             m    = len(dat)
             p    = len(perm) - 1
@@ -1760,7 +1764,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
 ## Purpose:   Define edges between vertices of a knowledge graph
 ##
 ############################################################################
-def edges(clus=None,rows=[]):
+def edges(clus=None,rows=[],limit=True):
     ret  = None
     if not (clus == None or len(rows) == 0):
         # number of cpu cores
@@ -1768,7 +1772,15 @@ def edges(clus=None,rows=[]):
         # append the data point row numbers of those data points that are connected to the i-th data point in the current cluster
         #
         # have to sourround [x] so that extend doesn't separate the characters
-        tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i]]) for i in range(0,len(rows)))
+        if not limit:
+            # all possible connections that form edges
+            tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i]])                                                      for i in range(0,len(rows)))
+        else:
+            # random field and graph theory states that full connectivity
+            # occurs (within a cluster) if each vertex in said cluster connects
+            # to O(logN) of its neighbors
+            #tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[i] in rows[j:min(len(rows),j+int(ceil(log(len(rows)))))]]) for i in range(0,len(rows)))
+            tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i] and rows[i] in rows[j:(j+int(ceil(log(len(rows)))))]]) for i in range(0,len(rows)))
         # append the cluster number
         ret  = Parallel(n_jobs=nc)(delayed(extend1)(clus,tret[i]) for i in range(0,len(tret)))
     return ret
@@ -1786,7 +1798,7 @@ def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None):
         if ve == const.constants.V:
             # only need to append the unique id defined by the row label to the data row
             # this is the set of vertices for each data point in the data set
-            ret  = Parallel(n_jobs=nc)(delayed(extend)(str(inst)+'-'+lbl+'-'+lbls[i],dat[i]) for i in range(0,len(lbls)))
+            ret  = Parallel(n_jobs=nc)(delayed(extend)(str(inst)+const.constants.SEP+lbl+const.constants.SEP+lbls[i],dat[i]) for i in range(0,len(lbls)))
         else:
             # which cluster has been identified for storing the data
             clus = Parallel(n_jobs=nc)(delayed(split)(lbls[i]  ) for i in range(0,len(lbls)))
@@ -1891,17 +1903,11 @@ def ai_testing(M=500,N=3):
     # uniformly sample values between 0 and 1
     #ivals= np.random.sample(size=(500,3))
     ivals= np.random.sample(size=(m,p))
-    # create the data for the sample knowledge graph
-    kg   = create_kg(0,ivals,s)
-    print(kg[0])
     # test ocr
     #o    = ocr(["/home/robert/data/files/kg.pdf"],0)
     #print(o)
-    # create column names (normally obtained by var.dtype.names)
+    # set the default instance number
     inst = 0
-    coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
-    # test the thought function with the default number of predictions 3
-    print(thought(inst,list(coln.items())))
     # get the default configuration
     cfg  = config.cfg()
     # ordering of the data elements in the JSON file
@@ -1909,6 +1915,79 @@ def ai_testing(M=500,N=3):
     typ  = cfg["instances"][inst]["src"]["types"]["glove"]
     # glove file
     gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
+    print(gfl)
+    # create the data for the sample knowledge graph
+    #
+    # create columns names (normally obtained by var.dtype.names)
+    f    = open(gfl[0])
+    nvals= np.asarray([row.split() for row in f.readlines()])
+    f.close()
+    vals = min(p,len(nvals[0]))
+    # can't use categoricals for the labels here
+    # throws an error for the list of things in the first column being longer than the number of labels
+    # yet this is ok for this application since all words in our corpus
+    # that's captured by the GloVe model bave non-zero probability of co-occurrence
+    # thus all words connect in one cluster (random field theory and markov property)
+    # which will be the case for floating pint labels sent to to_categorical
+    #
+    # because of the single brain (single model) forced by the last parameter to create_kg
+    # all other columns in the data set will be used to model the single first column
+    #
+    # the only other things is to change the behavior of which data points are connected
+    # to which and this will involve a little higher order probability theory which
+    # states that we have full connectivity, i.e. one cluster if each node in a network
+    # connects to O(logN) of its neighbors, where N is the total number of nodes
+    #
+    # the first column can be turned into categoricals by considering the theory that allows for choosing the number of clusters.
+    # Then, by separability, the marginal of the first column's cluster distribution can be learned using a DBN where categorical
+    # labels (using the number of clusters) as the output
+    #
+    # order of the categoricals are found as such
+    #
+    # sort the first column to obtain the sort order indices ... calculate the number of clusters and divide the data uniformly
+    # with labels represented in the right proportion ... uniformity is legitimate by the Central Limit Theorem giving an
+    # assumption of normality of the first column, but we order it, which allows us to assume a beta distribution whose parameters
+    # give uniformity by other arguments from the same theory that allows calculation of the number of clusters ... then, get the reverse
+    # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
+
+    #nvals[:,0]=list(range(1,len(nvals)+1))#[i/len(nvals) for i in range(len(nvals))]
+    #nvals=np.float64(nvals)
+    svals= np.argsort(nvals[:,1])
+    rints= list(range(1,nn.calcN(len(nvals))+1))
+    sints= int(ceil(len(nvals)/len(rints)))
+    tvals= []
+    for i in rints:
+        tvals.extend([[i] for j in range((i-1)*sints,min(i*sints,len(nvals)))])
+    #print(tvals)
+    nvs  = np.asarray([[int(i[0])] for i in np.asarray(tvals)[np.argsort(svals)]])
+    nvs1 = nvals[:,1:].astype(float)
+    print(nvs); print(len(nvs)); print(nvals.shape)
+    nvals= np.hstack((nvs,nvs1))
+    print(nvals[:,0])
+    #coln = {"col"+str(i):i for i in range(1,vals)}
+    #coln["word"]=0
+    #print(coln); print(coln.items())); print(list(coln.items()))
+    #kgdat= create_kg(0,nvals[0:100,range(vals)],s,[tuple(list(range(vals)))])
+    #kgdat= create_kg(0,nvals[0:500,range(vals)],s)
+    #print(kgdat[0])
+    # create column names (normally obtained by var.dtype.names)
+    coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    print(coln); print(coln.items()); print(list(coln.items()))
+    # create the data for the sample knowledge graph
+    #kgdat= create_kg(0,ivals,s,[tuple(list(range(len(ivals))))])
+    kgdat= create_kg(0,ivals,s)
+    print(kgdat[0])
+    # instantiate a JanusGraph object
+    graph= Graph()
+    # connection to the remote server
+    conn = DriverRemoteConnection(data.url_kg(inst),'g')
+    # get the remote graph traversal
+    g    = graph.traversal().withRemote(conn)
+    # write the knowledge graph
+    print([data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat])
+    print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
+    # test the thought function with the default number of predictions 3
+    print(thought(inst,list(coln.items())))
     # test glove output
     g    = extendglove(["README.txt","README.txt"],gfl[0])
     leng = len(g)
@@ -1917,6 +1996,7 @@ def ai_testing(M=500,N=3):
     else:
         print("GloVe: "+str(leng))
     print(data.permute(range(0,len(ivals[0]))))
+    print("brain: ")
     print(brain(ivals))
     #imgs = convert_from_path("/home/robert/data/files/kg.pdf")
     #print(imgs)
