@@ -1764,7 +1764,7 @@ def cyberglove(docs=[],words=0,ngrams=3,splits=2,props=2):
 ## Purpose:   Define edges between vertices of a knowledge graph
 ##
 ############################################################################
-def edges(clus=None,rows=[],limit=True):
+def edges(clus=None,rows=[],limit=False):
     ret  = None
     if not (clus == None or len(rows) == 0):
         # number of cpu cores
@@ -1790,7 +1790,7 @@ def edges(clus=None,rows=[],limit=True):
 ## Purpose:   Create vertices and edges of a knowledge graph
 ##
 ############################################################################
-def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None):
+def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None,limit=False):
     ret  = None
     if not (inst <= const.constants.BVAL or len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
         # number of cpu cores
@@ -1808,7 +1808,7 @@ def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None):
             # only need to extract the cluster label to go along with the brain label that was passed in
             # the edges will consist of the cluster label, brain label and connected data point pairs
             # this shows which data points are connected to form a cluster under the model in the current brain
-            ret  = Parallel(n_jobs=nc)(delayed(edges)(ucs[i],[x for j,x in enumerate(rows) if clus[j] == ucs[i]]) for i in range(0,len(ucs)))
+            ret  = Parallel(n_jobs=nc)(delayed(edges)(ucs[i],[x for j,x in enumerate(rows) if clus[j] == ucs[i]],limit) for i in range(0,len(ucs)))
     return ret
 
 ############################################################################
@@ -1816,7 +1816,7 @@ def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None):
 ## Purpose:   Heavy lift of creating a knowledge graph
 ##
 ############################################################################
-def build_kg(inst,dat=[],brn={},splits=2):
+def build_kg(inst,dat=[],brn={},splits=2,limit=False):
     ret  = {const.constants.V:[],const.constants.E:[]}
     if not (inst == None  or
             inst < 0      or
@@ -1840,9 +1840,9 @@ def build_kg(inst,dat=[],brn={},splits=2):
         # generate the labels for the data
         lbls = label(preds)
         # create the vertices
-        v    = create_kg_ve(inst,dat,lbls,lbl,const.constants.V)
+        v    = create_kg_ve(inst,dat,lbls,lbl,const.constants.V,limit)
         # create the edges
-        e    = create_kg_ve(inst,dat,lbls,lbl,const.constants.E)
+        e    = create_kg_ve(inst,dat,lbls,lbl,const.constants.E,limit)
         ret[const.constants.V] = v
         ret[const.constants.E] = e
     return ret 
@@ -1877,7 +1877,7 @@ def append_kg(ret={},dat={}):
 ## Purpose:   Create a knowledge graph
 ##
 ############################################################################
-def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[]):
+def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[],limit=False):
     ret  = {const.constants.V:[],const.constants.E:[]}
     if not (inst <= const.constants.BVAL or len(dat) == 0 or splits < 2):
         # number of cpu cores
@@ -1885,7 +1885,7 @@ def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[]):
         # generate the brains
         brns = brain(dat,splits,permu)
         # generate the vertices and edges
-        bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits) for brn in brns)
+        bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits,limit) for brn in brns)
         rret = ret
         ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
     return ret
@@ -1975,7 +1975,7 @@ def ai_testing(M=500,N=3):
     print(coln); print(coln.items()); print(list(coln.items()))
     # create the data for the sample knowledge graph
     #kgdat= create_kg(0,ivals,s,[tuple(list(range(len(ivals))))])
-    kgdat= create_kg(0,ivals,s)
+    kgdat= create_kg(0,ivals,s,limit=True)
     print(kgdat[0])
     # instantiate a JanusGraph object
     graph= Graph()
