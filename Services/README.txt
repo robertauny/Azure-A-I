@@ -1,12 +1,12 @@
-1.  The cyber.py file is the main driver code and it picks up after the data from the different data sources has been collected and merged into the data warehouse.
+1.  The services.py file is the main driver code and it picks up after the data from the different data sources has been collected and merged into the data warehouse.
 
-2.  Within data.py, there are functions to access the data housed within the data warehouse, which relies, in large part, on the data definitions defined in the cyber.json configuration file.
+2.  Within data.py, there are functions to access the data housed within the data warehouse, which relies, in large part, on the data definitions defined in the services.json configuration file.
 
-3.  An instance number relates to a set of configuration items in cyber.json.  It is used to identify a set of related data elements to be used when creating the knowledge graph using the knowledge graph functions within cyber.py.
+3.  An instance number relates to a set of configuration items in services.json.  It is used to identify a set of related data elements to be used when creating the knowledge graph using the knowledge graph functions within services.py.
 
 4.  The created knowledge graph can be read from (and written to) the knowledge graph DB using functions in data.py.
 
-5.  Functions in ai.py allow for labeling clusters, generating a knowledge "brain", consisting of a set of related knowledge graphs and associated neural networks, each generated from a different permutation of the original data set.  Each data set is a different ordering of the inputs, resulting in a different hierarchy that is necessary for cyber when modeling one input as a function of all others.  In addition, there is an unfinished function "thought" within ai.py which is intended to return the result of a prediction from the appropriate model in the knowledge brain.
+5.  Functions in ai.py allow for labeling clusters, generating a knowledge "brain", consisting of a set of related knowledge graphs and associated neural networks, each generated from a different permutation of the original data set.  Each data set is a different ordering of the inputs, resulting in a different hierarchy that is necessary for services when modeling one input as a function of all others.  In addition, there is an unfinished function "thought" within ai.py which is intended to return the result of a prediction from the appropriate model in the knowledge brain.
 
 6.  # spark sqlContext should be used when writing to/from the graph DB
     # to create the data frame of edges and vertices in the following format
