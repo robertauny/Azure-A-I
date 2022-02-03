@@ -1,16 +1,3 @@
-############################################################################
-# Begin license text.
-# Copyright 2020 Robert A. Murphy
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# End license text.
-############################################################################
-
 #!/usr/bin/python
 
 ############################################################################
@@ -23,7 +10,7 @@
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Dec. 24, 2019
+## Date:      Nov. 22, 2021
 ##
 ############################################################################
 
@@ -110,10 +97,10 @@ def permute(dat=[],mine=True,l=3):
 ## Purpose:   Use SODAPy to get data
 ##
 ############################################################################
-def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
+def sodaget(inst=const.constants.BVAL,pill={},objd=True,lim=0,train=False):
     ret  = {}
     lpill= len(pill)
-    if not (inst <= const.BVAL or lpill == 0):
+    if not (inst <= const.constants.BVAL or lpill == 0):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["src"]["index"]
         typ  = cfg["instances"][inst]["src"]["types"]["pill"]
@@ -156,7 +143,7 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                     # because too many results are returned that are not useful
                     #
                     # image values
-                    p    = pill[keys][const.IMG] if objd else vals
+                    p    = pill[keys][const.constants.IMG] if objd else vals
                     p1   = unique(p)
                     #if not (len(p1) == 1):
                         #p1   = [v for v in p1 if len(v) > 1]
@@ -209,8 +196,8 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
                                 if not (len(ret[keys]) <= 1):
                                     # if object detection is turned on
                                     if objd:
-                                        o    = pill[keys][const.OBJ]
-                                        s    = pill[keys][const.SHP]
+                                        o    = pill[keys][const.constants.OBJ]
+                                        s    = pill[keys][const.constants.SHP]
                                         # try to check the color
                                         clrs = np.append([o0.lower() for o0 in o[0]],[o[i].lower() for i in range(1,len(o))])
                                         bret = [(a.lower() in clrs) for a in ret[keys][clr].to_list()]
@@ -278,9 +265,9 @@ def sodaget(inst=const.BVAL,pill={},objd=True,lim=0,train=False):
 ## Purpose:   Get the URL to the knowledge graph
 ##
 ############################################################################
-def url_kg(inst=const.BVAL):
+def url_kg(inst=const.constants.BVAL):
     ret  = None
-    if not (inst <= const.BVAL):
+    if not (inst <= const.constants.BVAL):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["kg"]
         # subscription key
@@ -311,9 +298,9 @@ def url_kg(inst=const.BVAL):
 ## Purpose:   Read a knowledge graph from the remote DB
 ##
 ############################################################################
-def read_kg(inst=const.BVAL,coln=[],g=None):
+def read_kg(inst=const.constants.BVAL,coln=[],g=None):
     ret  = {"fl":[],"labels":[],"nns":[],"dat":[]}
-    if not (inst <= const.BVAL or len(coln) == 0):
+    if not (inst <= const.constants.BVAL or len(coln) == 0):
         drop = False
         # column keys and values
         ckeys= np.asarray(coln)[:,0]
@@ -341,9 +328,9 @@ def read_kg(inst=const.BVAL,coln=[],g=None):
             # create the label that defines the ID of the data
             lbl  = [str(inst)]
             lbl.extend(cvals)
-            lbl  = const.SEP.join(map(str,lbl))
+            lbl  = const.constants.SEP.join(map(str,lbl))
             # read all files matching the current pattern determined by lbl
-            fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind(const.SEP)] == lbl} for r,d,f in os.walk(home+"/data/")]
+            fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind(const.constants.SEP)] == lbl} for r,d,f in os.walk(home+"/data/")]
             if not (len(fls) == 0 or len(fls[0]) == 0):
                 for fl in fls:
                     # file keys and values
@@ -426,12 +413,12 @@ def write_ve(stem=None,coln=[],kgdat=[],g=None):
     lkg0 = len(kgdat)
     # creating vertices/edges for exactly one KG
     if not (stem == None or lcol == 0 or lkg0 == 0 or g == None):
-        if stem == const.V:
+        if stem == const.constants.V:
             cols = np.asarray(coln)[:,0]
             # create IDs using the ID defined by the vertices
-            ret  = kgdat[0].split(const.SEP)
+            ret  = kgdat[0].split(const.constants.SEP)
             if not (len(ret) <= 1):
-                ret  = [const.SEP.join(np.asarray(ret)[range(0,len(ret)-1)])]
+                ret  = [const.constants.SEP.join(np.asarray(ret)[range(0,len(ret)-1)])]
             for i in range(0,len(kgdat)):
                 if i == 0:
                     # add the ID
@@ -472,9 +459,9 @@ def write_we(r=[],coln=[],kgdat=[],g=None):
                     v2   = r[j][1]
                     c2   = kgdat[j][1]
                     # create the ID
-                    ids12= const.SEP.join((ids1,ids2))
+                    ids12= const.constants.SEP.join((ids1,ids2))
                     # create the edge between the vertices in question
-                    g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
+                    g.V(v1).has("id",ids1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",np.exp(np.dot(c1,c2))).fold()
             ret  = True
     return ret
 
@@ -483,21 +470,21 @@ def write_we(r=[],coln=[],kgdat=[],g=None):
 ## Purpose:   Heavy lift of writing a knowledge graph with needed NLP
 ##
 ############################################################################
-def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
+def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=True):
     ret  = None
-    if not (stem == None or inst <= const.BVAL or len(coln) == 0 or len(kgdat) == 0 or g == None):
-        if stem in [const.V,const.E]:
+    if not (stem == None or inst <= const.constants.BVAL or len(coln) == 0 or len(kgdat) == 0 or g == None):
+        if stem in [const.constants.V,const.constants.E]:
             # ordering of the data elements in the JSON file
             src  = cfg["instances"][inst]["kg"]
             # file extension
             ext  = cfg["instances"][inst]["sources"][src]["connection"]["ext" ]
             # current set of vertices
-            vert = kgdat[const.V]
+            vert = kgdat[const.constants.V]
             # returns for the current stem, one KG row at a time
-            ret  = [write_ve(const.V,coln,k,g) for k in vert]
+            ret  = [write_ve(const.constants.V,coln,k,g) for k in vert]
             # possibly have multiple clusters and multiple rows in that cluster
-            for clus in kgdat[const.E]:
-                if not (len(clus) == 0 or len(clus[0]) == 0):
+            for clus in kgdat[const.constants.E]:
+                if not (len(clus) == 0):# or len(clus[0]) == 0): # for the limit on edges in a cluster
                     # needed length for the weight of the edge
                     lclus= float(len(clus))
                     crow = []
@@ -508,14 +495,14 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                             row1 = int(row[1])
                             row2 = int(row[2])
                             # create the ID
-                            ids1 = ret[row1-1][0] + const.SEP + str(row1)
-                            ids2 = ret[row2-1][0] + const.SEP +                         str(row2)
-                            ids12= ret[row1-1][0] + const.SEP + str(row1) + const.SEP + str(row2)
+                            ids1 = ret[row1-1][0] + const.constants.SEP + str(row1)
+                            ids2 = ret[row2-1][0] + const.constants.SEP +                                   str(row2)
+                            ids12= ret[row1-1][0] + const.constants.SEP + str(row1) + const.constants.SEP + str(row2)
                             # get vertices associated to the IDs in question
                             v1   = ret[row1-1][1]
                             v2   = ret[row2-1][1]
                             # create the edge between the vertices in question
-                            g.V(v1).has("id",ids1).addE(const.E).to(v2).property("id",ids12).property("weight",lblk/lclus).next()
+                            g.V(v1).has("id",ids1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",lblk/lclus).next()
                             # add the current row1 value to the list of rows in this cluster
                             crow.append(row1)
                     # write the graph to disk
@@ -539,11 +526,11 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                 g.E().drop().iterate()
                 g.V().drop().iterate()
         else:
-            if stem == const.ENTS:
+            if stem == const.constants.ENTS:
                 # read the graph associated with this sequence of columns
                 kg   = read_kg(inst,coln,g)
                 # returns for the current stem, one KG row at a time
-                ret  = [write_ve(const.V,[["word"]],[str(k[0])],g) for k in kgdat]
+                ret  = [write_ve(const.constants.V,[["word"]],[str(k[0])],g) for k in kgdat]
                 # write the edges for these words just returned in ret
                 if not (ret == None):
                     # write the edges to the graph
@@ -555,7 +542,7 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                     g.E().drop().iterate()
                     g.V().drop().iterate()
             else:
-                if stem == const.CONS:
+                if stem == const.constants.CONS:
                     # read the graph associated with this sequence of columns
                     kg   = read_kg(inst,coln,g)
                     # we should have the phrases and the sentiment in 2 separate blocks
@@ -582,24 +569,24 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
                                 if not (l == 1):
                                     for i in range(0,l-1):
                                         # the word in question
-                                        ret  = [write_ve(const.V,cols,["word",words[i],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                                        ret  = [write_ve(const.constants.V,cols,["word",words[i],kgdat[1][k][0],kgdat[1][k][1]],g)]
                                         if ret == None:
                                             continue
                                         # obtain the vertex ID associated with this word
                                         v1   = ret[0][1]
                                         for j in range(i+1,l):
                                             # the word in question
-                                            ret  = [write_ve(const.V,cols,["word",words[j],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                                            ret  = [write_ve(const.constants.V,cols,["word",words[j],kgdat[1][k][0],kgdat[1][k][1]],g)]
                                             if ret == None:
                                                 continue
                                             # obtain the vertex ID associated with this word
                                             v2   = ret[0][1]
                                             # create the ID
-                                            ids12= const.SEP.join((words[i],words[j]))
+                                            ids12= const.constants.SEP.join((words[i],words[j]))
                                             # add the edge
-                                            g.V(v1).addE(const.E).to(v2).property("id",ids12).property("weight",kgdat[1][k][1]**2).next()
+                                            g.V(v1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",kgdat[1][k][1]**2).next()
                                 else:
-                                    ret  = [write_ve(const.V,cols,["word",words[0],kgdat[1][k][0],kgdat[1][k][1]],g)]
+                                    ret  = [write_ve(const.constants.V,cols,["word",words[0],kgdat[1][k][0],kgdat[1][k][1]],g)]
                     # write the graph to disk
                     g.io(kg["fl"][0]).write().iterate()
                     # drop all of the data that was just loaded
@@ -618,8 +605,8 @@ def write_kg(stem=None,inst=const.BVAL,coln=[],kgdat=[],g=None,drop=True):
 ## Purpose:   Read/write a knowledge graph from/to a graph DB using spark
 ##
 ############################################################################
-def rw_kg(inst=const.BVAL,df=None,testing=True):
-    if not (inst <= const.BVAL):
+def rw_kg(inst=const.constants.BVAL,df=None,testing=True):
+    if not (inst <= const.constants.BVAL):
         # ordering of the data elements in the JSON file
         kg   = cfg["instances"][inst]["kg"]
         # configuration parameters
@@ -708,9 +695,9 @@ def rw_kg(inst=const.BVAL,df=None,testing=True):
 ## Purpose:   Housekeeping done when logging into a graph DB.
 ##
 ############################################################################
-def blob_conf_set(inst=const.BVAL,acc=None,testing=True):
+def blob_conf_set(inst=const.constants.BVAL,acc=None,testing=True):
     ret  = False
-    if not (inst <= const.BVAL or acc == None):
+    if not (inst <= const.constants.BVAL or acc == None):
         # ordering of the data elements in the JSON file
         wh   = cfg["instances"][inst]["wh"]
         # configuration parameters
@@ -729,8 +716,8 @@ def blob_conf_set(inst=const.BVAL,acc=None,testing=True):
 ## Purpose:   Read/write data from/to a data warehouse using spark
 ##
 ############################################################################
-def rw_warehouse(inst=const.BVAL,df=None,testing=True):
-    if not (inst <= const.BVAL):
+def rw_warehouse(inst=const.constants.BVAL,df=None,testing=True):
+    if not (inst <= const.constants.BVAL):
         # ordering of the data elements in the JSON file
         wh   = cfg["instances"][inst]["wh"]
         # configuration parameters
@@ -794,4 +781,4 @@ def data_testing(inst=0):
     src  = cfg["instances"][inst]["src"]["index"]
     mysql= cfg["instances"][inst]["src"]["types"]["mysql"]
     host = cfg["instances"][inst]["sources"][src][mysql]["connection"]["host"]
-    print(str(src)+const.SEP+str(mysql)+const.SEP+host)
+    print(str(src)+const.constants.SEP+str(mysql)+const.constants.SEP+host)
