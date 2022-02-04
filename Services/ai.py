@@ -1,16 +1,3 @@
-############################################################################
-# Begin license text.
-# Copyright 2020 Robert A. Murphy
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# End license text.
-############################################################################
-
 #!/usr/bin/python
 
 ############################################################################
@@ -333,7 +320,7 @@ def brain(dat=[],splits=2,permu=[]):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=0,coln=[],preds=3):
+def thought(inst=0,coln=[],preds=3,res=True):
     ret  = {}
     if not (inst == None or len(coln) == 0 or preds < 0):
         # ordering of the data elements in the JSON file
@@ -443,10 +430,13 @@ def thought(inst=0,coln=[],preds=3):
                                             # the sum of the mean (prediction of the median here) and gaussian noise
                                             # which we can do because the model gives the underlying subspace
                                             # which is just the best estimate of the data (or equilibrium distribution)
-                                            prds         = rmdl.predict(np.asarray(rdat))
+                                            prds         = np.asarray(rmdl.predict(np.asarray(rdat)))
                                             # the mean and variance are computed using theory from
                                             # A Predictive Model using the Markov Property
-                                            ret[lbls[m]] = [prds[i][0] + np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)]
+                                            residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[i,0]))[:,0] if   \
+                                                           res                                                       else \
+                                                           [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
+                                            ret[lbls[m]] = prds[:,0] + residuals
                                 else:
                                     # just return the data point for other uses (e.g. pill images) since
                                     # the data point will correspond to a label from the extended GloVe data set
@@ -1787,7 +1777,7 @@ def edges(clus=None,rows=[],limit=False):
         # have to sourround [x] so that extend doesn't separate the characters
         if not limit:
             # all possible connections that form edges
-            tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i]])                                                      for i in range(0,len(rows)))
+            tret = Parallel(n_jobs=nc)(delayed(extend1)(rows[i],[[x] for j,x in enumerate(rows) if rows[j] != rows[i]                                                     ]) for i in range(0,len(rows)))
         else:
             # random field and graph theory states that full connectivity
             # occurs (within a cluster) if each vertex in said cluster connects
@@ -2001,6 +1991,7 @@ def ai_testing(M=500,N=3):
     print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
     # test the thought function with the default number of predictions 3
     print(thought(inst,list(coln.items())))
+    print(thought(inst,list(coln.items()),res=False))
     # test glove output
     g    = extendglove(["README.txt","README.txt"],gfl[0])
     leng = len(g)
