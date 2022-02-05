@@ -66,7 +66,7 @@ import config
 import nn
 import data
 
-from nn import dbn,categoricals
+from nn import dbn,categoricals,calcC
 
 cfg  = config.cfg()
 
@@ -269,7 +269,7 @@ def brain(dat=[],splits=2,permu=[]):
             # produce regressors to segregate the data that amount to
             # projections onto the last feature of the data, as we are only using
             # the last of the input features in the definition of the outputs
-            odat = to_categorical(d[:,perm[0]],num_classes=splits**(2*p))
+            odat = to_categorical(calcC(d[:,perm[0]]).flatten(),num_classes=splits**(2*p))
             # generate the cluster model
             mdl  = dbn(d[:,perm[1:]],odat,splits=splits,props=p)
             # save the cluster model to a local file
@@ -1458,7 +1458,8 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2,opt=True):
                     # 
                     # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
                     # can consist of one unique value for each row of constants
-                    ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
+                    #ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
+                    ovals= to_categorical(calcC(gvals).flatten(),num_classes=(clust+1))
                     # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
                     # of a plane ... i.e. each row of constants defines an element of a conditional specification
                     #
@@ -1955,14 +1956,7 @@ def ai_testing(M=500,N=3):
 
     #nvals[:,0]=list(range(1,len(nvals)+1))#[i/len(nvals) for i in range(len(nvals))]
     #nvals=np.float64(nvals)
-    svals= np.argsort(nvals[:,1])
-    rints= list(range(1,nn.calcN(len(nvals))+1))
-    sints= int(ceil(len(nvals)/len(rints)))
-    tvals= []
-    for i in rints:
-        tvals.extend([[i] for j in range((i-1)*sints,min(i*sints,len(nvals)))])
-    #print(tvals)
-    nvs  = np.asarray([[int(i[0])] for i in np.asarray(tvals)[np.argsort(svals)]])
+    nvs  = calcC(nvals[:,1])
     nvs1 = nvals[:,1:].astype(float)
     print(nvs); print(len(nvs)); print(nvals.shape)
     nvals= np.hstack((nvs,nvs1))
@@ -2001,7 +1995,7 @@ def ai_testing(M=500,N=3):
         print("GloVe: "+str(leng))
     print(data.permute(range(0,len(ivals[0]))))
     print("brain: ")
-    print(brain(ivals))
+    print(brain(ivals,s))
     #imgs = convert_from_path("/home/robert/data/files/kg.pdf")
     #print(imgs)
     #for img in imgs:
