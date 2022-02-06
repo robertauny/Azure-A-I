@@ -79,16 +79,13 @@ logging.disable(logging.WARNING)
 ## Purpose:   Identify the cluster for the data row
 ##
 ############################################################################
-def store(dat=[],typ=None):
-    ret  = []
+def store(dat=[],arr=False):
+    ret  = None
     sz   = len(dat)
     if not (sz == 0):
         # which cluster has been identified for storing the data
         tdat = [j for j,x in enumerate(dat) if x == max(dat)]
-        if not (typ == None):
-            ret  = np.asarray(tdat) + 1
-        else:
-            ret  = tdat[0]
+        ret  = np.asarray(tdat) + 1 if arr else tdat[0]
     return ret
 
 ############################################################################
@@ -320,9 +317,9 @@ def brain(dat=[],splits=2,permu=[]):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=0,coln=[],preds=3,res=True):
+def thought(inst=0,coln=[],dat=None,res=True):
     ret  = {}
-    if not (inst == None or len(coln) == 0 or preds < 0):
+    if not (inst == None or len(coln) == 0):
         # ordering of the data elements in the JSON file
         src  = cfg["instances"][inst]["kg"]
         # file extension
@@ -353,95 +350,100 @@ def thought(inst=0,coln=[],preds=3,res=True):
                     # so what we will do is to manufacture a data point by taking the median of each
                     # column of the data defining the brain then predict the cluster for that data point
                     if not (len(dat1) == 0 or type(dat1[0]) == type(None)):
-                        pt   = []
-                        if not (dat1[m][0] == None):
-                            if not (len(dat1) <= 1):
-                                dat  = dat1[m]
-                                # if we have multiple medians (clusters), then combine them back into one data set
-                                # then use the entire data set to find the median used to get the correct cluster
-                                if len(dat1) > 2:
-                                    for d in dat1[1:(len(dat1)-1)]:
-                                        dat  = np.vstack((dat,d))
-                                    # note that we are getting data from the second column to the end
-                                    # because in the regression models, we are only expecting a single output
-                                    # with multiple inputs and the responses are in the first column
-                                    pt   = np.resize(np.median([row for row in dat[:,1:] if not (len(row) == 0)],axis=0),(1,len(dat[0])-1))
+                        if type(dat) == type(None):
+                            pt   = []
+                            preds= 0
+                            if not (dat1[m][0] == None):
+                                if not (len(dat1) <= 1):
+                                    dat  = dat1[m]
+                                    # if we have multiple medians (clusters), then combine them back into one data set
+                                    # then use the entire data set to find the median used to get the correct cluster
+                                    if len(dat1) > 2:
+                                        for d in dat1[1:(len(dat1)-1)]:
+                                            dat  = np.vstack((dat,d))
+                                        # note that we are getting data from the second column to the end
+                                        # because in the regression models, we are only expecting a single output
+                                        # with multiple inputs and the responses are in the first column
+                                        pt   = np.resize(np.median([row for row in dat[:,1:] if not (len(row) == 0)],axis=0),(1,len(dat[0])-1))
+                                    else:
+                                        pt   = np.resize(np.asarray(dat)[1:],(1,len(dat)-1))
                                 else:
-                                    pt   = np.resize(np.asarray(dat)[1:],(1,len(dat)-1))
-                            else:
-                                # if only one median (cluster), then use it as the point to get the cluster
-                                if not (len(dat1) == 0):
-                                    # note that we are getting data from the second column to the end
-                                    # because in the regression models, we are only expecting a single output
-                                    # with multiple inputs and the responses are in the first column
-                                    pt   = np.resize(np.asarray(dat1)[0,1:],(1,len(dat1[0])-1))
-                        if not (len(pt) == 0):
+                                    # if only one median (cluster), then use it as the point to get the cluster
+                                    if not (len(dat1) == 0):
+                                        # note that we are getting data from the second column to the end
+                                        # because in the regression models, we are only expecting a single output
+                                        # with multiple inputs and the responses are in the first column
+                                        pt   = np.resize(np.asarray(dat1)[0,1:],(1,len(dat1[0])-1))
+                                preds= 1
+                        else:
+                            pt   = dat
+                            preds= len(pt)
+                        if not (preds == 0):
                             # load the clustering model and make the cluster prediction for this data point
                             mdl  = load_model(fl)
-                            pred = store(mdl.predict(pt)[0],True)
+                            pred = store(mdl.predict(pt).flatten(),True)
                             # is the correct cluster being predicted, as referenced by the list pred
                             if int(lbls[m][e+1]) in pred:
-                                if not (preds == 0):
-                                    # regression neural networks for the predicted cluster
-                                    nnet = str(df["nns"][m])
-                                    # what we want to do is to use the regression network for this brain
-                                    # where the brain is obtained as the set of values in the dictionary
-                                    # coln and make the number of requested predictions preds ... this network
-                                    # is also defined by the labels when we remove the instance found before
-                                    # the first const.constants.SEP in the label and the cluster, which is found when removing characters
-                                    # after the last const.constants.SEP in the label ... then we just squeeze the remaining
-                                    # characters and prepend with the "models/" directory and add the ".h5" file ext
+                                # regression neural networks for the predicted cluster
+                                nnet = str(df["nns"][m])
+                                # what we want to do is to use the regression network for this brain
+                                # where the brain is obtained as the set of values in the dictionary
+                                # coln and make the number of requested predictions preds ... this network
+                                # is also defined by the labels when we remove the instance found before
+                                # the first const.constants.SEP in the label and the cluster, which is found when removing characters
+                                # after the last const.constants.SEP in the label ... then we just squeeze the remaining
+                                # characters and prepend with the "models/" directory and add the ".h5" file ext
+                                #
+                                # then get the column indices of the original data set that defines this brain
+                                cols = lbls[m][b:e].split(const.constants.SEP)
+                                # load the regression model for this brain so we can make the predictions
+                                # of the next input data points that will be seen beyond the current data set
+                                rfl  = str("models/"+"".join(cols)+".h5")
+                                if os.path.exists(rfl) and os.path.getsize(rfl) > 0:
+                                    # load the particular regression model for the chosen cluster
+                                    rmdl = load_model(rfl)
+                                    # so we load the model and make the predictions preds ... after making the
+                                    # requested number of predictions, we use the main clustering model that has
+                                    # almost the same name as the regression model, except we don't squeeze the remaining
+                                    # characters since we leave the const.constants.SEP in between ... we predict the cluster of the
+                                    # resulting predictions from the regression model so that we know which cluster model
+                                    # to use when making the final (more specific) regression predictions preds
                                     #
-                                    # then get the column indices of the original data set that defines this brain
-                                    cols = lbls[m][b:e].split(const.constants.SEP)
-                                    # load the regression model for this brain so we can make the predictions
-                                    # of the next input data points that will be seen beyond the current data set
-                                    rfl  = str("models/"+"".join(cols)+".h5")
-                                    if os.path.exists(rfl) and os.path.getsize(rfl) > 0:
-                                        # load the particular regression model for the chosen cluster
-                                        rmdl = load_model(rfl)
-                                        # so we load the model and make the predictions preds ... after making the
-                                        # requested number of predictions, we use the main clustering model that has
-                                        # almost the same name as the regression model, except we don't squeeze the remaining
-                                        # characters since we leave the const.constants.SEP in between ... we predict the cluster of the
-                                        # resulting predictions from the regression model so that we know which cluster model
-                                        # to use when making the final (more specific) regression predictions preds
-                                        #
-                                        # making the requested number of predictions by first predicting the next inputs
-                                        # that belong to the same distribution as that of this cluster
-                                        #
-                                        # the idea is that the final distribution changes with time ... so we need
-                                        # to make adjustments to the mean with time ... however, the variance will remain
-                                        # the same as we stay within the bounds of the original distribution with starting
-                                        # mean and variance already given (stationarity) but allowing for bounded adjustments
-                                        rdat = []
-                                        for i in range(0,preds):
-                                            npt  = rmdl.predict(pt)[0]
-                                            rdat.append(npt)
-                                            pt   = np.resize(npt,(1,len(npt)))
-                                        # starting mean and variance
-                                        mpt  = dat1[0          ][0]
-                                        vpt  = dat1[len(dat1)-1][0]
-                                        # using these data points, make the predictions using nnet
-                                        if os.path.exists(nnet) and os.path.getsize(nnet) > 0:
-                                            # load the particular regression model for the predicted cluster
-                                            rmdl         = load_model(nnet)
-                                            # markov property guarantees that the predictions will be
-                                            # the sum of the mean (prediction of the median here) and gaussian noise
-                                            # which we can do because the model gives the underlying subspace
-                                            # which is just the best estimate of the data (or equilibrium distribution)
-                                            prds         = np.asarray(rmdl.predict(np.asarray(rdat)))
-                                            # the mean and variance are computed using theory from
-                                            # A Predictive Model using the Markov Property
-                                            residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[i,0]))[:,0] if   \
-                                                           res                                                       else \
-                                                           [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
-                                            ret[lbls[m]] = prds[:,0] + residuals
-                                else:
-                                    # just return the data point for other uses (e.g. pill images) since
-                                    # the data point will correspond to a label from the extended GloVe data set
-                                    # as it is the median of the data (unchanged) so we can match it to get the label
-                                    ret["pred"] = coln[pred[0]][0]
+                                    # making the requested number of predictions by first predicting the next inputs
+                                    # that belong to the same distribution as that of this cluster
+                                    #
+                                    # the idea is that the final distribution changes with time ... so we need
+                                    # to make adjustments to the mean with time ... however, the variance will remain
+                                    # the same as we stay within the bounds of the original distribution with starting
+                                    # mean and variance already given (stationarity) but allowing for bounded adjustments
+                                    rdat = []
+                                    for i in range(0,preds):
+                                        npt  = rmdl.predict(pt)[0]
+                                        rdat.append(npt)
+                                        pt   = np.resize(npt,(1,len(npt)))
+                                    # starting mean and variance
+                                    mpt  = dat1[0          ][0]
+                                    vpt  = dat1[len(dat1)-1][0]
+                                    # using these data points, make the predictions using nnet
+                                    if os.path.exists(nnet) and os.path.getsize(nnet) > 0:
+                                        # load the particular regression model for the predicted cluster
+                                        rmdl         = load_model(nnet)
+                                        # markov property guarantees that the predictions will be
+                                        # the sum of the mean (prediction of the median here) and gaussian noise
+                                        # which we can do because the model gives the underlying subspace
+                                        # which is just the best estimate of the data (or equilibrium distribution)
+                                        prds         = np.asarray(rmdl.predict(np.asarray(rdat)))
+                                        # the mean and variance are computed using theory from
+                                        # A Predictive Model using the Markov Property
+                                        residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[i,0]))[:,0] if   \
+                                                       res                                                       else \
+                                                       [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
+                                        ret[lbls[m]] = prds[:,0] + residuals
+                        else:
+                            # just return the data point for other uses (e.g. pill images) since
+                            # the data point will correspond to a label from the extended GloVe data set
+                            # as it is the median of the data (unchanged) so we can match it to get the label
+                            ret["pred"] = coln[pred[0]][0]
         except Exception as err:
             ret["error"] = str(err)
     return ret

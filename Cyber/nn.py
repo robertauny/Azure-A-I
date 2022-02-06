@@ -1,16 +1,3 @@
-############################################################################
-# Begin license text.
-# Copyright 2020 Robert A. Murphy
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# End license text.
-############################################################################
-
 #!/usr/bin/python
 
 ############################################################################
@@ -108,6 +95,49 @@ def calcN(pts=None):
                 ret  = N**2
             else:
                 break
+    return ret
+
+############################################################################
+##
+## Purpose:   Random cluster theory for formation
+##
+############################################################################
+def calcC(vals=None):
+    ret  = None
+    # can't use categoricals for the labels here
+    # throws an error for the list of things in the first column being longer than the number of labels
+    # yet this is ok for this application since all words in our corpus
+    # that's captured by the GloVe model bave non-zero probability of co-occurrence
+    # thus all words connect in one cluster (random field theory and markov property)
+    # which will be the case for floating pint labels sent to to_categorical
+    #
+    # because of the single brain (single model) forced by the last parameter to create_kg
+    # all other columns in the data set will be used to model the single first column
+    #
+    # the only other things is to change the behavior of which data points are connected
+    # to which and this will involve a little higher order probability theory which
+    # states that we have full connectivity, i.e. one cluster if each node in a network
+    # connects to O(logN) of its neighbors, where N is the total number of nodes
+    #
+    # the first column can be turned into categoricals by considering the theory that allows for choosing the number of clusters.
+    # Then, by separability, the marginal of the first column's cluster distribution can be learned using a DBN where categorical
+    # labels (using the number of clusters) as the output
+    #
+    # order of the categoricals are found as such
+    #
+    # sort the first column to obtain the sort order indices ... calculate the number of clusters and divide the data uniformly
+    # with labels represented in the right proportion ... uniformity is legitimate by the Central Limit Theorem giving an
+    # assumption of normality of the first column, but we order it, which allows us to assume a beta distribution whose parameters
+    # give uniformity by other arguments from the same theory that allows calculation of the number of clusters ... then, get the reverse
+    # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
+    if not (type(vals) == type(None) or len(vals) == 0):
+        svals= np.argsort(vals)
+        rints= list(range(1,calcN(len(vals))+1))
+        sints= int(ceil(len(vals)/len(rints)))
+        tvals= []
+        for i in rints:
+            tvals.extend([[i] for j in range((i-1)*sints,min(i*sints,len(vals)))])
+        ret  = np.asarray([[int(i[0])] for i in np.asarray(tvals)[np.argsort(svals)]])
     return ret
 
 ############################################################################
