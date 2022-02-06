@@ -417,10 +417,8 @@ def thought(inst=0,coln=[],dat=None,res=True):
                                     # the same as we stay within the bounds of the original distribution with starting
                                     # mean and variance already given (stationarity) but allowing for bounded adjustments
                                     rdat = []
-                                    for i in range(0,preds):
-                                        npt  = rmdl.predict(pt)[0]
-                                        rdat.append(npt)
-                                        pt   = np.resize(npt,(1,len(npt)))
+                                    npt  = rmdl.predict(pt)
+                                    rdat.extend(npt)
                                     # starting mean and variance
                                     mpt  = dat1[0          ][0]
                                     vpt  = dat1[len(dat1)-1][0]
@@ -435,7 +433,7 @@ def thought(inst=0,coln=[],dat=None,res=True):
                                         prds         = np.asarray(rmdl.predict(np.asarray(rdat)))
                                         # the mean and variance are computed using theory from
                                         # A Predictive Model using the Markov Property
-                                        residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[i,0]))[:,0] if   \
+                                        residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[:,0]))[:,0] if   \
                                                        res                                                       else \
                                                        [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
                                         ret[lbls[m]] = prds[:,0] + residuals
@@ -1986,8 +1984,10 @@ def ai_testing(M=500,N=3):
     print([data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat])
     print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
     # test the thought function with the default number of predictions 3
-    print(thought(inst,list(coln.items())))
-    print(thought(inst,list(coln.items()),res=False))
+    print(thought(inst,list(coln.items())                                             ))
+    print(thought(inst,list(coln.items()),                                   res=False))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1))          ))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1)),res=False))
     # test glove output
     g    = extendglove(["README.txt","README.txt"],gfl[0])
     leng = len(g)
