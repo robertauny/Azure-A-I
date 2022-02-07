@@ -376,8 +376,21 @@ def thought(inst=0,coln=[],dat=None,res=True):
                                         pt   = np.resize(np.asarray(dat1)[0,1:],(1,len(dat1[0])-1))
                                 preds= 1
                         else:
-                            pt   = dat
-                            preds= len(pt)
+                            d    = np.asarray(dat)
+                            shp  = list(d.shape)
+                            if len(shp) == 1:
+                                pt   = np.resize(d,(1,len(d)))
+                                preds= 1
+                            else:
+                                if len(d) == 1:
+                                    pt   = np.resize(d[0],(1,len(d[0])))
+                                    preds= 1
+                                else:
+                                    for i in range(0,len(d)):
+                                        dump = thought(inst,coln,d[i],res)
+                                        for key in list(dump.keys()):
+                                            ret[key+"["+str(i)+"]"] = dump[key]
+                                    preds= 0
                         if not (preds == 0):
                             # load the clustering model and make the cluster prediction for this data point
                             mdl  = load_model(fl)
@@ -437,11 +450,6 @@ def thought(inst=0,coln=[],dat=None,res=True):
                                                        res                                                       else \
                                                        [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
                                         ret[lbls[m]] = prds[:,0] + residuals
-                        else:
-                            # just return the data point for other uses (e.g. pill images) since
-                            # the data point will correspond to a label from the extended GloVe data set
-                            # as it is the median of the data (unchanged) so we can match it to get the label
-                            ret["pred"] = coln[pred[0]][0]
         except Exception as err:
             ret["error"] = str(err)
     return ret
