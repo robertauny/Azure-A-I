@@ -46,6 +46,12 @@ from PIL                          import Image
 
 from datetime                     import datetime
 
+# opensource replacements for azure methods
+from pytesseract                  import image_to_string as its
+from bertopic                     import BERTopic        as bt
+from spacy                        import load
+from textblob                     import TextBlob        as tb
+
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
 from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
@@ -70,7 +76,7 @@ from nn import dbn,categoricals,calcC
 
 cfg  = config.cfg()
 
-np.random.seed(12345)
+np.random.seed(const.constants.SEED)
 
 logging.disable(logging.WARNING)
 
@@ -995,176 +1001,203 @@ def pil2array(pil=None):
 def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=True):
     ret  = []
     if not (wtyp == None or len(docs) == 0 or inst <= const.constants.BVAL):
-        # ordering of the data elements in the JSON file
-        src  = cfg["instances"][inst]["src"]["index"]
-        typ  = cfg["instances"][inst]["src"]["types"][wtyp]
-        # azure subscription key
-        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
-        # azure vision api
-        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
-        # api
-        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
-        # version
-        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
-        # app
-        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
-        # url
-        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
-        # request headers. Important: content should be bytestream as we are sending an image from local
-        hdrs = {"Ocp-Apim-Subscription-Key":key}
-        parms= {"language":"unk","detectOrientation":"true"}
         if not testing:
             ftext= []
-            if wtyp == const.constants.OCR:
-                hdrs["Content-Type"] = "application/octet-stream"
-                for i in docs:
-                    try:
-                        # get response from the server
-                        resp = requests.post(url,headers=hdrs,params=parms,data=i)
-                        resp.raise_for_status()
-                        # get json data to parse it later
-                        js   = resp.json()
-                        # all the lines from a page, including noise
-                        for reg in js["regions"]:
-                            line = reg["lines"]
-                            for elem in line:
-                                ltext = " ".join([word["text"] for word in elem["words"]])
-                                ftext.append(ltext.lower())
-                    except Exception as err:
-                        ftext.append(str(err))
+            if wtyp == const.constants.SHP:
+                try:
+                    # load the image and resize it to a smaller factor so that
+                    # the shapes can be approximated better
+                    image= cv2.imread(docs)
+                    rsz  = imutils.resize(image,width=300)
+                    # convert the resized image to grayscale, blur it slightly and threshold it
+                    gray = cv2.cvtColor(rsz,cv2.COLOR_BGR2GRAY)
+                    blur = cv2.GaussianBlur(gray,(5,5),0)
+                    thrsh= cv2.threshold(blur,60,255,cv2.THRESH_BINARY)[1]
+                    # find contours in the thresholded image and initialize the shape detector
+                    cnts = cv2.findContours(thrsh.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+                    cnts = imutils.grab_contours(cnts)
+                    ltext= []
+                    for cnt in cnts:
+                        peri = cv2.arcLength(cnt,True)
+                        appr = cv2.approxPolyDP(cnt,0.04*peri,True)
+                        if len(appr) == 3:
+                            ltext.extend(["triangle"])
+                        elif len(appr) == 4:
+                            # compute the bounding box of the contour and use the
+                            # bounding box to compute the aspect ratio
+                            (x,y,w,h) = cv2.boundingRect(appr)
+                            ar        = w / float(h)
+                            # a square will have an aspect ratio that is approximately
+                            # equal to one, otherwise, the shape is a rectangle
+                            if ar >= 0.95 and ar <= 1.05:
+                                ltext.extend(["square","round"])
+                            else:
+                                ltext.extend(["rectangle","capsule","oval"])
+                        elif len(appr) == 5:
+                            ltext.extend(["pentagon","round"])
+                        elif len(appr) == 6:
+                            ltext.extend(["hexagon" ,"round"])
+                        elif len(appr) == 7:
+                            ltext.extend(["heptagon","round"])
+                        elif len(appr) == 8:
+                            ltext.extend(["octagon" ,"round"])
+                        else:
+                            # default shape
+                            ltext.extend(["round"])
+                    ftext= np.unique(ltext)
+                except Exception as err:
+                    ftext.append(str(err))
             else:
-                if wtyp == const.constants.IMG:
-                    hdrs["Content-Type"] = "application/octet-stream"
+                if wtyp == const.constants.WIK:
+                    # request headers. Important: content should be json as we are sending an array of json objects
+                    hdrs["Content-Type"] = "application/json"
                     try:
-                        # get response from the server
-                        resp = requests.post(url,headers=hdrs,params=parms,data=docs)
-                        resp.raise_for_status()
-                        # The recognized text isn't immediately available, so poll to wait for completion.
-                        anal = {}
-                        poll = True
-                        while poll:
-                            respf= requests.get(resp.headers["Operation-Location"],headers=hdrs)
-                            respf.raise_for_status()
-                            anal = respf.json()
-                            time.sleep(1)
-                            if "recognitionResults" in anal:
-                                poll = False
-                                # Extract the recognized text
-                                ltext= [line["text"] for line in anal["recognitionResults"][0]["lines"]]
-                            if ("status" in anal and anal["status"] == "Failed"):
-                                poll = False
-                                ltext= "Failed"
-                        ftext= np.append(ftext,ltext)
+                        for term in docs:
+                            for i in term.split():
+                                # wikipedia url
+                                url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + i
+                                # get response from the server
+                                resp = requests.get(url,headers=hdrs)
+                                resp.raise_for_status()
+                                # get json data to parse it later
+                                js   = resp.json()
+                                typ  = js["type"]
+                                if (typ == "standard"):
+                                    ext  = js["extract"    ].replace(",","")
+                                    ftext.append(ext)
+                                    desc = js["description"].replace(",","")
+                                    ftext.append(desc)
+                                else:
+                                    ftext.append(term)
                     except Exception as err:
                         ftext.append(str(err))
                 else:
-                    if wtyp == const.constants.OBJ:
-                        hdrs["Content-Type"] = "application/octet-stream"
-                        parms                = {"visualFeatures":"Categories,Description,Color"}
-                        try:
-                            # get response from the server
-                            resp = requests.post(url,headers=hdrs,params=parms,data=docs)
-                            resp.raise_for_status()
-                            # get json data to parse it later
-                            js   = resp.json()
-                            # only get the description and color from an image return
-                            ftext.append(js["description"]["tags"                   ]   )
-                            ftext.append(js["color"      ]["dominantColorForeground"]   )
-                            ftext.append(js["color"      ]["dominantColorBackground"]   )
-                            ftext.append(js["color"      ]["dominantColors"         ][0])
-                            ftext.append(js["color"      ]["accentColor"            ]   )
-                        except Exception as err:
-                            ftext.append(str(err))
-                    else:
-                        if wtyp == const.constants.SHP:
-                            try:
-                                # load the image and resize it to a smaller factor so that
-                                # the shapes can be approximated better
-                                image= cv2.imread(docs)
-                                rsz  = imutils.resize(image,width=300)
-                                # convert the resized image to grayscale, blur it slightly and threshold it
-                                gray = cv2.cvtColor(rsz,cv2.COLOR_BGR2GRAY)
-                                blur = cv2.GaussianBlur(gray,(5,5),0)
-                                thrsh= cv2.threshold(blur,60,255,cv2.THRESH_BINARY)[1]
-                                # find contours in the thresholded image and initialize the shape detector
-                                cnts = cv2.findContours(thrsh.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
-                                cnts = imutils.grab_contours(cnts)
-                                ltext= []
-                                for cnt in cnts:
-                                    peri = cv2.arcLength(cnt,True)
-                                    appr = cv2.approxPolyDP(cnt,0.04*peri,True)
-                                    if len(appr) == 3:
-                                        ltext.extend(["triangle"])
-                                    elif len(appr) == 4:
-                                        # compute the bounding box of the contour and use the
-                                        # bounding box to compute the aspect ratio
-                                        (x,y,w,h) = cv2.boundingRect(appr)
-                                        ar        = w / float(h)
-                                        # a square will have an aspect ratio that is approximately
-                                        # equal to one, otherwise, the shape is a rectangle
-                                        if ar >= 0.95 and ar <= 1.05:
-                                            ltext.extend(["square","round"])
-                                        else:
-                                            ltext.extend(["rectangle","capsule","oval"])
-                                    elif len(appr) == 5:
-                                        ltext.extend(["pentagon","round"])
-                                    elif len(appr) == 6:
-                                        ltext.extend(["hexagon" ,"round"])
-                                    elif len(appr) == 7:
-                                        ltext.extend(["heptagon","round"])
-                                    elif len(appr) == 8:
-                                        ltext.extend(["octagon" ,"round"])
-                                    else:
-                                        # default shape
-                                        ltext.extend(["round"])
-                                ftext= np.unique(ltext)
-                            except Exception as err:
-                                ftext.append(str(err))
-                        else:
-                            if wtyp == const.constants.WIK:
-                                # request headers. Important: content should be json as we are sending an array of json objects
-                                hdrs["Content-Type"] = "application/json"
+                    if not local:
+                        # ordering of the data elements in the JSON file
+                        src  = cfg["instances"][inst]["src"]["index"]
+                        typ  = cfg["instances"][inst]["src"]["types"][wtyp]
+                        # azure subscription key
+                        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
+                        # azure vision api
+                        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+                        # api
+                        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
+                        # version
+                        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
+                        # app
+                        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
+                        # url
+                        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
+                        # request headers. Important: content should be bytestream as we are sending an image from local
+                        hdrs = {"Ocp-Apim-Subscription-Key":key}
+                        parms= {"language":"unk","detectOrientation":"true"}
+                        if wtyp == const.constants.OCR:
+                            hdrs["Content-Type"] = "application/octet-stream"
+                            for i in docs:
                                 try:
-                                    for term in docs:
-                                        for i in term.split():
-                                            # wikipedia url
-                                            url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + i
-                                            # get response from the server
-                                            resp = requests.get(url,headers=hdrs)
-                                            resp.raise_for_status()
-                                            # get json data to parse it later
-                                            js   = resp.json()
-                                            typ  = js["type"]
-                                            if (typ == "standard"):
-                                                ext  = js["extract"    ].replace(",","")
-                                                ftext.append(ext)
-                                                desc = js["description"].replace(",","")
-                                                ftext.append(desc)
-                                            else:
-                                                ftext.append(term)
+                                    # get response from the server
+                                    resp = requests.post(url,headers=hdrs,params=parms,data=i)
+                                    resp.raise_for_status()
+                                    # get json data to parse it later
+                                    js   = resp.json()
+                                    # all the lines from a page, including noise
+                                    for reg in js["regions"]:
+                                        line = reg["lines"]
+                                        for elem in line:
+                                            ltext = " ".join([word["text"] for word in elem["words"]])
+                                            ftext.append(ltext.lower())
+                                except Exception as err:
+                                    ftext.append(str(err))
+                        else:
+                            if wtyp == const.constants.IMG:
+                                hdrs["Content-Type"] = "application/octet-stream"
+                                try:
+                                    # get response from the server
+                                    resp = requests.post(url,headers=hdrs,params=parms,data=docs)
+                                    resp.raise_for_status()
+                                    # The recognized text isn't immediately available, so poll to wait for completion.
+                                    anal = {}
+                                    poll = True
+                                    while poll:
+                                        respf= requests.get(resp.headers["Operation-Location"],headers=hdrs)
+                                        respf.raise_for_status()
+                                        anal = respf.json()
+                                        time.sleep(1)
+                                        if "recognitionResults" in anal:
+                                            poll = False
+                                            # Extract the recognized text
+                                            ltext= [line["text"] for line in anal["recognitionResults"][0]["lines"]]
+                                        if ("status" in anal and anal["status"] == "Failed"):
+                                            poll = False
+                                            ltext= "Failed"
+                                    ftext= np.append(ftext,ltext)
                                 except Exception as err:
                                     ftext.append(str(err))
                             else:
-                                if wtyp in [const.constants.EE,const.constants.SENT]:
-                                    # request headers. Important: content should be json as we are sending an array of json objects
-                                    hdrs["Content-Type"] = "application/json"
+                                if wtyp == const.constants.OBJ:
+                                    hdrs["Content-Type"] = "application/octet-stream"
+                                    parms                = {"visualFeatures":"Categories,Description,Color"}
                                     try:
-                                        ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
                                         # get response from the server
-                                        resp = requests.post(url,headers=hdrs,json=ijson)
+                                        resp = requests.post(url,headers=hdrs,params=parms,data=docs)
                                         resp.raise_for_status()
                                         # get json data to parse it later
                                         js   = resp.json()
-                                        # all the lines from a page, including noise
-                                        for doc in js["documents"]:
-                                            keys = doc[wtyp]
-                                            if wtyp == const.constants.SENT:
-                                                keys = [keys,doc["documentScores"][keys]]
-                                            ftext.append(keys)
+                                        # only get the description and color from an image return
+                                        ftext.append(js["description"]["tags"                   ]   )
+                                        ftext.append(js["color"      ]["dominantColorForeground"]   )
+                                        ftext.append(js["color"      ]["dominantColorBackground"]   )
+                                        ftext.append(js["color"      ]["dominantColors"         ][0])
+                                        ftext.append(js["color"      ]["accentColor"            ]   )
                                     except Exception as err:
                                         ftext.append(str(err))
                                 else:
-                                    ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                                    if wtyp in [const.constants.EE,const.constants.SENT]:
+                                        # request headers. Important: content should be json as we are sending an array of json objects
+                                        hdrs["Content-Type"] = "application/json"
+                                        try:
+                                            ijson= { "documents": [{"language":"en","id":i,"text":docs[i-1]} for i in range(1,len(docs)+1)] }
+                                            # get response from the server
+                                            resp = requests.post(url,headers=hdrs,json=ijson)
+                                            resp.raise_for_status()
+                                            # get json data to parse it later
+                                            js   = resp.json()
+                                            # all the lines from a page, including noise
+                                            for doc in js["documents"]:
+                                                keys = doc[wtyp]
+                                                if wtyp == const.constants.SENT:
+                                                    keys = [keys,doc["documentScores"][keys]]
+                                                ftext.append(keys)
+                                        except Exception as err:
+                                            ftext.append(str(err))
+                                    else:
+                                        ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                    else:
+                        if wtyp == const.constants.OCR:
+                            try:
+                                for i in docs:
+                                    ftext.append(its(i))
+                            except Exception as err:
+                                ftext.append(str(err))
+                        else:
+                            if wtyp == const.constants.KP:
+                                tm     = bt()
+                                topic,_= tm.fit_transform(docs)
+                                ftext  = tm.get_topic_info()["Name"].to_list()
+                            else:
+                                if wtyp == const.constants.EE:
+                                    nlp  = load('en_core_web_sm')
+                                    for i in docs:
+                                        doc  = load(i)
+                                        for ent in doc.ents:
+                                            ftext.append(ent.label_+const.constants.SEP+ent.text)
+                                else:
+                                    if wtyp == const.constants.SENT:
+                                        for i in docs:
+                                            ftext.append(TextBlob(i).sentiment)
+                                    else:
+                                        ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
+                        # use opensource versions for OCR, sentiment and entity extraction
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)

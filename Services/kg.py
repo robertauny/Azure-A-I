@@ -1,16 +1,3 @@
-############################################################################
-# Begin license text.
-# Copyright 2020 Robert A. Murphy
-#
-# Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-#
-# The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-#
-# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-#
-# End license text.
-############################################################################
-
 #!/usr/bin/python
 
 ############################################################################
@@ -23,7 +10,7 @@
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Dec. 20, 2019
+## Date:      Nov. 22, 2021
 ##
 ############################################################################
 
@@ -44,7 +31,7 @@ from gremlin_python.driver.driver_remote_connection import DriverRemoteConnectio
 
 cfg  = config.cfg()
 
-np.random.seed(12345)
+np.random.seed(const.constants.SEED)
 
 ############################################################################
 ##
@@ -55,10 +42,10 @@ def kg_testing(inst=1,M=10,N=5,testing=False):
     # number of data points and properties
     m    = M
     p    = N
-    if p > const.MAX_FEATURES:
-        p    = const.MAX_FEATURES
+    if p > const.constants.MAX_FEATURES:
+        p    = const.constants.MAX_FEATURES
     # define the number of splits of each property
-    s    = p if p <= const.MAX_SPLITS else const.MAX_SPLITS
+    s    = p if p <= const.constants.MAX_SPLITS else const.constants.MAX_SPLITS
     # uniformly sample values between 0 and 1 as the data set
     dat  = np.random.sample(size=(m,p))
     # create column names (normally obtained by var.dtype.names)
@@ -76,7 +63,7 @@ def kg_testing(inst=1,M=10,N=5,testing=False):
     # get the remote graph traversal
     g    = graph.traversal().withRemote(conn)
     # we only want to process the right brain
-    print(kg(const.V,inst,coln,kgdat,g,False,testing))
+    print(kg(const.constants.V,inst,coln,kgdat,g,False,testing))
     # after building the knowledge graph, use the output of ocr to test the GloVe write
     #
     # call cognitive to produce the ocr output
@@ -90,13 +77,13 @@ def kg_testing(inst=1,M=10,N=5,testing=False):
     rdat = extendglove(oret[0][0],gfl[0])
     rdat = [(k,v) for k,v in list(rdat.items())[0:M]]
     # write the glove output to the knowledge graph
-    print(kg(const.ENTS,inst,coln,rdat,g,False,testing))
+    print(kg(const.constants.ENTS,inst,coln,rdat,g,False,testing))
     # get the ocr data ... using the real way to get the ocr data here
     typ  = cfg["instances"][inst]["src"]["types"]["ocrf"]
     pdfs = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
-    cdat = cognitive(const.OCR,pdfs,inst,False,testing)
+    cdat = cognitive(const.constants.OCR,pdfs,inst,False,testing)
     # write the ocr data to the graph
-    print(kg(const.CONS,inst,coln,cdat[1:],g,True,testing))
+    print(kg(const.constants.CONS,inst,coln,cdat[1:],g,True,testing))
     # close the connection
     conn.close()
     # test the thought function with the default number of predictions 3

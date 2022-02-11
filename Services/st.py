@@ -2,15 +2,15 @@
 
 ############################################################################
 ##
-## File:      images.py
+## File:      st.py
 ##
-## Purpose:   Read text from images
+## Purpose:   Clean data and make predictions
 ##
 ## Parameter: N/A
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Nov. 22, 2021
+## Date:      Feb. 10, 2022
 ##
 ############################################################################
 
@@ -32,10 +32,8 @@ else:
     from tensorflow.keras.models                            import Sequential,load_model,Model
     from tensorflow.keras.utils                             import to_categorical
 
-from data                                           import url_kg,read_kg,sodaget,permute
-from services                                       import images,kg
-from ai                                             import create_kg,extendglove,thought,cognitive,wvec,almost,glovemost
-from nn                                             import dbn
+from ai                                             import brain,create_kg,extendglove,thought,cognitive,wvec,almost,glovemost
+from nn                                             import dbn,calcC,nn_importance
 
 import config
 import data
@@ -55,26 +53,90 @@ np.random.seed(const.constants.SEED)
 
 ############################################################################
 ##
-## Purpose:   Process the image data
+## Purpose:   Process the data
 ##
 ############################################################################
-def permutes(lk=const.constants.MAX_FEATURES):
-    ret  = []
-    if not (lk <= const.constants.MAX_FEATURES):
-        perma= permute(range(0,lk),False,const.constants.MAX_FEATURES)
-        for a in perma:
-            ret.append(a)
-            #permb= permute(a)
-            #for b in permb:
-                #ret.append(b)
+def fixdata(inst=0,dat=[]):
+    ret  = None
+    if inst > const.constants.BVAL and type(dat ) in [type([]),type(np.asarray([]))] and len(dat ) > 0:
+        d    = np.asarray(dat).copy()
+        # check which rows have any null values and remove them
+        #
+        # doing rows first since a null row will eliminate all columns
+        rows = [i for i in range(0,len(d)) if d[i].all() == None]
+        d    = d[-rows,:] if len(rows) > 0 else d
+        # have to check that we still have rows of data
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # check which columns have any null values and remove them
+            d1   = d.transpose()
+            cols = [i for i in range(0,len(d1)) if d1[i].all() == None]
+            d    = d[:,-cols] if len(cols) > 0 else d
+            # have to check that we still have columns of data
+            if not (len(d) == 0 or len(d[0]) == 0):
+                # for those remaining rows, we want to keep track of any columns
+                # that have missing values, as we will only model with completely
+                # full rows/columns
+
+                # for the rows that are left, we will use to fill missing values
+                #
+                # first we will determine importance of each feature, with the reason
+                # being, we will be modeling each feature in the data set as a function
+                # of the top features as determined by importance
+                #
+                # first we will make use of the central limit theorem when making the
+                # assumption that the original data set is a mixed bag of normals that
+                # we want to separate (cluster)
+                #
+                # implicitly, we are making use of a result from the random cluster model
+                # that allows us to determine the number of clusters based upon the assumption
+                # of normality, plus ordering that gives uniformity
+                #
+                # inputs for importance are the subset of rows that have values
+                ip   = d
+                # mixed bag of normals used as inputs when calculating labels for use as outputs
+                ndat = np.random.normal(size=(len(d),1)).flatten()
+                # outputs for importance calculated as categorical labels
+                op   = calcC(ndat)
+                # gauge the importance of each feature of the modified data set
+                imp  = nn_importance(ip,op)
+                # finally replace the values for use in building the models to fix the data
+                ipt  = imp.transform(ip)
+                # gonna brute force a way to check which features are being selected from the data
+                ncols= []
+                for i in range(0,len(dat[0])):
+                    for j in range(0,len(ipt)):
+                        if dat[-rows,i] == ipt[:,j]:
+                            ncols.append(i)
+                # now we will build "brains" from the transformed data that will do the "thinking"
+                # for us when we want to replace missing values in the original data set
+                #
+                # instantiate a JanusGraph object
+                graph= Graph()
+                # connection to the remote server
+                conn = DriverRemoteConnection(data.url_kg(inst),'g')
+                # get the remote graph traversal
+                g    = graph.traversal().withRemote(conn)
+                # make a data set for each column of data needing replacement values
+                for i in ncols:
+                    ndat = np.vstack((dat[-rows,i],ipt))
+                    # create column names (normally obtained by var.dtype.names)
+                    coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
+                    # create the knowledge graph that holds the "brains"
+                    kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
+                    # write the knowledge graph
+                    dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
+                    dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,False) for k in kgdat]
+                    # thought function will give us the predictions for replacement in original data set
+                    for j in rows:
+                        dat[j,i] = thought(inst,list(coln.items()),dat[j,-cols]) if not dat[j,i].any() else dat[j,i]
     return ret
 
 ############################################################################
 ##
-## Purpose:   Process the image data
+## Purpose:   Process the data
 ##
 ############################################################################
-def images_testing(inst=0,objd=True,lim=0,train=False,testing=False):
+def st_testing(inst=0,train=False,testing=False):
     ret  = {}
     try:
         # turn the punctuation into a list

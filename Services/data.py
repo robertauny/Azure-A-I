@@ -42,7 +42,7 @@ from nn                                             import dbn
 # read the default json config file
 cfg  = config.cfg()
 
-np.random.seed(12345)
+np.random.seed(const.constants.SEED)
 
 logging.disable(logging.WARNING)
 
