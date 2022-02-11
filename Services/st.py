@@ -117,7 +117,7 @@ def fixdata(inst=0,dat=[]):
                 # get the remote graph traversal
                 g    = graph.traversal().withRemote(conn)
                 # make a data set for each column of data needing replacement values
-                for i in ncols:
+                for i in cols:
                     ndat = np.vstack((dat[-rows,i],ipt))
                     # create column names (normally obtained by var.dtype.names)
                     coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
@@ -128,7 +128,7 @@ def fixdata(inst=0,dat=[]):
                     dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,False) for k in kgdat]
                     # thought function will give us the predictions for replacement in original data set
                     for j in rows:
-                        dat[j,i] = thought(inst,list(coln.items()),dat[j,-cols]) if not dat[j,i].any() else dat[j,i]
+                        dat[j,i] = thought(inst,list(coln.items()),dat[j,ncols]) if not dat[j,i].any() else dat[j,i]
     return ret
 
 ############################################################################
