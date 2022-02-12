@@ -998,10 +998,13 @@ def pil2array(pil=None):
 ##            Other text analytics
 ##
 ############################################################################
-def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=True):
+def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=True,local=True):
     ret  = []
     if not (wtyp == None or len(docs) == 0 or inst <= const.constants.BVAL):
         if not testing:
+            # request headers. Important: content should be bytestream as we are sending an image from local
+            hdrs = {"Ocp-Apim-Subscription-Key":None}
+            parms= {"language":"unk","detectOrientation":"true"}
             ftext= []
             if wtyp == const.constants.SHP:
                 try:
@@ -1088,9 +1091,7 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
                         app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
                         # url
                         url  = "https://" + host + "/" + api + "/" + ver + "/" + app
-                        # request headers. Important: content should be bytestream as we are sending an image from local
-                        hdrs = {"Ocp-Apim-Subscription-Key":key}
-                        parms= {"language":"unk","detectOrientation":"true"}
+                        hdrs["Ocp-Apim-Subscription-Key"] = key
                         if wtyp == const.constants.OCR:
                             hdrs["Content-Type"] = "application/octet-stream"
                             for i in docs:
@@ -1245,7 +1246,7 @@ def rotate(img=None,deg=0,by=0):
 ## Purpose:  Read data from an array of PDF files
 ##
 ############################################################################
-def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=False,testing=True):
+def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=False,testing=True,local=False):
     ret  = None
     if not (wtyp == None or len(pdfs) == 0 or inst <= const.constants.BVAL):
         # number of cpu cores
@@ -1254,24 +1255,24 @@ def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=Fa
             # converted images
             if wtyp == const.constants.OCR:
                 # convert the data in the pdf into images using python image library format
-                imgs = Parallel(n_jobs=nc)(delayed(convert_from_path        )(pdfs[i]                   ) for i in range(0,len(pdfs )))
+                imgs = Parallel(n_jobs=nc)(delayed(convert_from_path        )(pdfs[i]                         ) for i in range(0,len(pdfs )))
                 # save the images of the pdfs to addressable memory
-                pimgs= Parallel(n_jobs=nc)(delayed(ocre                     )(imgs[i]                   ) for i in range(0,len(imgs )))
+                pimgs= Parallel(n_jobs=nc)(delayed(ocre                     )(imgs[i]                         ) for i in range(0,len(imgs )))
                 # extract the text from the images
                 #
                 # this thread can die due to timeout waiting for a response from Azure
                 # results in a warning from tensorflow about __del__
-                oimgs= Parallel(n_jobs=nc)(delayed(img2txt                  )(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs)))
+                oimgs= Parallel(n_jobs=nc)(delayed(img2txt                  )(wtyp,pimgs[i],inst,testing,local) for i in range(0,len(pimgs)))
                 ret  = []
                 if not (len(oimgs) <= 1):
-                    ret.append(Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                  ) for i in range(1,len(oimgs))))
+                    ret.append(Parallel(n_jobs=nc)(delayed(oimgs[0].append  )(oimgs[i]                        ) for i in range(1,len(oimgs))))
                 else:
                     if not (len(oimgs) == 0):
                         ret.append(oimgs[0])
                 # key phrases or entity extractions
-                ret.append(cognitive(const.constants.EE  ,ret[0],inst,objd,testing))
+                ret.append(cognitive(const.constants.EE  ,ret[0],inst,objd,testing,local))
                 # sentiment and scores
-                ret.append(cognitive(const.constants.SENT,ret[0],inst,objd,testing))
+                ret.append(cognitive(const.constants.SENT,ret[0],inst,objd,testing,local))
             else:
                 if wtyp == const.constants.IMG:
                     ret  = {}
@@ -1300,7 +1301,7 @@ def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=Fa
                             for img in imgs:
                                 pimgs.extend(img)
                         # extract the text from the image
-                        oimgs= [img2txt(wtyp,pimgs[i],inst,testing) for i in range(0,len(pimgs))]
+                        oimgs= [img2txt(wtyp,pimgs[i],inst,testing,local) for i in range(0,len(pimgs))]
                         # default is to not use object detection
                         if not objd:
                             # capture the text in the image
@@ -1311,16 +1312,16 @@ def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=Fa
                             # capture the text in the image
                             rret[const.constants.IMG] = [i[0] for i in oimgs if not len(i) == 0]
                             # object detection
-                            rret[const.constants.OBJ] = cognitive(const.constants.OBJ,pimgs[0],inst,objd,testing)
+                            rret[const.constants.OBJ] = cognitive(const.constants.OBJ,pimgs[0],inst,objd,testing,local)
                             # shape detection
-                            rret[const.constants.SHP] = cognitive(const.constants.SHP,pdfs[i] ,inst,objd,testing)
+                            rret[const.constants.SHP] = cognitive(const.constants.SHP,pdfs[i] ,inst,objd,testing,local)
                             # final return for this pdf
                             ret [pdfs[i]  ]           = rret
                 else:
                     # placeholder for the future
                     imgs = None
         else:
-            ret  = img2txt(wtyp,pdfs,inst,testing)
+            ret  = img2txt(wtyp,pdfs,inst,testing,local)
     return ret
 
 ############################################################################
