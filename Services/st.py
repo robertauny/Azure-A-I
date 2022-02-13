@@ -92,7 +92,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 for i in range(0,len(d[0])):
                     if not bool(np.char.isnumeric(d[0,i])):
                         if "" in dat[rows,i]:
-                            wiki = wikilabel(inst,d[:,i],True)
+                            wiki = wikilabel(inst,d[:,i],True,True)
                             for k in indx:
                                 # when using the open source (local=True) method, the return
                                 # should contain the numeric label and the topic, separated by const.constants.SEP
@@ -104,4 +104,4 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 # the hack for now
                 dat[0,:] = hdr
                 # fix the data by intelligently filling missing values
-                dat  = fixdata(inst,dat[1:len(dat)])
+                dat  = fixdata(inst,dat[1:len(dat)],{dat[0,k]:k for k in range(0,len(dat[0]))})

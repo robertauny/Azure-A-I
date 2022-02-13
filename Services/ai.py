@@ -1984,9 +1984,11 @@ def checkdata(dat=[]):
 ## Purpose:   Fix a data set using simulated thought in a knowledge brain
 ##
 ############################################################################
-def fixdata(inst=0,dat=[]):
+def fixdata(inst=0,dat=[],coln={}):
     ret  = None
-    if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+    if inst > const.constants.BVAL                                     and \
+       type(dat ) in [type([]),type(np.asarray([]))] and len(dat ) > 0 and \
+       type(coln) ==  type({})                       and len(coln) > 0:
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
@@ -2026,8 +2028,6 @@ def fixdata(inst=0,dat=[]):
             op   = d[:, cols]
             # unrelated redifinition of ndat to be used in the loop
             ndat = np.hstack((op,ip)).astype(np.single)
-            # create column names (normally obtained by var.dtype.names)
-            coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
             # create the knowledge graph that holds the "brains"
             kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
             # write the knowledge graph
@@ -2073,7 +2073,7 @@ def wikidocs(inst=0,dat=[]):
 ## Purpose:   Use Wikipedia to expand text data and assign labels
 ##
 ############################################################################
-def wikilabel(inst=0,dat=[],wik=False):
+def wikilabel(inst=0,dat=[],wik=False,rf=False):
     ret  = None
     if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
         d    = np.asarray(dat).copy()
@@ -2091,7 +2091,38 @@ def wikilabel(inst=0,dat=[],wik=False):
         #
         # when using the open source (local=True) method, the return
         # should contain the numeric label and the topic, separated by const.constants.SEP
-        ret  = img2txt(const.constants.KP,wikis,inst,False,True)
+        #
+        # can't use categoricals for the labels here
+        # throws an error for the list of things in the first column being longer than the number of labels
+        # yet this is ok for this application since all words in our corpus
+        # that's captured by the GloVe model bave non-zero probability of co-occurrence
+        # thus all words connect in one cluster (random field theory and markov property)
+        # which will be the case for floating pint labels sent to to_categorical
+        #
+        # because of the single brain (single model) forced by the last parameter to create_kg
+        # all other columns in the data set will be used to model the single first column
+        #
+        # the only other things is to change the behavior of which data points are connected
+        # to which and this will involve a little higher order probability theory which
+        # states that we have full connectivity, i.e. one cluster if each node in a network
+        # connects to O(logN) of its neighbors, where N is the total number of nodes
+        #
+        # the first column can be turned into categoricals by considering the theory that allows for choosing the number of clusters.
+        # Then, by separability, the marginal of the first column's cluster distribution can be learned using a DBN where categorical
+        # labels (using the number of clusters) as the output
+        #
+        # order of the categoricals are found as such
+        #
+        # sort the first column to obtain the sort order indices ... calculate the number of clusters and divide the data uniformly
+        # with labels represented in the right proportion ... uniformity is legitimate by the Central Limit Theorem giving an
+        # assumption of normality of the first column, but we order it, which allows us to assume a beta distribution whose parameters
+        # give uniformity by other arguments from the same theory that allows calculation of the number of clusters ... then, get the reverse
+        # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
+        if not rf:
+            ret  = img2txt(const.constants.KP,wikis,inst,False,True)
+        else:
+            t    = calcC(d).flatten()
+            ret  = [str(t[i])+const.constants.SEP+const.constants.SEP.join(np.asarray(list(d[i]))[0:min(const.constants.MAX_COLS,len(list(d[i])))]) for i in range(0,len(t))]
     return ret
 
 ############################################################################
