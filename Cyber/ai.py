@@ -51,6 +51,12 @@ from pytesseract                  import image_to_string as its
 from bertopic                     import BERTopic        as bt
 from spacy                        import load
 from textblob                     import TextBlob        as tb
+from nltk.corpus                  import stopwords       as sw
+
+# imports related to calculating importance of features
+from eli5.sklearn                import PermutationImportance
+from sklearn.feature_selection   import SelectFromModel
+from sklearn.svm                 import SVC
 
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
@@ -1174,6 +1180,7 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
                                     else:
                                         ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
                     else:
+                        # use opensource versions for OCR, sentiment and entity extraction
                         if wtyp == const.constants.OCR:
                             try:
                                 for i in docs:
@@ -1181,24 +1188,36 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
                             except Exception as err:
                                 ftext.append(str(err))
                         else:
+                            # preprocessing on the docs
+                            #
+                            # create "texts" from the docs
+                            txts = [" ".join([word.translate(str.maketrans('','',punctuation)).lower() for word in d.split() if word.lower() not in set(sw.words("english"))]) for d in docs]
                             if wtyp == const.constants.KP:
-                                tm     = bt()
-                                topic,_= tm.fit_transform(docs)
-                                ftext  = tm.get_topic_info()["Name"].to_list()
+                                tm   = bt()
+                                t,_  = tm.fit_transform(txts)
+                                # fit transform will return many things, among which is
+                                # a list of integer labels corresponding to a topic
+                                # this list can contain -1 which corresponds to the "general"
+                                # topic to which any document can belong
+                                # this general topic is also used when not enough documents are
+                                # used during training/testing to make a distinction, especially
+                                # if there is a lot of information per document in a small corpus
+                                tp = tm.get_topics()
+                                for topic in t:
+                                    ftext.append(str(topic)+const.constants.SEP+const.constants.SEP.join(np.asarray(list(tp[topic]))[0:min(const.constants.MAX_COLS,len(list(tp[topic]))),0]))
                             else:
                                 if wtyp == const.constants.EE:
                                     nlp  = load('en_core_web_sm')
-                                    for i in docs:
+                                    for i in txts:
                                         doc  = load(i)
                                         for ent in doc.ents:
                                             ftext.append(ent.label_+const.constants.SEP+ent.text)
                                 else:
                                     if wtyp == const.constants.SENT:
-                                        for i in docs:
+                                        for i in txts:
                                             ftext.append(TextBlob(i).sentiment)
                                     else:
                                         ftext.append("ERR: WRONG TYPE IN FIRST ARGUMENT")
-                        # use opensource versions for OCR, sentiment and entity extraction
             # clean array containing only important data
             for line in ftext:
                 ret.append(line)
@@ -1934,6 +1953,168 @@ def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[],limit=False):
         bret = Parallel(n_jobs=nc)(delayed(build_kg)(inst,dat,brn,splits,limit) for brn in brns)
         rret = ret
         ret  = Parallel(n_jobs=nc)(delayed(append_kg)(rret,bret[i]) for i in range(0,len(bret)))
+    return ret
+
+############################################################################
+##
+## Purpose:   Return the subset of data rows that are full
+##
+############################################################################
+def checkdata(dat=[]):
+    ret  = []
+    rows = 0
+    cols = 0
+    if type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+        ret  = np.asarray(dat).copy()
+        # check which rows have any null values and remove them
+        #
+        # doing rows first since a null row will eliminate all columns
+        rows = [i for i in range(0,len(ret)) if any(a is None or len(a) == 0 for a in ret[i])]
+        ret  = ret[[i for i in range(0,len(ret)) if i not in rows],:] if len(rows) > 0 else ret
+        # have to check that we still have rows of data
+        if not (len(ret) == 0 or len(ret[0]) == 0):
+            # check which columns have any null values and remove them
+            d1   = ret.transpose()
+            cols = [i for i in range(0,len(d1)) if any(a is None or len(a) == 0 for a in d1[i])]
+            ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]] if len(cols) > 0 else ret
+    return ret,rows,cols
+
+############################################################################
+##
+## Purpose:   Fix a data set using simulated thought in a knowledge brain
+##
+############################################################################
+def fixdata(inst=0,dat=[]):
+    ret  = None
+    if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+        # check which rows/columns have any null values and remove them
+        d,rows,cols = checkdata(dat)
+        # have to check that we still have rows/columns of data
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # for those remaining rows, we want to keep track of any columns
+            # that have missing values, as we will only model with completely
+            # full rows/columns
+            #
+            # for the rows that are left, we will use to fill missing values
+            #
+            # first we will determine importance of each feature, with the reason
+            # being, we will be modeling each feature in the data set as a function
+            # of the top features as determined by importance
+            #
+            # first we will make use of the central limit theorem when making the
+            # assumption that the original data set is a mixed bag of normals that
+            # we want to separate (cluster)
+            #
+            # implicitly, we are making use of a result from the random cluster model
+            # that allows us to determine the number of clusters based upon the assumption
+            # of normality, plus ordering that gives uniformity
+            #
+            # inputs for importance are the subset of rows that have values
+            ip   = d
+            # mixed bag of normals used as inputs when calculating labels for use as outputs
+            ndat = np.random.normal(size=(len(d),1)).flatten()
+            # outputs for importance calculated as categorical labels
+            op   = calcC(ndat)
+            # gauge the importance of each feature of the modified data set
+            imp  = importance(ip,op)
+            # finally replace the values for use in building the models to fix the data
+            ipt  = imp.transform(ip)
+            # gonna brute force a way to check which features are being selected from the data
+            ncols= []
+            for i in range(0,len(dat[0])):
+                for j in range(0,len(ipt)):
+                    if dat[[k for k in range(0,len(dat)) if k not in rows],i] == ipt[:,j]:
+                        ncols.append(i)
+            # now we will build "brains" from the transformed data that will do the "thinking"
+            # for us when we want to replace missing values in the original data set
+            #
+            # instantiate a JanusGraph object
+            graph= Graph()
+            # connection to the remote server
+            conn = DriverRemoteConnection(data.url_kg(inst),'g')
+            # get the remote graph traversal
+            g    = graph.traversal().withRemote(conn)
+            # make a data set for each column of data needing replacement values
+            for i in cols:
+                ndat = np.vstack((dat[[k for k in range(0,len(dat)) if k not in rows],i],ipt))
+                # create column names (normally obtained by var.dtype.names)
+                coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
+                # create the knowledge graph that holds the "brains"
+                kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
+                # write the knowledge graph
+                dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
+                dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,False) for k in kgdat]
+                # thought function will give us the predictions for replacement in original data set
+                for j in rows:
+                    dat[j,i] = thought(inst,list(coln.items()),dat[j,ncols]).values()[0] if dat[j,i] is None else dat[j,i]
+    return ret
+
+############################################################################
+##
+## Purpose:   wikilabel support function to expand data
+##
+############################################################################
+def wikidocs(inst=0,dat=[]):
+    ret  = []
+    if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+        # for each text "document" in the list we will tokenize
+        # and get a Wikipedia for each word, then concatenate the docs
+        #
+        # keras tokenizer will also remove punctuation
+        tok  = Tokenizer()
+        tok.fit_on_texts(dat)
+        items= np.asarray(list(tok.word_index.items()))
+        # grab the wikipedia data with image object detection
+        # and the testing flags both set to False
+        wiki = cognitive(const.constants.WIK,items[:,0],inst,False,False,True)
+        # append together all wikis and do some topic modeling
+        # that will hopefully give more uniform values, as it seems
+        # that some text values started out being similar but not
+        # exactly the same, which can affect labeling
+        ret.append(" ".join(wiki))
+    return ret
+
+############################################################################
+##
+## Purpose:   Use Wikipedia to expand text data and assign labels
+##
+############################################################################
+def wikilabel(inst=0,dat=[],wik=False):
+    ret  = None
+    if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+        d    = np.asarray(dat).copy()
+        if wik:
+            # number of cpu cores
+            nc   = mp.cpu_count()
+            # for each text "document" in the list we will tokenize
+            # and get a Wikipedia for each word, then concatenate the docs
+            wikis= [wikidocs(inst,doc.split(" ")) for doc in d]
+            wikis= np.asarray(wikis).flatten()
+        else:
+            wikis= d
+        # now we will do some topic modeling
+        #
+        # when using the open source (local=True) method, the return
+        # should contain the numeric label and the topic, separated by const.constants.SEP
+        ret  = img2txt(const.constants.KP,wikis,inst,False,True)
+    return ret
+
+############################################################################
+##
+## Purpose:   Permute data rows to introduce entropy then calc feature importance
+##
+############################################################################
+def importance(ip=[],op=[],model=None):
+    ret  = None
+    if type(model) == type(None):
+        if ip.any() and op.any():
+            kfold= min(const.constants.KFOLD ,2) if hasattr(const.constants,"KFOLD" ) else 2
+            thold=     const.constants.THRESH    if hasattr(const.constants,"THRESH") else 0.05
+            # fit the model and gauge permutation importance
+            ret  = SelectFromModel(PermutationImportance(SVC(),cv=kfold),threshold=thold).fit(ip.astype(np.single),op.astype(np.single))
+    else:
+        # model is already fit so just compute permutation importance
+        ret  = SelectFromModel(PermutationImportance(model,cv="prefit"),threshold=thold,prefit=True)
     return ret
 
 # *************** TESTING *****************

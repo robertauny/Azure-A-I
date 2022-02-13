@@ -28,7 +28,7 @@ class constants():
     E              = "edges"
     MDL            = "model"
     LBL            = "label"
-    SEP            = "-"
+    SEP            = "_"
     SEED           = 12345
     INST           = 0
     FILL_COLOR     = 0

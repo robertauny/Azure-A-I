@@ -46,10 +46,6 @@ from PIL                         import Image
 from scipy                       import stats
 from glob                        import glob 
 
-# imports related to calculating importance of features
-from eli5.sklearn                import PermutationImportance
-from sklearn.feature_selection   import SelectFromModel
-
 import multiprocessing       as mp
 import numpy                 as np
 import pandas                as pd
@@ -367,47 +363,6 @@ def dbn(inputs=[]
                 model.fit(x=ip,y=op,   epochs=epochs,verbose=verbose)
     # return the model to the caller
     return model
-
-############################################################################
-##
-## Purpose:   Permute data rows to introduce entropy then calc feature importance
-##
-############################################################################
-def nn_importance(ip=[],op=[],model=None):
-    ret  = None
-    if type(model) == type(None):
-        if ip.any() and op.any():
-            # linear stack of layers in the neural network (NN)
-            model= Sequential()
-            # control the size of the network's inner layers
-            #
-            # if all possible levels, then M  = len(inputs[0])
-            if type(ip[0]) in [type([]),type(np.asarray([]))]:
-                if type(ip[0,0]) in [type([]),type(np.asarray([]))]:
-                    M    = min(len(ip[0,0]),props)
-                else:
-                    M    = min(len(ip[0  ]),props)
-                # central to the actual model are restricted Boltzmann machines (RBM)
-                # each of which being a single-hidden-layer feed forward network
-                #
-                # in the actual model, multiple RBMs are constructed in a multi-layered network
-                # for local approximation according to writings in
-                # "Auto-encoding a Knowledge Graph Using a Deep Belief Network"
-                #
-                # using the local structure, the original data are partitioned into smaller
-                # chunks (by row and column) for parallel processing ... however, that's not needed here
-                #
-                # what we need is the full data set for introducing entropy and determining
-                # which features express more variability as a result
-                dbnlayers(model,M,ip.shape[1:],'relu',useact)
-                dbnlayers(model,M,M,'tanh' if ver == const.constants.VER else 'selu',useact)
-                dbnlayers(model,1,M,'sigmoid',useact)
-                # fit the model and gauge permutation importance
-                ret  = SelectFromModel(PermutationImportance(model,cv=const.constants.KFOLD),threshold=const.constants.THRESH).fit(ip,op)
-    else:
-        # model is already fit so just compute permutation importance
-        ret  = SelectFromModel(PermutationImportance(model,cv="prefit"),threshold=const.constants.THRESH,prefit=True)
-    return ret
 
 ############################################################################
 ##
