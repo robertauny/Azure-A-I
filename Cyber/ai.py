@@ -1970,13 +1970,13 @@ def checkdata(dat=[]):
         #
         # doing rows first since a null row will eliminate all columns
         rows = [i for i in range(0,len(ret)) if any(a is None or len(a) == 0 for a in ret[i])]
-        ret  = ret[[i for i in range(0,len(ret)) if i not in rows],:] if len(rows) > 0 else ret
         # have to check that we still have rows of data
         if not (len(ret) == 0 or len(ret[0]) == 0):
             # check which columns have any null values and remove them
             d1   = ret.transpose()
             cols = [i for i in range(0,len(d1)) if any(a is None or len(a) == 0 for a in d1[i])]
-            ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]] if len(cols) > 0 else ret
+        # for the return, we will remove all rows that have empty (null) strings
+        ret  = ret[[i for i in range(0,len(ret)) if i not in rows],:] if len(rows) > 0 else ret
     return ret,rows,cols
 
 ############################################################################
@@ -2009,22 +2009,6 @@ def fixdata(inst=0,dat=[]):
             # that allows us to determine the number of clusters based upon the assumption
             # of normality, plus ordering that gives uniformity
             #
-            # inputs for importance are the subset of rows that have values
-            ip   = d
-            # mixed bag of normals used as inputs when calculating labels for use as outputs
-            ndat = np.random.normal(size=(len(d),1)).flatten()
-            # outputs for importance calculated as categorical labels
-            op   = calcC(ndat)
-            # gauge the importance of each feature of the modified data set
-            imp  = importance(ip,op)
-            # finally replace the values for use in building the models to fix the data
-            ipt  = imp.transform(ip)
-            # gonna brute force a way to check which features are being selected from the data
-            ncols= []
-            for i in range(0,len(dat[0])):
-                for j in range(0,len(ipt)):
-                    if dat[[k for k in range(0,len(dat)) if k not in rows],i] == ipt[:,j]:
-                        ncols.append(i)
             # now we will build "brains" from the transformed data that will do the "thinking"
             # for us when we want to replace missing values in the original data set
             #
@@ -2034,19 +2018,29 @@ def fixdata(inst=0,dat=[]):
             conn = DriverRemoteConnection(data.url_kg(inst),'g')
             # get the remote graph traversal
             g    = graph.traversal().withRemote(conn)
+            # set of columns that don't need fixing
+            ncols= [i for i in range(0,len(dat[0])) if i not in cols]
+            # inputs for importance are the subset of rows that have values
+            ip   = d[:,ncols]
+            # outputs for importance calculated as categorical labels
+            op   = d[:, cols]
+            # unrelated redifinition of ndat to be used in the loop
+            ndat = np.hstack((op,ip)).astype(np.single)
+            # create column names (normally obtained by var.dtype.names)
+            coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
+            # create the knowledge graph that holds the "brains"
+            kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
+            # write the knowledge graph
+            #dump = [map(lambda ve: map(lambda k: data.write_kg(ve,inst,list(coln.items()),k,g,False),kgdat), [const.constants.V,const.constants.E])]
+            dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
+            dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
             # make a data set for each column of data needing replacement values
             for i in cols:
-                ndat = np.vstack((dat[[k for k in range(0,len(dat)) if k not in rows],i],ipt))
-                # create column names (normally obtained by var.dtype.names)
-                coln = {"col"+str(k):(k-1) for k in range(1,len(ndat[0])+1)}
-                # create the knowledge graph that holds the "brains"
-                kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
-                # write the knowledge graph
-                dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
-                dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,False) for k in kgdat]
-                # thought function will give us the predictions for replacement in original data set
+                # thought function will give us the predictions for replacement in the original data set
                 for j in rows:
-                    dat[j,i] = thought(inst,list(coln.items()),dat[j,ncols]).values()[0] if dat[j,i] is None else dat[j,i]
+                    tht      = list(thought(inst,list(coln.items()),dat[j,ncols].astype(np.single)).values()) if "" in dat[j,i] else []
+                    dat[j,i] = tht[0][0]                                                                      if len(tht) > 0   else dat[j,i]
+            ret  = dat
     return ret
 
 ############################################################################
@@ -2089,6 +2083,7 @@ def wikilabel(inst=0,dat=[],wik=False):
             # for each text "document" in the list we will tokenize
             # and get a Wikipedia for each word, then concatenate the docs
             wikis= [wikidocs(inst,doc.split(" ")) for doc in d]
+            # each document should just be a line containing a string
             wikis= np.asarray(wikis).flatten()
         else:
             wikis= d
@@ -2107,7 +2102,8 @@ def wikilabel(inst=0,dat=[],wik=False):
 def importance(ip=[],op=[],model=None):
     ret  = None
     if type(model) == type(None):
-        if ip.any() and op.any():
+        if type(ip) in [type([]),type(np.asarray([]))] and len(ip) > 0 and \
+           type(op) in [type([]),type(np.asarray([]))] and len(op) > 0:
             kfold= min(const.constants.KFOLD ,2) if hasattr(const.constants,"KFOLD" ) else 2
             thold=     const.constants.THRESH    if hasattr(const.constants,"THRESH") else 0.05
             # fit the model and gauge permutation importance
