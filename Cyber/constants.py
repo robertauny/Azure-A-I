@@ -137,7 +137,7 @@ class constants():
     # shape detection
     SHP          = "objs"
     # shape detection
-    WIK          = "wiki"
+    WIK          = "summary"
     # entity extraction
     EE           = "keyPhrases"
     # sentiment

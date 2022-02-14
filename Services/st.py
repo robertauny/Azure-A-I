@@ -41,6 +41,7 @@ from nn                                             import dbn,calcC
 
 import config
 import data
+import utils
 
 import numpy           as np
 import multiprocessing as mp
@@ -82,26 +83,34 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             f.close()
             # going to capture the header and data so it can be replaced
             hdr  = dat[0].copy()
+            dat  = dat[1:]
             # check which rows/columns have any null values and remove them
             d,rows,cols = checkdata(dat)
             # have to check that we still have rows/columns of data
             if not (len(d) == 0 or len(d[0]) == 0):
                 # indices that actually had data originally
-                indx = [j for j in range(0,len(dat)) if j not in rows]
+                indxr= [j for j in range(0,len(dat   )) if j not in rows]
                 # string columns will be labeled using wikilabel
-                for i in range(0,len(d[0])):
-                    if not bool(np.char.isnumeric(d[0,i])):
-                        if "" in dat[rows,i]:
+                for i in range(0,len(dat[0])):
+                    if i in cols:
+                        if type("") == utils.sif(d[0,i]):
                             wiki = wikilabel(inst,d[:,i],True,True)
-                            for k in indx:
+                            for k in indxr:
                                 # when using the open source (local=True) method, the return
                                 # should contain the numeric label and the topic, separated by const.constants.SEP
                                 #
                                 # we only want the integer label for now, with the rest being used later
-                                dat[k,cols[i]] = wiki[indx.index(k)].split(const.constants.SEP)[0]
-                # i hate this hack but when i remove the header, then other things break
-                # will have to figure out how to get around this issue but keep
-                # the hack for now
-                dat[0,:] = hdr
+                                dat[k,i] = wiki[indxr.index(k)].split(const.constants.SEP)[0]
+                    else:
+                        if type("") == utils.sif(d[0,i]):
+                            wiki = wikilabel(inst,dat[:,i],True,True)
+                            for k in range(0,len(dat[:,i])):
+                                # when using the open source (local=True) method, the return
+                                # should contain the numeric label and the topic, separated by const.constants.SEP
+                                #
+                                # we only want the integer label for now, with the rest being used later
+                                dat[k,i] = wiki[k].split(const.constants.SEP)[0]
                 # fix the data by intelligently filling missing values
-                dat  = fixdata(inst,dat[1:len(dat)],{dat[0,k]:k for k in range(0,len(dat[0]))})
+                dat  = fixdata(inst,dat,{hdr[k]:k for k in range(0,len(hdr))})
+                # add the header back to the data set
+                dat  = np.vstack((hdr,dat))

@@ -1008,9 +1008,24 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
     ret  = []
     if not (wtyp == None or len(docs) == 0 or inst <= const.constants.BVAL):
         if not testing:
-            # request headers. Important: content should be bytestream as we are sending an image from local
-            hdrs = {"Ocp-Apim-Subscription-Key":None}
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["src"]["index"]
+            typ  = cfg["instances"][inst]["src"]["types"][wtyp]
+            # azure subscription key
+            key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
+            # azure vision api
+            host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+            # api
+            api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
+            # version
+            ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
+            # app
+            app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
+            # url
+            url  = "https://" + host + "/" + api + "/" + ver + "/" + app
+            hdrs = {"Ocp-Apim-Subscription-Key":key}
             parms= {"language":"unk","detectOrientation":"true"}
+            # request headers. Important: content should be bytestream as we are sending an image from local
             ftext= []
             if wtyp == const.constants.SHP:
                 try:
@@ -1064,9 +1079,9 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
                         for term in docs:
                             for i in term.split():
                                 # wikipedia url
-                                url  = "https://en.wikipedia.org/api/rest_v1/page/summary/" + i
+                                nurl = url + "/" + i
                                 # get response from the server
-                                resp = requests.get(url,headers=hdrs)
+                                resp = requests.get(nurl,headers=hdrs)
                                 resp.raise_for_status()
                                 # get json data to parse it later
                                 js   = resp.json()
@@ -1082,22 +1097,6 @@ def img2txt(wtyp=const.constants.OCR,docs=[],inst=const.constants.BVAL,testing=T
                         ftext.append(str(err))
                 else:
                     if not local:
-                        # ordering of the data elements in the JSON file
-                        src  = cfg["instances"][inst]["src"]["index"]
-                        typ  = cfg["instances"][inst]["src"]["types"][wtyp]
-                        # azure subscription key
-                        key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
-                        # azure vision api
-                        host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
-                        # api
-                        api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
-                        # version
-                        ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
-                        # app
-                        app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
-                        # url
-                        url  = "https://" + host + "/" + api + "/" + ver + "/" + app
-                        hdrs["Ocp-Apim-Subscription-Key"] = key
                         if wtyp == const.constants.OCR:
                             hdrs["Content-Type"] = "application/octet-stream"
                             for i in docs:
@@ -2027,6 +2026,9 @@ def fixdata(inst=0,dat=[],coln={}):
             # outputs for importance calculated as categorical labels
             op   = d[:, cols]
             # unrelated redifinition of ndat to be used in the loop
+            # 
+            # the order of the outputs/inputs matter in the horizontal stack
+            # as the model will be picked up as ... outputs as a function of inputs
             ndat = np.hstack((op,ip)).astype(np.single)
             # create the knowledge graph that holds the "brains"
             kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
@@ -2078,12 +2080,28 @@ def wikilabel(inst=0,dat=[],wik=False,rf=False):
     if inst > const.constants.BVAL and type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
         d    = np.asarray(dat).copy()
         if wik:
-            # number of cpu cores
-            nc   = mp.cpu_count()
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["src"]["index"]
+            typ  = cfg["instances"][inst]["src"]["types"][const.constants.WIK]
+            # azure subscription key
+            key  = cfg["instances"][inst]["sources"][src][typ]["connection"]["key"]
+            # azure vision api
+            host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host"]
+            # api
+            api  = cfg["instances"][inst]["sources"][src][typ]["connection"]["api"]
+            # version
+            ver  = cfg["instances"][inst]["sources"][src][typ]["connection"]["ver"]
+            # app
+            app  = cfg["instances"][inst]["sources"][src][typ]["connection"]["app"]
+            # url
+            url  = "https://" + host + "/" + api + "/" + ver + "/" + app
             # for each text "document" in the list we will tokenize
             # and get a Wikipedia for each word, then concatenate the docs
             wikis= [wikidocs(inst,doc.split(" ")) for doc in d]
             # each document should just be a line containing a string
+            for i in range(0,len(wikis)):
+                if url in wikis[i]:
+                    wikis[i] = d[i]
             wikis= np.asarray(wikis).flatten()
         else:
             wikis= d

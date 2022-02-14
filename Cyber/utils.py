@@ -186,6 +186,30 @@ def confusion(tgts=[],prds=[],fl=None):
 
 ############################################################################
 ##
+## Purpose:   Check if argument is a string, int or float
+##
+############################################################################
+def sif(arg=None):
+    #ret  = type(arg)
+    ret  = type(None)
+    if not (type(arg) == type(None)):
+        try:
+            dump = int(arg)
+            ret  = type(0)
+        except:
+            try:
+                dump = float(arg)
+                ret  = type(0.0)
+            except:
+                try:
+                    dump = str(arg)
+                    ret  = type("")
+                except:
+                    dump = None
+    return ret
+
+############################################################################
+##
 ## Purpose:   Utils class
 ##
 ############################################################################
