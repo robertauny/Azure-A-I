@@ -89,7 +89,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             # have to check that we still have rows/columns of data
             if not (len(d) == 0 or len(d[0]) == 0):
                 # indices that actually had data originally
-                indxr= [j for j in range(0,len(dat   )) if j not in rows]
+                indxr= [j for j in range(0,len(dat)) if j not in rows]
                 # string columns will be labeled using wikilabel
                 for i in range(0,len(dat[0])):
                     if i in cols:
