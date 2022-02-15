@@ -284,45 +284,46 @@ def brain(dat=[],splits=2,permu=[]):
             # iterate to the next loop if this model is null
             if type(mdl) == type(None):
                 continue
-            # save the cluster model to a local file
-            fl   = "models/" + lbl + ".h5"
-            mdl.save(fl)
-            # generate the regression model whose genesis is to learn the
-            # model of the distribution of the highly correlated set of data
-            # points that are assumed to have the markov property, meaning
-            # that the most recent data point (or the last data point, in this case)
-            # carries with it all information about the data points that preceded it
-            # in the sequence of sampled output ... the idea for this model is simple
-            # ... learn the distribution of the previous data points that will predict
-            # the last data point ... then we can make predictions about the next values
-            # to be be seen in the input sequence, as a distribution of this type will
-            # be needed by the thought function
-            #
-            # the thought function will infer the next data points, which can be used to
-            # infer the cluster to which the next data points belong using the clustering
-            # model ... then we can predict the one-dimensional output as a function of the
-            # multi-dimensional inputs using the specific cluster regression models that are
-            # produced elsewhere ... the idea is this
-            #
-            # we have inputs from which we infer the next set of inputs, which will allow
-            # us to make inferences about the set of outputs of interest
-            #
-            # we use almost all inputs and reason about the next set of inputs to get to the desired outputs
-            # as this is the normal (human) thought process that we are attempting to model
-            #
-            # the way that we will find this model is to have the (k-1)-th data point to predict the k-th data point
-            # since the markov property guarantees that only the (k-1)-th data point is significant in predicting
-            # its successor k-th data point
-            mdl  = dbn(d[0:(len(dat)-1),perm[1:]]
-                      ,d[1: len(dat)   ,perm[1:]]
-                      ,loss="mean_squared_error"
-                      ,optimizer="sgd"
-                      ,rbmact="selu"
-                      ,dbnact="tanh"
-                      ,dbnout=p)
-            # regression model
-            rfl  = "models/" + "".join(lbl.split(const.constants.SEP)) + ".h5"
-            mdl.save(rfl)
+            else:
+                # save the cluster model to a local file
+                fl   = "models/" + lbl + ".h5"
+                mdl.save(fl)
+                # generate the regression model whose genesis is to learn the
+                # model of the distribution of the highly correlated set of data
+                # points that are assumed to have the markov property, meaning
+                # that the most recent data point (or the last data point, in this case)
+                # carries with it all information about the data points that preceded it
+                # in the sequence of sampled output ... the idea for this model is simple
+                # ... learn the distribution of the previous data points that will predict
+                # the last data point ... then we can make predictions about the next values
+                # to be be seen in the input sequence, as a distribution of this type will
+                # be needed by the thought function
+                #
+                # the thought function will infer the next data points, which can be used to
+                # infer the cluster to which the next data points belong using the clustering
+                # model ... then we can predict the one-dimensional output as a function of the
+                # multi-dimensional inputs using the specific cluster regression models that are
+                # produced elsewhere ... the idea is this
+                #
+                # we have inputs from which we infer the next set of inputs, which will allow
+                # us to make inferences about the set of outputs of interest
+                #
+                # we use almost all inputs and reason about the next set of inputs to get to the desired outputs
+                # as this is the normal (human) thought process that we are attempting to model
+                #
+                # the way that we will find this model is to have the (k-1)-th data point to predict the k-th data point
+                # since the markov property guarantees that only the (k-1)-th data point is significant in predicting
+                # its successor k-th data point
+                mdl  = dbn(d[0:(len(dat)-1),perm[1:]]
+                          ,d[1: len(dat)   ,perm[1:]]
+                          ,loss="mean_squared_error"
+                          ,optimizer="sgd"
+                          ,rbmact="selu"
+                          ,dbnact="tanh"
+                          ,dbnout=p)
+                # regression model
+                rfl  = "models/" + "".join(lbl.split(const.constants.SEP)) + ".h5"
+                mdl.save(rfl)
             # add the current label and model to the return
             ret.append({"label":lbl,"model":fl,"rmodel":rfl})
     return ret
