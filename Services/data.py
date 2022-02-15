@@ -508,19 +508,20 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                     # write the graph to disk
                     fl   = "data/" + ret[0][0] + ext
                     g.io(fl).write().iterate()
-                    # data to generate a neural network for the rows in the current cluster
-                    dat  = np.asarray(vert)[unique(crow)-1,1:]
-                    # generate the model
-                    mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
-                              ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
-                              ,loss="mean_squared_error"
-                              ,optimizer="sgd"
-                              ,rbmact="selu"
-                              ,dbnact="tanh"
-                              ,dbnout=1)
-                    # identify the file and save the data from the current cluster
-                    fl   = "models/" + ret[0][0] + ".h5"
-                    mdl.save(fl)
+                    if not len(crow) == 0:
+                        # data to generate a neural network for the rows in the current cluster
+                        dat  = np.asarray(vert)[unique(crow)-1,1:]
+                        # generate the model
+                        mdl  = dbn(np.asarray([[float(dat[j,i]) for i in range(0,len(dat[j,1:]))] for j in range(0,len(dat))])
+                                  ,np.asarray( [float(dat[j,0])                                   for j in range(0,len(dat))])
+                                  ,loss="mean_squared_error"
+                                  ,optimizer="sgd"
+                                  ,rbmact="selu"
+                                  ,dbnact="tanh"
+                                  ,dbnout=1)
+                        # identify the file and save the data from the current cluster
+                        fl   = "models/" + ret[0][0] + ".h5"
+                        mdl.save(fl)
             # drop all of the data that was just loaded
             if drop:
                 g.E().drop().iterate()
