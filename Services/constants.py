@@ -52,8 +52,13 @@ class constants():
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
     TARGETS        = ["REASONCODE"]
-    DATES          = ["DATE"]
-    DROP           = ["Id"
+    DATES          = ["START","STOP"]
+    DROP           = ["PATIENT"
+                     ,"PAYER"
+                     ,"ENCOUNTER"
+                     ,"REASONCODE"
+                     ,"CODE"]
+    DROP1          = ["Id"
                      ,"PATIENT"
                      ,"START"
                      ,"STOP"

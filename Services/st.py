@@ -44,6 +44,7 @@ import data
 import utils
 
 import numpy           as np
+import pandas          as pd
 import multiprocessing as mp
 
 import csv
@@ -82,8 +83,25 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             dat  = np.asarray([line for line in csv.reader(f)])
             f.close()
             # going to capture the header and data so it can be replaced
-            hdr  = dat[0].copy()
+            hdr  = list(dat[0].copy())
+            # move beyond the header and add it back later
             dat  = dat[1:]
+            # columns to drop, including date columns .. add them back later
+            dat         = pd.DataFrame(dat)
+            dat.columns = hdr
+            if hasattr(const.constants,"DROP" )                                                                  and \
+               type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
+                drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
+                dat  = dat.drop(columns=const.constants.DROP )
+                dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
+                hdr  = [i for i in hdr if i not in dhdr]
+            if hasattr(const.constants,"DATES")                                                                  and \
+               type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
+                dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
+                dat  = dat.drop(columns=const.constants.DATES)
+                thdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DATES]])
+                hdr  = [i for i in hdr if i not in thdr]
+            dat  = dat.to_numpy()
             # check which rows/columns have any null values and remove them
             d,rows,cols = checkdata(dat)
             # have to check that we still have rows/columns of data
@@ -112,5 +130,11 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                 dat[k,i] = wiki[k].split(const.constants.SEP)[0]
                 # fix the data by intelligently filling missing values
                 dat  = fixdata(inst,dat,{hdr[k]:k for k in range(0,len(hdr))})
-                # add the header back to the data set
-                dat  = np.vstack((hdr,dat))
+                # add the header and drop/date columns back to the data set
+                if hasattr(const.constants,"DROP" )                                                                  and \
+                   type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
+                    dat  = np.hstack((drop,dat))
+                if hasattr(const.constants,"DATES")                                                                  and \
+                   type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
+                    dat  = np.hstack((dts ,dat))
+                dat  = np.vstack(([thdr+dhdr+hdr],dat))
