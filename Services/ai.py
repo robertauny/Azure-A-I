@@ -278,9 +278,12 @@ def brain(dat=[],splits=2,permu=[]):
             # produce regressors to segregate the data that amount to
             # projections onto the last feature of the data, as we are only using
             # the last of the input features in the definition of the outputs
-            odat = to_categorical(calcC(d[:,perm[0]]).flatten(),num_classes=splits**(2*p))
+            odat = to_categorical(calcC(d[:,perm[0]],splits**(2*p)).flatten(),num_classes=splits**(2*p))
             # generate the cluster model
             mdl  = dbn(d[:,perm[1:]],odat,splits=splits,props=p)
+            # iterate to the next loop if this model is null
+            if type(mdl) == type(None):
+                continue
             # save the cluster model to a local file
             fl   = "models/" + lbl + ".h5"
             mdl.save(fl)
@@ -1519,7 +1522,7 @@ def extendglove(docs=[],gdoc=None,splits=2,props=2,opt=True):
                     # now since every set of input constants is associated to a unique word from the glove data set, then our outputs
                     # can consist of one unique value for each row of constants
                     #ovals= to_categorical(np.sum(gvals,axis=1),num_classes=(clust+1))
-                    ovals= to_categorical(calcC(gvals).flatten(),num_classes=(clust+1))
+                    ovals= to_categorical(calcC(gvals,clust+1).flatten(),num_classes=(clust+1))
                     # for each word in the glove files, we have a conditional distribution defined by constants as the parameters
                     # of a plane ... i.e. each row of constants defines an element of a conditional specification
                     #
@@ -2031,7 +2034,8 @@ def fixdata(inst=0,dat=[],coln={}):
             # as the model will be picked up as ... outputs as a function of inputs
             ndat = np.hstack((op,ip)).astype(np.single)
             # create the knowledge graph that holds the "brains"
-            kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
+            #kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
+            kgdat= create_kg(inst,ndat,limit=True)
             # write the knowledge graph
             #dump = [map(lambda ve: map(lambda k: data.write_kg(ve,inst,list(coln.items()),k,g,False),kgdat), [const.constants.V,const.constants.E])]
             dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]

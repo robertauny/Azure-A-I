@@ -102,7 +102,7 @@ def calcN(pts=None):
 ## Purpose:   Random cluster theory for formation
 ##
 ############################################################################
-def calcC(vals=None):
+def calcC(vals=None,clust=None):
     ret  = None
     # can't use categoricals for the labels here
     # throws an error for the list of things in the first column being longer than the number of labels
@@ -132,7 +132,7 @@ def calcC(vals=None):
     # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
     if not (type(vals) == type(None) or len(vals) == 0):
         svals= np.argsort(vals)
-        rints= list(range(1,calcN(len(vals))+1))
+        rints= list(range(1,clust if clust is not None and clust >= 2 else calcN(len(vals))+1))
         sints= int(ceil(len(vals)/len(rints)))
         tvals= []
         for i in rints:
