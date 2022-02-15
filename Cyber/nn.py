@@ -738,30 +738,27 @@ def nn_cat(dat=None,splits=const.constants.SPLITS,props=const.constants.PROPS,cl
 ## Purpose:   Merge the data and split into train and test sets
 ##
 ############################################################################
-def nn_split(pfl=None,mfl=None,prfl=None):
+def nn_split(pfl=None,mfl=None):
     ret  = {"train":None,"test":None,"labels":{}}
-    if (os.path.exists(pfl) and os.stat(pfl).st_size > 0) and \
-       (os.path.exists(mfl) and os.stat(mfl).st_size > 0) and \
-       (os.path.exists(prfl) and os.stat(prfl).st_size > 0):
-        # get the input patient values
+    if (os.path.exists(pfl) and os.stat(pfl).st_size > 0):
+        # get the first input values
         dat  = pd.read_csv(pfl).fillna(0)
-        ld   = dat.to_numpy().shape
-        cd   = dat.columns.tolist()
-        # get the output medication values
-        mat  = pd.read_csv(mfl).fillna(0)
-        lt   = mat.to_numpy().shape
-        ct   = mat.columns.tolist()
-        # get the output medication values
-        pr   = pd.read_csv(prfl).fillna(0)
-        lt   = pr.to_numpy().shape
-        ct   = pr.columns.tolist()
-        # merge the data
-        pat          = mat.merge(pr,how="inner").fillna(0)
-        dat          = dat.merge(mat
-                                ,how="inner"
-                                ,left_on=const.constants.MATCH_ON[0]
-                                ,right_on=const.constants.MATCH_ON[1]).fillna(0)
-        dat          = dat.drop(columns=const.constants.DROP) if hasattr(const.constants,"DROP") else dat
+        if not type(mfl) == type(None):
+            if type(mfl) in [type([]),type(np.asarray([]))]:
+                for m in mfl:
+                    if (os.path.exists(m) and os.stat(m).st_size > 0):
+                        # get the next input values
+                        mat  = pd.read_csv(m).fillna(0)
+                        # merge the data
+                        dat  = dat.merge(mat,how="inner").fillna(0)
+            else:
+                if (os.path.exists(mfl) and os.stat(mfl).st_size > 0):
+                    # get the next input values
+                    mat  = pd.read_csv(mfl).fillna(0)
+                    # merge the data
+                    dat  = dat.merge(mat,how="inner").fillna(0)
+        # drop certain columns if requested
+        dat  = dat.drop(columns=const.constants.DROP) if hasattr(const.constants,"DROP") else dat
         # do some conditioning of the data before attempting to train or test
         # build the model
         #

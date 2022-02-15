@@ -472,6 +472,39 @@ def thought(inst=0,coln=[],dat=None,res=True):
 
 ############################################################################
 ##
+## Purpose:   Use thought for multi-dimensional output relying on separability
+##
+############################################################################
+def afterthought(inst=0,coln=[],dat=[],res=True,out=1):
+    ret  = {}
+    # we are interested in using separability of the multi-dimensional distribution
+    # that is to be learned from the inputs ... to learn this distribution we first
+    # make an assumption that the joint distribution is a multi-dimensional product
+    # of single-output conditional/marginal distributions ... indeed, if the markov
+    # property is assusmed, it is within reason to also make an assumption of
+    # separability, in which case, variance of the joint distribution is just the
+    # product of variance of marginals in one or more random variables ... learning
+    # these marginals is the approach that is taken by way of "thought" so that
+    # the joint distribution is a "tuple" comprised of output from these marginals
+    #
+    # output variables are at least 2 and the number of columns of data is at
+    # least 1 + the number of output variables, as our route to constructing the
+    # marginals whose output will be used in construction of the "tuple" will be
+    # a function of common input variables since we want to gauge how the how outputs
+    # vary together as a function of the common inputs
+    if not (inst == None or out < 1 or len(coln) < out+1 or len(dat) == 0):
+        # we assume that the first out columns of coln
+        # are to be used as the output variables
+        if len(coln) > const.constants.MAX_COLS:
+            dump                                = afterthought(inst,coln[-(len(coln)-const.constants.MAX_COLS+1):],dat[:,-(len(coln)-const.constants.MAX_COLS+1):],res,1)
+            dat[:,(const.constants.MAX_COLS-1)] = list(dump.values())[0][0]
+            ret                                 = thought(inst,coln[0:const.constants.MAX_COLS],dat[:,0:const.constants.MAX_COLS],res)
+        else:
+            ret                                 = thought(inst,coln                            ,dat                              ,res)
+    return ret
+
+############################################################################
+##
 ## Purpose:   Convert a list of strings into their ordinal representation
 ##
 ############################################################################
