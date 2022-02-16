@@ -476,7 +476,7 @@ def thought(inst=0,coln=[],dat=None,res=True):
 ##
 ############################################################################
 def afterthought(inst=0,coln=[],dat=[],res=True,out=1):
-    ret  = {}
+    ret  = None
     # we are interested in using separability of the multi-dimensional distribution
     # that is to be learned from the inputs ... to learn this distribution we first
     # make an assumption that the joint distribution is a multi-dimensional product
@@ -495,12 +495,14 @@ def afterthought(inst=0,coln=[],dat=[],res=True,out=1):
     if not (inst == None or out < 1 or len(coln) < out+1 or len(dat) == 0):
         # we assume that the first out columns of coln
         # are to be used as the output variables
-        if len(coln) > const.constants.MAX_COLS:
-            dump                                = afterthought(inst,coln[-(len(coln)-const.constants.MAX_COLS+1):],dat[:,-(len(coln)-const.constants.MAX_COLS+1):],res,1)
-            dat[:,(const.constants.MAX_COLS-1)] = list(dump.values())[0][0]
-            ret                                 = thought(inst,coln[0:const.constants.MAX_COLS],dat[:,0:const.constants.MAX_COLS],res)
-        else:
-            ret                                 = thought(inst,coln                            ,dat                              ,res)
+        for i in range(0,out):
+            cols = [i]
+            cols.extend(list(range(out,len(coln))))
+            if len(coln)-out+1 > const.constants.MAX_COLS:
+                nret = afterthought(inst,coln[cols],dat[:,cols],res,1)
+            else:
+                nret =      thought(inst,coln[cols],dat[:,cols],res  )
+        ret  = nret if type(ret) == type(None) else np.hstack((ret,nret))
     return ret
 
 ############################################################################
