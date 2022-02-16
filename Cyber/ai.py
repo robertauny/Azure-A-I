@@ -501,7 +501,7 @@ def afterthought(inst=0,coln=[],dat=[],res=True,out=1):
             if len(coln)-out+1 > const.constants.MAX_COLS:
                 nret = afterthought(inst,coln[cols],dat[:,cols],res,1)
             else:
-                nret =      thought(inst,coln[cols],dat[:,cols],res  )
+                nret = list(thought(inst,coln[cols],dat[:,cols],res  ).values())
         ret  = nret if type(ret) == type(None) else np.hstack((ret,nret))
     return ret
 
