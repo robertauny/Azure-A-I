@@ -330,7 +330,7 @@ def dbn(inputs=[]
             # file type extension
             flt  = ".hdf5"
             # model checkpoint call back
-            nsfl = fln + "_" + dt + flt
+            nsfl = fln + const.constants.SEP + dt + flt
             chkpt= ModelCheckpoint(filepath=nsfl,save_weights_only=False,monitor='val_acc',mode='max')#,save_best_only=True)
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
@@ -352,7 +352,7 @@ def dbn(inputs=[]
                 # file type extension
                 flt  = sfl[ sfl.rfind("."):]
                 # save the model
-                nsfl = fln + "_" + dt + flt
+                nsfl = fln + const.constants.SEP + dt + flt
                 model.save(nsfl)
         else:
             x    = ip.astype(np.single)
