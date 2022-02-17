@@ -52,9 +52,12 @@ class constants():
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
     TARGETS        = ["REASONCODE"]
-    DATES          = ["START","STOP"]
+    #DATES          = ["START","STOP"]
+    #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
     DROP           = ["PATIENT"
                      ,"PAYER"
+                     ,"START"
+                     ,"STOP"
                      ,"ENCOUNTER"
                      ,"REASONCODE"
                      ,"CODE"]

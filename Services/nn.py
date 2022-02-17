@@ -355,12 +355,14 @@ def dbn(inputs=[]
                 nsfl = fln + "_" + dt + flt
                 model.save(nsfl)
         else:
+            x    = ip.astype(np.single)
+            y    = op.astype(np.single)
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
             if ver == const.constants.VER:
-                model.fit(x=ip,y=op,nb_epoch =epochs,verbose=verbose)
+                model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose)
             else:
-                model.fit(x=ip,y=op,   epochs=epochs,verbose=verbose)
+                model.fit(x=x,y=y,   epochs=epochs,verbose=verbose)
     # return the model to the caller
     return model
 
@@ -740,36 +742,20 @@ def nn_cat(dat=None,splits=const.constants.SPLITS,props=const.constants.PROPS,cl
 ############################################################################
 def nn_split(pfl=None,mfl=None):
     ret  = {"train":None,"test":None,"labels":{}}
-    if (os.path.exists(pfl) and os.stat(pfl).st_size > 0):
+    if type(pfl) == type(pd.DataFrame([])):
         # get the first input values
-        dat  = pd.read_csv(pfl).fillna(0)
-        if not type(mfl) == type(None):
-            if type(mfl) in [type([]),type(np.asarray([]))]:
-                for m in mfl:
-                    if (os.path.exists(m) and os.stat(m).st_size > 0):
-                        # get the next input values
-                        mat  = pd.read_csv(m).fillna(0)
-                        # merge the data
-                        dat  = dat.merge(mat,how="inner").fillna(0)
-            else:
-                if (os.path.exists(mfl) and os.stat(mfl).st_size > 0):
-                    # get the next input values
-                    mat  = pd.read_csv(mfl).fillna(0)
+        dat  = pfl.copy()
+        if type(mfl) in [type([]),type(np.asarray([]))]:
+            for m in mfl:
+                if type(m) == type(pd.DataFrame([])):
                     # merge the data
-                    dat  = dat.merge(mat,how="inner").fillna(0)
+                    dat  = dat.merge(m,how="inner").fillna(0)
+        else:
+            if type(mfl) == type(pd.DataFrame([])):
+                # merge the data
+                dat  = dat.merge(mfl,how="inner").fillna(0)
         # drop certain columns if requested
         dat  = dat.drop(columns=const.constants.DROP) if hasattr(const.constants,"DROP") else dat
-        # do some conditioning of the data before attempting to train or test
-        # build the model
-        #
-        # perform some cleaning of the data set
-        cols         = dat.columns
-        dat          = pd.DataFrame(nn_mgmt(dat.to_numpy()))
-        dat.columns  = cols
-        # balance the data set
-        cols         = dat.columns
-        dat          = pd.DataFrame(nn_balance(dat.to_numpy()))
-        dat.columns  = cols
         # move target columns to the end if requested
         if hasattr(const.constants,"TARGETS") and (type(const.constants.TARGETS) == type([]) or type(const.constants.TARGETS) == type(np.asarray([]))):
             cols         = dat.columns.tolist()
@@ -785,7 +771,7 @@ def nn_split(pfl=None,mfl=None):
             cols         = dat.columns.tolist()
             for i in range(0,len(cols)):
                 if cols[i] in const.constants.DATES:
-                    dat[cols[i]] = datetime.datetime.strptime(dat.iloc[:,i],"%Y-%m-%dT%H:%M:%SZ")
+                    dat[cols[i]] = datetime.datetime.strptime(dat.iloc[:,i],const.constants.DTFORMAT)
         # get a train and test data set
         tpct         = const.constants.TRAIN_PCT if hasattr(const.constants,"TRAIN_PCT") else 0.8
         trow1        = np.random.randint(0,len(dat),int(ceil(tpct*len(dat))))

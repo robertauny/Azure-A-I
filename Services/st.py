@@ -37,15 +37,17 @@ else:
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,checkdata,fixdata,wikidocs,wikilabel,importance
-from nn                                             import dbn,calcC
+from nn                                             import dbn,calcC,nn_split
 
 import config
 import data
 import utils
 
-import numpy           as np
-import pandas          as pd
-import multiprocessing as mp
+import numpy             as np
+import pandas            as pd
+import multiprocessing   as mp
+import seaborn           as sns
+import matplotlib.pyplot as plt
 
 import csv
 
@@ -83,7 +85,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             dat  = np.asarray([line for line in csv.reader(f)])
             f.close()
             # going to capture the header and data so it can be replaced
-            hdr  = list(dat[0].copy())
+            hdr = list(dat[0].copy())
             # move beyond the header and add it back later
             dat  = dat[1:]
             # columns to drop, including date columns .. add them back later
@@ -94,14 +96,16 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
                 dat  = dat.drop(columns=const.constants.DROP )
                 dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
-                hdr  = [i for i in hdr if i not in dhdr]
+                nhdr = [i for i in  hdr if i not in dhdr]
             if hasattr(const.constants,"DATES")                                                                  and \
                type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
                 dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
                 dat  = dat.drop(columns=const.constants.DATES)
                 thdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DATES]])
-                hdr  = [i for i in hdr if i not in thdr]
+                nhdr = [i for i in nhdr if i not in thdr]
             dat  = dat.to_numpy()
+            #coln = {hdr[k]:k for k in range(0,len(hdr)) if hdr[k] in nhdr}
+            coln = {h:i for i,h in enumerate(nhdr)}
             # check which rows/columns have any null values and remove them
             d,rows,cols = checkdata(dat)
             # have to check that we still have rows/columns of data
@@ -111,16 +115,15 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 # string columns will be labeled using wikilabel
                 for i in range(0,len(dat[0])):
                     if i in cols:
-                        if type("") == utils.sif(d[0,i]):
-                            wiki = wikilabel(inst,d[:,i],True,True)
-                            for k in indxr:
-                                # when using the open source (local=True) method, the return
-                                # should contain the numeric label and the topic, separated by const.constants.SEP
-                                #
-                                # we only want the integer label for now, with the rest being used later
-                                dat[k,i] = wiki[indxr.index(k)].split(const.constants.SEP)[0]
+                        wiki = wikilabel(inst,dat[indxr,i],True,True)
+                        for k in indxr:
+                            # when using the open source (local=True) method, the return
+                            # should contain the numeric label and the topic, separated by const.constants.SEP
+                            #
+                            # we only want the integer label for now, with the rest being used later
+                            dat[k,i] = wiki[indxr.index(k)].split(const.constants.SEP)[0]
                     else:
-                        if type("") == utils.sif(d[0,i]):
+                        if type("") == utils.sif(dat[0,i]):
                             wiki = wikilabel(inst,dat[:,i],True,True)
                             for k in range(0,len(dat[:,i])):
                                 # when using the open source (local=True) method, the return
@@ -129,7 +132,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                 # we only want the integer label for now, with the rest being used later
                                 dat[k,i] = wiki[k].split(const.constants.SEP)[0]
                 # fix the data by intelligently filling missing values
-                dat  = fixdata(inst,dat,{hdr[k]:k for k in range(0,len(hdr))})
+                dat  = fixdata(inst,dat,coln)
                 # add the header and drop/date columns back to the data set
                 if hasattr(const.constants,"DROP" )                                                                  and \
                    type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
@@ -137,4 +140,42 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 if hasattr(const.constants,"DATES")                                                                  and \
                    type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
                     dat  = np.hstack((dts ,dat))
-                dat  = np.vstack(([thdr+dhdr+hdr],dat))
+                dat  = pd.DataFrame(dat,columns=hdr)
+            # take the data and split it into a train and test set
+            split= nn_split(dat)
+            train= np.asarray(split["train"]).astype(np.single)
+            test = np.asarray(split["test" ]).astype(np.single)
+            # create a knowledge graph for the modeling using instance 1
+            # (requires addition of an object in the json config file)
+            # so we don't overwrite the knowledge graph used when fixing the data set
+            inst = 1
+            kgdat= create_kg(inst,dat=train,limit=True)
+            # instantiate a JanusGraph object
+            graph= Graph()
+            # connection to the remote server
+            conn = DriverRemoteConnection(data.url_kg(inst),'g')
+            # get the remote graph traversal
+            g    = graph.traversal().withRemote(conn)
+            # write the knowledge graph
+            dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
+            dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
+            # with the trained models in instance 1, we will predict the test data
+            # one column at a time, each as a function of the remaining columns
+            # then we will concatenate all of the predicted columns together and
+            # use seaborn's pairplot to see the plots for each column in a table
+            #
+            # first build the data outputs
+            preds= []
+            for col in range(0,len(test[0])):
+                cls  = [col]
+                cls.extend([j for j in range(0,len(test[0])) if j not in cls])
+                mdl  = "models/" + const.constants.SEP.join([s for s in map(str,cls)]) + ".h5"
+                model= load_model(mdl)
+                pred = model.predict(test[:,cls[1:]])
+                preds= np.hstack((preds,pred)) if not len(preds) == 0 else pred
+            # we need a data frame for the paired plots
+            df   = pd.DataFrame(preds,columns=hdr)
+            # get the paired plots and save them
+            sns.pairplot(df)
+            # save the plot just created
+            plt.save("images/st.png")

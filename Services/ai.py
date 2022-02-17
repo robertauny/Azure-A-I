@@ -2007,14 +2007,17 @@ def checkdata(dat=[]):
         # check which rows have any null values and remove them
         #
         # doing rows first since a null row will eliminate all columns
-        rows = [i for i in range(0,len(ret)) if any(a is None or len(a) == 0 for a in ret[i])]
+        #rows = [i for i in range(0,len(ret)) if any(a is None or len(a) == 0 for a in ret[i])]
+        rows = [i for i in range(0,len(ret)) if "" in ret[i]]
         # have to check that we still have rows of data
-        if not (len(ret) == 0 or len(ret[0]) == 0):
+        if not (len(ret) == len(rows)):
             # check which columns have any null values and remove them
             d1   = ret.transpose()
-            cols = [i for i in range(0,len(d1)) if any(a is None or len(a) == 0 for a in d1[i])]
+            #cols = [i for i in range(0,len(d1)) if any(a is None or len(a) == 0 for a in d1[i])]
+            cols = [i for i in range(0,len(d1)) if "" in d1[i]]
         # for the return, we will remove all rows that have empty (null) strings
-        ret  = ret[[i for i in range(0,len(ret)) if i not in rows],:] if len(rows) > 0 else ret
+        ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
+        ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
     return ret,rows,cols
 
 ############################################################################
@@ -2059,11 +2062,15 @@ def fixdata(inst=0,dat=[],coln={}):
             # get the remote graph traversal
             g    = graph.traversal().withRemote(conn)
             # set of columns that don't need fixing
+            nrows= [i for i in range(0,len(dat   )) if i not in rows]
+            # set of columns that don't need fixing
             ncols= [i for i in range(0,len(dat[0])) if i not in cols]
             # inputs for importance are the subset of rows that have values
-            ip   = d[:,ncols]
+            ip   = dat[nrows,:]
+            ip   = ip[:,ncols]
             # outputs for importance calculated as categorical labels
-            op   = d[:, cols]
+            op   = dat[nrows, :]
+            op   = op[:, cols]
             # unrelated redifinition of ndat to be used in the loop
             # 
             # the order of the outputs/inputs matter in the horizontal stack
@@ -2078,10 +2085,13 @@ def fixdata(inst=0,dat=[],coln={}):
             dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
             # make a data set for each column of data needing replacement values
             for i in cols:
+                # need to order the indices to find the right model when predicting values
+                indx = [i]
+                indx.extend(ncols)
                 # thought function will give us the predictions for replacement in the original data set
                 for j in rows:
-                    tht      = list(thought(inst,list(coln.items()),dat[j,ncols].astype(np.single)).values()) if "" in dat[j,i] else []
-                    dat[j,i] = tht[0][0]                                                                      if len(tht) > 0   else dat[j,i]
+                    tht      = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if "" in dat[j,i] else []
+                    dat[j,i] = tht[0][0]                                                                                        if len(tht) > 0   else dat[j,i]
             ret  = dat
     return ret
 
