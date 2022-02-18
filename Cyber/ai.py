@@ -2017,7 +2017,7 @@ def checkdata(dat=[]):
             cols = [i for i in range(0,len(d1)) if "" in d1[i]]
         # for the return, we will remove all rows that have empty (null) strings
         ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
-        ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
+        #ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
     return ret,rows,cols
 
 ############################################################################

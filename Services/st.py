@@ -50,6 +50,7 @@ import seaborn           as sns
 import matplotlib.pyplot as plt
 
 import csv
+import glob
 
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
@@ -166,16 +167,24 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             #
             # first build the data outputs
             preds= []
+            hdrs = []
             for col in range(0,len(test[0])):
                 cls  = [col]
                 cls.extend([j for j in range(0,len(test[0])) if j not in cls])
-                mdl  = "models/" + const.constants.SEP.join([s for s in map(str,cls)]) + ".h5"
-                model= load_model(mdl)
-                pred = model.predict(test[:,cls[1:]])
-                preds= np.hstack((preds,pred)) if not len(preds) == 0 else pred
-            # we need a data frame for the paired plots
-            df   = pd.DataFrame(preds,columns=hdr)
-            # get the paired plots and save them
-            sns.pairplot(df)
-            # save the plot just created
-            plt.save("images/st.png")
+                # multiple models should be returned
+                mdls = glob.glob("models/*"+const.constants.SEP.join([s for s in map(str,cls)])+"*.h5")
+                # essentially the same model with outputs fixed and a function
+                # of the remaining columns of data
+                if len(mdls) > 0:
+                    hdrs.append(nhdr[col])
+                    model= load_model(mdls[0])
+                    pred = model.predict(test[:,cls[1:]])
+                    # we will stack all of the outputs
+                    preds= np.hstack((preds,pred)) if not len(preds) == 0 else pred
+            if len(preds) > 0:
+                # we need a data frame for the paired plots
+                df   = pd.DataFrame(preds,columns=hdrs)
+                # get the paired plots and save them
+                sns.pairplot(df)
+                # save the plot just created
+                plt.savefig(mdls[0].replace("models","images").replace(".h5",".png"))
