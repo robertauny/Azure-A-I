@@ -351,7 +351,8 @@ def thought(inst=0,coln=[],dat=None,res=True):
             for m in range(0,len(lbls)):
                 # beginning and end indices in the label string that need to be removed to find the brain
                 b    = lbls[m].find(const.constants.SEP) + 1
-                e    = lbls[m].rfind(ext) - 1
+                #e    = lbls[m].rfind(ext) - 1
+                e    = lbls[m].rfind(const.constants.SEP)
                 # file for the clustering model
                 fl   = str("models/"+lbls[m][b:e]+".h5")
                 if os.path.exists(fl) and os.path.getsize(fl) > 0:
@@ -412,7 +413,7 @@ def thought(inst=0,coln=[],dat=None,res=True):
                             mdl  = load_model(fl)
                             pred = store(mdl.predict(pt).flatten(),True)
                             # is the correct cluster being predicted, as referenced by the list pred
-                            if int(lbls[m][e+1]) in pred:
+                            if int(lbls[m][(e+1):]) in pred:
                                 # regression neural networks for the predicted cluster
                                 nnet = str(df["nns"][m])
                                 # what we want to do is to use the regression network for this brain
