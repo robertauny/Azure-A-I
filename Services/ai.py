@@ -2001,8 +2001,8 @@ def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[],limit=False):
 ############################################################################
 def checkdata(dat=[]):
     ret  = []
-    rows = 0
-    cols = 0
+    rows = []
+    cols = []
     if type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
         ret  = np.asarray(dat).copy()
         # check which rows have any null values and remove them
@@ -2113,14 +2113,18 @@ def wikidocs(inst=0,dat=[]):
         tok  = Tokenizer()
         tok.fit_on_texts(dat)
         items= np.asarray(list(tok.word_index.items()))
-        # grab the wikipedia data with image object detection
-        # and the testing flags both set to False
-        wiki = cognitive(const.constants.WIK,items[:,0],inst,False,False,True)
-        # append together all wikis and do some topic modeling
-        # that will hopefully give more uniform values, as it seems
-        # that some text values started out being similar but not
-        # exactly the same, which can affect labeling
-        ret.append(" ".join(wiki))
+        if len(items) > 0:
+            # grab the wikipedia data with image object detection
+            # and the testing flags both set to False
+            wiki = cognitive(const.constants.WIK,items[:,0],inst,False,False,True)
+            # append together all wikis and do some topic modeling
+            # that will hopefully give more uniform values, as it seems
+            # that some text values started out being similar but not
+            # exactly the same, which can affect labeling
+            ret.append(" ".join(wiki))
+        else:
+            # just return what we already have
+            ret.append(" ".join(dat))
     return ret
 
 ############################################################################
@@ -2150,7 +2154,7 @@ def wikilabel(inst=0,dat=[],wik=False,rf=False):
             url  = "https://" + host + "/" + api + "/" + ver + "/" + app
             # for each text "document" in the list we will tokenize
             # and get a Wikipedia for each word, then concatenate the docs
-            wikis= [wikidocs(inst,doc.split(" ")) for doc in d]
+            wikis= [wikidocs(inst,doc.split(" ")) if len(doc.split(" ")) > 1 else doc for doc in d]
             # each document should just be a line containing a string
             for i in range(0,len(wikis)):
                 if url in wikis[i]:

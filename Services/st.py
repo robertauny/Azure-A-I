@@ -122,31 +122,24 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             # string columns will be labeled using wikilabel
             for i in range(0,len(dat[0])):
                 if i in cols:
-                    wiki = wikilabel(inst,dat[indxr,i],True,True)
-                    for k in indxr:
-                        # when using the open source (local=True) method, the return
-                        # should contain the numeric label and the topic, separated by const.constants.SEP
-                        #
-                        # we only want the integer label for now, with the rest being used later
-                        dat[k,i] = wiki[indxr.index(k)].split(const.constants.SEP)[0]
+                    #wiki = wikilabel(inst,dat[indxr,i],True,True)
+                    dat[indxr,i] = list(calcC(dat[indxr,i]).flatten())
                 else:
-                    if type("") == utils.sif(dat[0,i]):
-                        wiki = wikilabel(inst,dat[:,i],True,True)
-                        for k in range(0,len(dat[:,i])):
-                            # when using the open source (local=True) method, the return
-                            # should contain the numeric label and the topic, separated by const.constants.SEP
-                            #
-                            # we only want the integer label for now, with the rest being used later
-                            dat[k,i] = wiki[k].split(const.constants.SEP)[0]
+                    if type("") in [t for t in map(utils.sif,dat[:,i])]:
+                        #wiki = wikilabel(inst,dat[:,i],True,True)
+                        dat[:,i] = list(calcC(dat[:,i]).flatten())
             # fix the data by intelligently filling missing values
             dat  = fixdata(inst,dat,coln)
             dat  = pd.DataFrame(dat,columns=nhdr)
-        dat  = dat.to_numpy()
+            dat  = dat.to_numpy()
         # predict each column and write some output
         for col in range(0,len(nhdr)):
+            # begin and end columns for each loop
+            b    = col + 1
+            e    = col + const.constants.MAX_COLS + 1
             # structure which columns are dependent and which are independent
             cls  = [col]
-            cols = [j for j in range(0,len(nhdr)) if j not in cls]
+            cols = list(range(b,e))
             cls.extend(cols)
             # define the inputs to the model
             x    = dat[:,cols].astype(np.single)
@@ -154,13 +147,15 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             model= Sequential()
             # relu at the input layer
             dbnlayers(model,len(cols),len(cols),'relu',False)
-            if utils.sif(dat[0,col]) == type(0.0):
+            # the outputs to be fit
+            fit  = dat[:,col].astype(np.single)
+            if type(0.0) in [t for t in map(utils.sif,dat[:,col])]:
                 # floating point column and regression prediction
                 dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
                 # compile the model
                 model.compile(loss="mean_squared_error",optimizer="sgd")
                 # define the outputs of the model
-                y    = dat[:,col].astype(np.single)
+                y    = fit
             else:
                 # random field theory to calculate the number of clusters to form
                 clust= calcN(len(dat))
@@ -171,19 +166,57 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 # compile the model
                 model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
                 # define the outputs of the model
-                y    = to_categorical(calcC(dat[:,col].astype(np.int8),clust).flatten(),num_classes=clust)
+                y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
             # fit the model
             model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
             # get some predictions using the same input data since this
             # is just for simulation to produce graphics
-            preds= model.predict(x)
+            pred = model.predict(x)
             # stack the recent predictions with the original inputs
-            preds= np.hstack((preds,x))
+            preds= np.hstack((pred,x))
             # produce some output
             if len(preds) > 0:
                 # we need a data frame for the paired plots
-                df   = pd.DataFrame(preds,columns=nhdr[cls])
+                df   = pd.DataFrame(preds)#,columns=np.asarray(nhdr)[cls])
                 # get the paired plots and save them
                 sns.pairplot(df)
                 # save the plot just created
-                plt.savefig("images/"+const.constants.SEP.join(cls)+const.constants.SEP+"grid.png")
+                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"grid.png")
+                # other plots to show that the built model is markovian
+                # since it will (hopefully) be shown that the errors are
+                # normally distributed
+                #
+                # recall that the typical linear model of an assumed normally
+                # distributed sample (central limit theorem) is the sum of a
+                # deterministic hyperplane (as a lower dimensional subspace of
+                # the sample space) plus normally distributed noise ... it's this
+                # noise that we will show graphically, lending credence to the
+                # gaussian distributed sample
+                #
+                # in addition, recall that the simplest markov model is the sum of
+                # a measured start point, plus gaussian white noise that accumulates
+                # at each time step, requiring that each new measurement only depends
+                # on the last measurement plus more additive noise
+                #
+                # residual errors (noise)
+                res  = store(pred) if len(np.asarray(pred).shape) > 1 else list(pred) - list(fit)
+                # Two plots
+                fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
+                # Histogram of residuals
+                sns.distplot(res,ax=ax1)
+                ax1.set_title("Histogram of Residuals")
+                # save the plot just created
+                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist.png")
+                # Fitted vs residuals
+                x1 = pd.Series(pred,name="Fitted "+nhdr[col])
+                x2 = pd.Series(fit[nhdr[col]], name=nhdr[col]+" Values")
+                sns.kdeplot(x1,x2,n_levels=40,ax=ax2)
+                sns.regplot(x=x1,y=x2,scatter=False,ax=ax2)
+                ax2.set_title("Fitted vs. Actual Values")
+                ax2.set_xlim([0,120])
+                ax2.set_ylim([0,120])
+                ax2.set_aspect("equal")
+                # save the plot just created
+                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"fitVres.png")
+            if e >= len(nhdr):
+                break
