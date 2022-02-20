@@ -2084,6 +2084,8 @@ def fixdata(inst=0,dat=[],coln={}):
             #dump = [map(lambda ve: map(lambda k: data.write_kg(ve,inst,list(coln.items()),k,g,False),kgdat), [const.constants.V,const.constants.E])]
             dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
             dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
+            #dump = data.write_kg(const.constants.V,inst,list(coln.items()),kgdat[0],g,False)
+            #dump = data.write_kg(const.constants.E,inst,list(coln.items()),kgdat[0],g,True )
             # make a data set for each column of data needing replacement values
             for i in cols:
                 # need to order the indices to find the right model when predicting values

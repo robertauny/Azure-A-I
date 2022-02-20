@@ -37,7 +37,7 @@ else:
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,checkdata,fixdata,wikidocs,wikilabel,importance
-from nn                                             import dbn,calcC,nn_split
+from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN
 
 import config
 import data
@@ -134,57 +134,50 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                 dat[k,i] = wiki[k].split(const.constants.SEP)[0]
                 # fix the data by intelligently filling missing values
                 dat  = fixdata(inst,dat,coln)
-                # add the header and drop/date columns back to the data set
-                if hasattr(const.constants,"DROP" )                                                                  and \
-                   type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
-                    dat  = np.hstack((drop,dat))
-                if hasattr(const.constants,"DATES")                                                                  and \
-                   type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
-                    dat  = np.hstack((dts ,dat))
-                dat  = pd.DataFrame(dat,columns=hdr)
-            # take the data and split it into a train and test set
-            split= nn_split(dat)
-            train= np.asarray(split["train"]).astype(np.single)
-            test = np.asarray(split["test" ]).astype(np.single)
-            # create a knowledge graph for the modeling using instance 1
-            # (requires addition of an object in the json config file)
-            # so we don't overwrite the knowledge graph used when fixing the data set
-            inst = 1
-            kgdat= create_kg(inst,dat=train,limit=True)
-            # instantiate a JanusGraph object
-            graph= Graph()
-            # connection to the remote server
-            conn = DriverRemoteConnection(data.url_kg(inst),'g')
-            # get the remote graph traversal
-            g    = graph.traversal().withRemote(conn)
-            # write the knowledge graph
-            dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
-            dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
-            # with the trained models in instance 1, we will predict the test data
-            # one column at a time, each as a function of the remaining columns
-            # then we will concatenate all of the predicted columns together and
-            # use seaborn's pairplot to see the plots for each column in a table
-            #
-            # first build the data outputs
-            preds= []
-            hdrs = []
-            for col in range(0,len(test[0])):
+                dat  = pd.DataFrame(dat,columns=nhdr)
+            dat  = dat.to_numpy()
+            # predict each column and write some output
+            for col in range(0,len(nhdr)):
+                # structure which columns are dependent and which are independent
                 cls  = [col]
-                cls.extend([j for j in range(0,len(test[0])) if j not in cls])
-                # multiple models should be returned
-                mdls = glob.glob("models/*"+const.constants.SEP.join([s for s in map(str,cls)])+"*.h5")
-                # essentially the same model with outputs fixed and a function
-                # of the remaining columns of data
-                if len(mdls) > 0:
-                    hdrs.append(nhdr[col])
-                    model= load_model(mdls[0])
-                    pred = model.predict(test[:,cls[1:]])
-                    # we will stack all of the outputs
-                    preds= np.hstack((preds,pred)) if not len(preds) == 0 else pred
-            if len(preds) > 0:
-                # we need a data frame for the paired plots
-                df   = pd.DataFrame(preds,columns=hdrs)
-                # get the paired plots and save them
-                sns.pairplot(df)
-                # save the plot just created
-                plt.savefig(mdls[0].replace("models","images").replace(".h5",".png"))
+                cols = [j for j in range(0,len(nhdr)) if j not in cls]
+                cls.extend(cols)
+                # define the inputs to the model
+                x    = dat[:,cols].astype(np.single)
+                # build a simple model
+                model= Sequential()
+                # relu at the input layer
+                dbnlayers(model,len(cols),len(cols),'relu',False)
+                if utils.sif(dat[0,col]) == type(0.0):
+                    # floating point column and regression prediction
+                    dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
+                    # compile the model
+                    model.compile(loss="mean_squared_error",optimizer="sgd")
+                    # define the outputs of the model
+                    y    = dat[:,col].astype(np.single)
+                else:
+                    # random field theory to calculate the number of clusters to form
+                    clust= calcN(len(dat))
+                    # creating a restricted Boltzmann machine here
+                    dbnlayers(model,len(cols),len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
+                    # categorical column and classification prediction
+                    dbnlayers(model,clust,len(cols),'sigmoid',False)
+                    # compile the model
+                    model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
+                    # define the outputs of the model
+                    y    = to_categorical(calcC(dat[:,col].astype(np.int8),clust).flatten(),num_classes=clust)
+                # fit the model
+                model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
+                # get some predictions using the same input data since this
+                # is just for simulation to produce graphics
+                preds= model.predict(x)
+                # stack the recent predictions with the original inputs
+                preds= np.hstack((preds,x))
+                # produce some output
+                if len(preds) > 0:
+                    # we need a data frame for the paired plots
+                    df   = pd.DataFrame(preds,columns=nhdr[cls])
+                    # get the paired plots and save them
+                    sns.pairplot(df)
+                    # save the plot just created
+                    plt.savefig("images/"+const.constants.SEP.join(cls)+const.constants.SEP+"grid.png")
