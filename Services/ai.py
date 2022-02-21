@@ -2034,7 +2034,7 @@ def fixdata(inst=0,dat=[],coln={}):
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
-        if not (len(d) == 0 or len(d[0]) == 0):
+        if len(rows) > 0 or len(cols) > 0:
             # for those remaining rows, we want to keep track of any columns
             # that have missing values, as we will only model with completely
             # full rows/columns

@@ -36,7 +36,7 @@ else:
     from tensorflow.keras.preprocessing.text                import Tokenizer
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
-from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,checkdata,fixdata,wikidocs,wikilabel,importance
+from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,checkdata,fixdata,wikidocs,wikilabel,importance,store
 from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN
 
 import config
@@ -116,7 +116,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
-        if not (len(d) == 0 or len(d[0]) == 0):
+        if len(rows) > 0 or len(cols) > 0:
             # indices that actually had data originally
             indxr= [j for j in range(0,len(dat)) if j not in rows]
             # string columns will be labeled using wikilabel
@@ -172,12 +172,19 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             # get some predictions using the same input data since this
             # is just for simulation to produce graphics
             pred = model.predict(x)
+            if len(np.asarray(pred).shape) > 1:
+                p    = []
+                for row in list(pred):
+                    p.extend(j for j,x in enumerate(row) if x == max(row))
+                pred = np.asarray(p)
+            else:
+                pred = np.asarray(list(pred))
             # stack the recent predictions with the original inputs
-            preds= np.hstack((pred,x))
+            preds= np.hstack((pred.reshape((len(pred),1)),x))
             # produce some output
             if len(preds) > 0:
                 # we need a data frame for the paired plots
-                df   = pd.DataFrame(preds)#,columns=np.asarray(nhdr)[cls])
+                df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
                 # get the paired plots and save them
                 sns.pairplot(df)
                 # save the plot just created
@@ -199,24 +206,24 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 # on the last measurement plus more additive noise
                 #
                 # residual errors (noise)
-                res  = store(pred) if len(np.asarray(pred).shape) > 1 else list(pred) - list(fit)
+                res  = pred - np.asarray(list(fit))
                 # Two plots
                 fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
                 # Histogram of residuals
                 sns.distplot(res,ax=ax1)
                 ax1.set_title("Histogram of Residuals")
                 # save the plot just created
-                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist.png")
+                #plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist.png")
                 # Fitted vs residuals
                 x1 = pd.Series(pred,name="Fitted "+nhdr[col])
-                x2 = pd.Series(fit[nhdr[col]], name=nhdr[col]+" Values")
+                x2 = pd.Series(fit, name=nhdr[col]+" Values")
                 sns.kdeplot(x1,x2,n_levels=40,ax=ax2)
                 sns.regplot(x=x1,y=x2,scatter=False,ax=ax2)
                 ax2.set_title("Fitted vs. Actual Values")
-                ax2.set_xlim([0,120])
-                ax2.set_ylim([0,120])
+                #ax2.set_xlim([0,120])
+                #ax2.set_ylim([0,120])
                 ax2.set_aspect("equal")
                 # save the plot just created
-                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"fitVres.png")
+                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist"+const.constants.SEP+"fitVres.png")
             if e >= len(nhdr):
                 break
