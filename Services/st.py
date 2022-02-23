@@ -22,6 +22,7 @@ from joblib                                         import Parallel,delayed
 from string                                         import punctuation
 from math                                           import ceil,log,exp
 from PIL                                            import ImageDraw,Image
+from scipy                                          import stats
 
 ver  = sys.version.split()[0]
 
@@ -65,6 +66,9 @@ np.random.seed(const.constants.SEED)
 ## Purpose:   Use A-I to expand and fix a data set before processing
 ##
 ############################################################################
+
+def r2(x,y):
+    return stats.pearson(x,y)[0]**2
 
 # an instance number corresponds to the set of constants in one object
 # of the JSON configuration array associated to the set of modules for this app
@@ -116,114 +120,130 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
-        if len(rows) > 0 or len(cols) > 0:
-            # indices that actually had data originally
-            indxr= [j for j in range(0,len(dat)) if j not in rows]
-            # string columns will be labeled using wikilabel
-            for i in range(0,len(dat[0])):
-                if i in cols:
-                    #wiki = wikilabel(inst,dat[indxr,i],True,True)
-                    dat[indxr,i] = list(calcC(dat[indxr,i]).flatten())
-                else:
-                    if type("") in [t for t in map(utils.sif,dat[:,i])]:
-                        #wiki = wikilabel(inst,dat[:,i],True,True)
-                        dat[:,i] = list(calcC(dat[:,i]).flatten())
-            # fix the data by intelligently filling missing values
-            dat  = fixdata(inst,dat,coln)
-            dat  = pd.DataFrame(dat,columns=nhdr)
-            dat  = dat.to_numpy()
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # if there is something to fix
+            if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
+                # indices that actually had data originally
+                indxr= [j for j in range(0,len(dat)) if j not in rows]
+                # string columns will be labeled using wikilabel
+                for i in range(0,len(dat[0])):
+                    sifs = np.asarray([t for t in map(utils.sif,dat[:,i])])
+                    ccd  = np.asarray(list(calcC(dat[:,i])))
+                    if i in cols:
+                        if not (type(0) in sifs or type(0.0) in sifs):
+                            #wiki = wikilabel(inst,dat[indxr,i],True,True)
+                            dat[rows,i] = ccd.flatten()[rows]
+                # fix the data by intelligently filling missing values
+                dat  = fixdata(inst,dat,coln)
+                dat  = pd.DataFrame(dat,columns=nhdr)
+                dat  = dat.to_numpy()
         # predict each column and write some output
         for col in range(0,len(nhdr)):
-            # begin and end columns for each loop
-            b    = col + 1
-            e    = col + const.constants.MAX_COLS + 1
-            # structure which columns are dependent and which are independent
-            cls  = [col]
-            cols = list(range(b,e))
-            cls.extend(cols)
-            # define the inputs to the model
-            x    = dat[:,cols].astype(np.single)
-            # build a simple model
-            model= Sequential()
-            # relu at the input layer
-            dbnlayers(model,len(cols),len(cols),'relu',False)
-            # the outputs to be fit
-            fit  = dat[:,col].astype(np.single)
-            if type(0.0) in [t for t in map(utils.sif,dat[:,col])]:
-                # floating point column and regression prediction
-                dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
-                # compile the model
-                model.compile(loss="mean_squared_error",optimizer="sgd")
-                # define the outputs of the model
-                y    = fit
-            else:
-                # random field theory to calculate the number of clusters to form
-                clust= calcN(len(dat))
-                # creating a restricted Boltzmann machine here
-                dbnlayers(model,len(cols),len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
-                # categorical column and classification prediction
-                dbnlayers(model,clust,len(cols),'sigmoid',False)
-                # compile the model
-                model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
-                # define the outputs of the model
-                y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
-            # fit the model
-            model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
-            # get some predictions using the same input data since this
-            # is just for simulation to produce graphics
-            pred = model.predict(x)
-            if len(np.asarray(pred).shape) > 1:
-                p    = []
-                for row in list(pred):
-                    p.extend(j for j,x in enumerate(row) if x == max(row))
-                pred = np.asarray(p)
-            else:
-                pred = np.asarray(list(pred))
-            # stack the recent predictions with the original inputs
-            preds= np.hstack((pred.reshape((len(pred),1)),x))
-            # produce some output
-            if len(preds) > 0:
-                # we need a data frame for the paired plots
-                df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
-                # get the paired plots and save them
-                sns.pairplot(df)
-                # save the plot just created
-                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"grid.png")
-                # other plots to show that the built model is markovian
-                # since it will (hopefully) be shown that the errors are
-                # normally distributed
-                #
-                # recall that the typical linear model of an assumed normally
-                # distributed sample (central limit theorem) is the sum of a
-                # deterministic hyperplane (as a lower dimensional subspace of
-                # the sample space) plus normally distributed noise ... it's this
-                # noise that we will show graphically, lending credence to the
-                # gaussian distributed sample
-                #
-                # in addition, recall that the simplest markov model is the sum of
-                # a measured start point, plus gaussian white noise that accumulates
-                # at each time step, requiring that each new measurement only depends
-                # on the last measurement plus more additive noise
-                #
-                # residual errors (noise)
-                res  = pred - np.asarray(list(fit))
-                # Two plots
-                fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
-                # Histogram of residuals
-                sns.distplot(res,ax=ax1)
-                ax1.set_title("Histogram of Residuals")
-                # save the plot just created
-                #plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist.png")
-                # Fitted vs residuals
-                x1 = pd.Series(pred,name="Fitted "+nhdr[col])
-                x2 = pd.Series(fit, name=nhdr[col]+" Values")
-                sns.kdeplot(x1,x2,n_levels=40,ax=ax2)
-                sns.regplot(x=x1,y=x2,scatter=False,ax=ax2)
-                ax2.set_title("Fitted vs. Actual Values")
-                #ax2.set_xlim([0,120])
-                #ax2.set_ylim([0,120])
-                ax2.set_aspect("equal")
-                # save the plot just created
-                plt.savefig("images/"+const.constants.SEP.join([i for i in map(str,cls)])+const.constants.SEP+"hist"+const.constants.SEP+"fitVres.png")
-            if e >= len(nhdr):
-                break
+            perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
+            for cols in perms:
+                if nhdr[col].lower() in [a.lower() for a in const.constants.COLUMNS] and col not in cols:
+                    print([nhdr[col],np.asarray(nhdr)[cols]])
+                    # structure which columns are dependent and which are independent
+                    cls  = [col]
+                    cls.extend(cols)
+                    # define the inputs to the model
+                    x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])#.sort_values(by=np.asarray(nhdr)[cols]).to_numpy()
+                    # build a simple model
+                    model= Sequential()
+                    # relu at the input layer
+                    dbnlayers(model,len(cols),len(cols),'relu',False)
+                    # the outputs to be fit
+                    fit  = dat[:,col].astype(np.single)
+                    if type(0) in [t for t in map(utils.sif,dat[:,col])] or type(0.0) in [t for t in map(utils.sif,dat[:,col])]:
+                        # floating point column and regression prediction
+                        dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
+                        # compile the model
+                        model.compile(loss="mean_squared_error",optimizer="sgd")
+                        # define the outputs of the model
+                        y    = fit
+                    else:
+                        # random field theory to calculate the number of clusters to form
+                        clust= calcN(len(dat))
+                        # creating a restricted Boltzmann machine here
+                        dbnlayers(model,len(cols),len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
+                        # categorical column and classification prediction
+                        dbnlayers(model,clust,len(cols),'sigmoid',False)
+                        # compile the model
+                        model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
+                        # define the outputs of the model
+                        y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
+                    # fit the model
+                    model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
+                    # get some predictions using the same input data since this
+                    # is just for simulation to produce graphics
+                    pred = model.predict(x)
+                    if len(np.asarray(pred).shape) > 1:
+                        p    = []
+                        for row in list(pred):
+                            p.extend(j for j,x in enumerate(row) if x == max(row))
+                        pred = np.asarray(p)
+                    else:
+                        pred = np.asarray(list(pred))
+                    # stack the recent predictions with the original inputs
+                    if len(pred) == len(x):
+                        preds= np.hstack((pred.reshape((len(pred),1)),x))
+                    else:
+                        continue
+                    # produce some output
+                    if len(preds) > 0:
+                        # we need a data frame for the paired plots
+                        df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
+                        # get the paired plots and save them
+                        g    = sns.pairplot(df,hue=nhdr[col])
+                        g.fig.suptitle(nhdr[col]+" Grid of Marginals")
+                        # save the plot just created
+                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"grid.png")
+                        # forecast plot
+                        x1 = pd.Series(list(range(1,len(pred)+1)),name=", ".join(np.asarray(nhdr)[cols])+" Inputs")
+                        #x1   = pd.Series(pred,name=", ".join(np.asarray(nhdr)[cols])+" Inputs")
+                        x2   = pd.Series(fit ,name=nhdr[col]+" Values")
+                        g    = sns.jointplot(x=x1
+                                            ,y=x2
+                                            ,kind="reg"
+                                            ,xlim=[1,len(pred)+1])
+                                            #,xlim=[0.5*min(pred),1.5*max(pred)]
+                                            #,ylim=[0.5*min(fit ),1.5*max(fit )])#,stat_func=r2)#,hue=nhdr[col])
+                        g.fig.suptitle("Forecast of "+nhdr[col])
+                        # save the plot just created
+                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"forecast.png")
+                        # other plots to show that the built model is markovian
+                        # since it will (hopefully) be shown that the errors are
+                        # normally distributed
+                        #
+                        # recall that the typical linear model of an assumed normally
+                        # distributed sample (central limit theorem) is the sum of a
+                        # deterministic hyperplane (as a lower dimensional subspace of
+                        # the sample space) plus normally distributed noise ... it's this
+                        # noise that we will show graphically, lending credence to the
+                        # gaussian distributed sample
+                        #
+                        # in addition, recall that the simplest markov model is the sum of
+                        # a measured start point, plus gaussian white noise that accumulates
+                        # at each time step, requiring that each new measurement only depends
+                        # on the last measurement plus more additive noise
+                        #
+                        # residual errors (noise)
+                        res  = pred - np.asarray(list(fit))
+                        # Two plots
+                        fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
+                        # Histogram of residuals
+                        sns.distplot(res,ax=ax1)
+                        ax1.set_title("Histogram of Residuals")
+                        # Fitted vs residuals
+                        #x1   = pd.Series(pred,name="Fitted "+nhdr[col])
+                        x1   = pd.Series(list(range(1,len(pred)+1)),name="Fitted "+nhdr[col])
+                        x2   = pd.Series(fit ,name=nhdr[col]+" Values")
+                        sns.kdeplot(x1,x2,ax=ax2,n_levels=40)
+                        sns.regplot(x=x1,y=x2,scatter=False,ax=ax2)
+                        ax2.set_title("Fitted vs. Actual Values")
+                        ax2.set_xlim([0,2*len(pred)])
+                        #ax2.set_xlim([0.5*min(pred),1.5*max(pred)])
+                        #ax2.set_ylim([0.5*min(fit ),1.5*max(fit)])
+                        ax2.set_aspect("equal")
+                        # save the plot just created
+                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"hist"+const.constants.SEP+"fitVres.png")

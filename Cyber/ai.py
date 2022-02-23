@@ -77,6 +77,7 @@ import os
 import config
 import nn
 import data
+import utils
 
 from nn import dbn,categoricals,calcC
 
@@ -2008,17 +2009,16 @@ def checkdata(dat=[]):
         # check which rows have any null values and remove them
         #
         # doing rows first since a null row will eliminate all columns
-        #rows = [i for i in range(0,len(ret)) if any(a is None or len(a) == 0 for a in ret[i])]
-        rows = [i for i in range(0,len(ret)) if "" in ret[i]]
+        rows = [i for i in range(0,len(ret)) if type("") in [t for t in map(utils.sif,ret[i])]]
         # have to check that we still have rows of data
         if not (len(ret) == len(rows)):
-            # check which columns have any null values and remove them
-            d1   = ret.transpose()
-            #cols = [i for i in range(0,len(d1)) if any(a is None or len(a) == 0 for a in d1[i])]
-            cols = [i for i in range(0,len(d1)) if "" in d1[i]]
-        # for the return, we will remove all rows that have empty (null) strings
-        ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
-        #ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
+            # for the return, we will remove all rows/cols that have empty (null) strings
+            ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
+        # check which columns have any null values and remove them
+        d1   = ret.transpose()
+        cols = [i for i in range(0,len(d1)) if type("") in [t for t in map(utils.sif,d1[i])]]
+        if not (len(ret[0]) == len(cols)):
+            ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
     return ret,rows,cols
 
 ############################################################################
@@ -2027,75 +2027,115 @@ def checkdata(dat=[]):
 ##
 ############################################################################
 def fixdata(inst=0,dat=[],coln={}):
-    ret  = None
+    ret  = dat
     if inst > const.constants.BVAL                                     and \
        type(dat ) in [type([]),type(np.asarray([]))] and len(dat ) > 0 and \
        type(coln) ==  type({})                       and len(coln) > 0:
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
-        if len(rows) > 0 or len(cols) > 0:
-            # for those remaining rows, we want to keep track of any columns
-            # that have missing values, as we will only model with completely
-            # full rows/columns
-            #
-            # for the rows that are left, we will use to fill missing values
-            #
-            # first we will determine importance of each feature, with the reason
-            # being, we will be modeling each feature in the data set as a function
-            # of the top features as determined by importance
-            #
-            # first we will make use of the central limit theorem when making the
-            # assumption that the original data set is a mixed bag of normals that
-            # we want to separate (cluster)
-            #
-            # implicitly, we are making use of a result from the random cluster model
-            # that allows us to determine the number of clusters based upon the assumption
-            # of normality, plus ordering that gives uniformity
-            #
-            # now we will build "brains" from the transformed data that will do the "thinking"
-            # for us when we want to replace missing values in the original data set
-            #
-            # instantiate a JanusGraph object
-            graph= Graph()
-            # connection to the remote server
-            conn = DriverRemoteConnection(data.url_kg(inst),'g')
-            # get the remote graph traversal
-            g    = graph.traversal().withRemote(conn)
-            # set of columns that don't need fixing
-            nrows= [i for i in range(0,len(dat   )) if i not in rows]
-            # set of columns that don't need fixing
-            ncols= [i for i in range(0,len(dat[0])) if i not in cols]
-            # inputs for importance are the subset of rows that have values
-            ip   = dat[nrows,:]
-            ip   = ip[:,ncols]
-            # outputs for importance calculated as categorical labels
-            op   = dat[nrows, :]
-            op   = op[:, cols]
-            # unrelated redifinition of ndat to be used in the loop
-            # 
-            # the order of the outputs/inputs matter in the horizontal stack
-            # as the model will be picked up as ... outputs as a function of inputs
-            ndat = np.hstack((op,ip)).astype(np.single)
-            # create the knowledge graph that holds the "brains"
-            #kgdat= create_kg(inst,ndat,permu=[tuple(list(range(len(coln))))],limit=True)
-            kgdat= create_kg(inst,ndat,limit=True)
-            # write the knowledge graph
-            #dump = [map(lambda ve: map(lambda k: data.write_kg(ve,inst,list(coln.items()),k,g,False),kgdat), [const.constants.V,const.constants.E])]
-            dump = [data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat]
-            dump = [data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat]
-            #dump = data.write_kg(const.constants.V,inst,list(coln.items()),kgdat[0],g,False)
-            #dump = data.write_kg(const.constants.E,inst,list(coln.items()),kgdat[0],g,True )
-            # make a data set for each column of data needing replacement values
-            for i in cols:
-                # need to order the indices to find the right model when predicting values
-                indx = [i]
-                indx.extend(ncols)
-                # thought function will give us the predictions for replacement in the original data set
-                for j in rows:
-                    tht      = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if "" in dat[j,i] else []
-                    dat[j,i] = tht[0][0]                                                                                        if len(tht) > 0   else dat[j,i]
-            ret  = dat
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # if there is something to fix
+            if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
+                # for those remaining rows, we want to keep track of any columns
+                # that have missing values, as we will only model with completely
+                # full rows/columns
+                #
+                # for the rows that are left, we will use to fill missing values
+                #
+                # first we will determine importance of each feature, with the reason
+                # being, we will be modeling each feature in the data set as a function
+                # of the top features as determined by importance
+                #
+                # first we will make use of the central limit theorem when making the
+                # assumption that the original data set is a mixed bag of normals that
+                # we want to separate (cluster)
+                #
+                # implicitly, we are making use of a result from the random cluster model
+                # that allows us to determine the number of clusters based upon the assumption
+                # of normality, plus ordering that gives uniformity
+                #
+                # now we will build "brains" from the transformed data that will do the "thinking"
+                # for us when we want to replace missing values in the original data set
+                #
+                # instantiate a JanusGraph object
+                graph= Graph()
+                # connection to the remote server
+                conn = DriverRemoteConnection(data.url_kg(inst),'g')
+                # get the remote graph traversal
+                g    = graph.traversal().withRemote(conn)
+                # set of columns that don't need fixing
+                nrows= [i for i in range(0,len(dat   )) if i not in rows]
+                # set of columns that don't need fixing
+                ncols= [i for i in range(0,len(dat[0])) if i not in cols]
+                # inputs for importance are the subset of rows that have values
+                ip   = dat[nrows,:]
+                ip   =  ip[:    ,ncols[0:const.constants.MAX_COLS]]
+                # outputs for importance calculated as categorical labels
+                op   = dat[nrows, :]
+                op   =  op[:    , cols                            ]
+                # do we have data to build models and a knowledge graph
+                #
+                # only numeric columns should need fixing at this point
+                if not (len(ip) == 0 or len(op) == 0):
+                    # unrelated redifinition of ndat to be used in the loop
+                    # 
+                    # the order of the outputs/inputs matter in the horizontal stack
+                    # as the model will be picked up as ... outputs as a function of inputs
+                    ndat = np.hstack((op,ip)).astype(np.single)
+                    # create the knowledge graph that holds the "brains"
+                    kgdat= create_kg(inst,ndat,limit=True)
+                    # write the knowledge graph
+                    cls  = [col]
+                    cls.extend(ncols[0:const.consants.MAX_COLS])
+                    dump = [data.write_kg(const.constants.V,inst,list(coln.items()[cls]),k,g,False) for k in kgdat]
+                    dump = [data.write_kg(const.constants.E,inst,list(coln.items()[cls]),k,g,True ) for k in kgdat]
+                    # make a data set for each column of data needing replacement values
+                    for i in cols:
+                        # need to order the indices to find the right model when predicting values
+                        indx = [i]
+                        indx.extend(ncols)
+                        # thought function will give us the predictions for replacement in the original data set
+                        for j in rows:
+                            tht      = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if type("") == utils.sif(dat[j,i]) else []
+                            dat[j,i] = tht[0][0]                                                                                        if len(tht) > 0                    else dat[j,i]
+                            # data can still be the null string so
+                            # just take the most frequent item
+                            if type("") == utils.sif(dat[j,i]):
+                                dat[j,i] = ceil(np.median(dat[nrows,i].astype(np.single)))
+                else:
+                    for col in cols:
+                        # set of columns that don't need fixing
+                        nrows= [i for i in range(0,len(dat[:,col])) if utils.sif(dat[i,col]) in [type(0),type(0.0)]]
+                        # inputs for importance are the subset of rows that have values
+                        ip   = dat[nrows,    :]
+                        ip   =  ip[:    ,ncols[0:const.constants.MAX_COLS]]
+                        # outputs for importance calculated as categorical labels
+                        op   = dat[nrows,    :]
+                        op   =  op[:    , col                             ]
+                        # unrelated redifinition of ndat to be used in the loop
+                        # 
+                        # the order of the outputs/inputs matter in the horizontal stack
+                        # as the model will be picked up as ... outputs as a function of inputs
+                        ndat = np.hstack((np.asarray(op).reshape((len(op),1)),ip)).astype(np.single)
+                        # create the knowledge graph that holds the "brains"
+                        kgdat= create_kg(inst,ndat,limit=True)
+                        # write the knowledge graph
+                        cls  = [col]
+                        cls.extend(ncols[0:const.constants.MAX_COLS])
+                        dump = [data.write_kg(const.constants.V,inst,np.asarray(list(coln.items()))[cls],k,g,False) for k in kgdat]
+                        dump = [data.write_kg(const.constants.E,inst,np.asarray(list(coln.items()))[cls],k,g,True ) for k in kgdat]
+                        # need to order the indices to find the right model when predicting values
+                        indx = [col]
+                        indx.extend(ncols)
+                        # thought function will give us the predictions for replacement in the original data set
+                        for j in rows:
+                            tht        = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if type("") == utils.sif(dat[j,col]) else []
+                            dat[j,col] = tht[0][0]                                                                                        if len(tht) > 0                      else dat[j,col]
+                            # data can still be the null string so
+                            # just take the most frequent item
+                            if type("") == utils.sif(dat[j,col]):
+                                dat[j,col] = ceil(np.median(dat[nrows,col].astype(np.single)))
     return ret
 
 ############################################################################

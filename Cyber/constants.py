@@ -50,49 +50,65 @@ class constants():
     PRED_H_SHIFT   = 15
     VSIZE          = 8
     HOUN_OFFSET    = 10
-    CPU_COUNT      = 1
+    #CPU_COUNT      = 1
+    PERMS          = 2
+    COLUMNS        = ["Customer reporting outage at least once"
+                     #,"Internal NH Crews"
+                     #,"Tree Crews"
+                     #,"ES Crews"
+                     #,"Accounts W/O Power at peak"
+                     ,"Broken Poles"]
+                     #,"Western Event Level"]
     TARGETS        = ["REASONCODE"]
-    #DATES          = ["START","STOP"]
+    #DATES          = ["Date"]
     #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
-    DROP           = ["PATIENT"
-                     ,"PAYER"
-                     ,"START"
-                     ,"STOP"
-                     ,"ENCOUNTER"
-                     ,"REASONCODE"
-                     ,"CODE"]
-    DROP1          = ["Id"
-                     ,"PATIENT"
-                     ,"START"
-                     ,"STOP"
-                     ,"PAYER"
-                     ,"CODE"
-                     ,"SSN"
-                     ,"BIRTHPLACE"
-                     ,"ADDRESS"
-                     ,"CITY"
-                     ,"STATE"
-                     ,"COUNTY"
-                     ,"ZIP"
-                     ,"LAT"
-                     ,"LON"
-                     ,"DRIVERS"
-                     ,"PASSPORT"
-                     ,"PREFIX"
-                     ,"FIRST"
-                     ,"LAST"
-                     ,"SUFFIX"
-                     ,"MAIDEN"
-                     ,"PAYER_COVERAGE"
-                     ,"DISPENSES"
-                     ,"TOTALCOST"
-                     ,"ENCOUNTER"
-                     ,"CODE"
-                     ,"DESCRIPTION"
-                     ,"BASE_COST"
-                     ,"BIRTHDATE"
-                     ,"DEATHDATE"
-                     ,"REASONDESCRIPTION"]
+    #DROP           = ["Date","Year","Month","Date","Season","Work Order","Activation (No Partial Remote Full)","Work Order"]
+    #DROP           = ["Date","Work Order"]
+    DROP           = [
+                      #"Year",
+                      #"Month",
+                      "Date",
+                      "Season",
+                      "Work Order",
+                      "Activation (No Partial Remote Full)",
+                      #"Storm Call",
+                      #"Advisory Issued",
+                      "Weather Forecast predicted",
+                      #"Weather Forecast Advisory",
+                      #"Central Event Level",
+                      #"Eastern Event Level",
+                      #"Northern Event Level",
+                      #"Southern Event Level",
+                      #"Western Event Level",
+                      #" Precipitation",
+                      #"Sustained Winds",
+                      #"Winds Gusts",
+                      "Temp  High",
+                      "Temp Low",
+                      "Weather Forecast actual",
+                      "Max Wind Gust in MPH",
+                      "Temp  High actual",
+                      "Temp Low actual",
+                      "Storm Direction",
+                      "Number Primary  Events (IEEE)",
+                      "Storm Duration (days)",
+                      "Concurrent Events",
+                      #"Accounts W/O Power at peak",
+                      "Customer reporting outage at least once (IEEE)",
+                      #"Customer reporting outage at least once",
+                      "DTN Trouble spots",
+                      "OPM Trouble Spots ",
+                      "Internal NH Crews",
+                      "Additional External Buckets",
+                      "Additional External Diggers",
+                      #"Tree Crews",
+                      #"ES Crews",
+                      #"Broken Poles",
+                      "Notes",
+                      "Cost (Charges to date)",
+                      "Exclusionary Day(s) ",
+                      "Applied for recovery"
+                     ]
     MATCH_ON       = ["Id","PATIENT"]
     # neural network constants
     OUTP           = 1
