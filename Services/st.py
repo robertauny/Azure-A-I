@@ -146,6 +146,11 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     # structure which columns are dependent and which are independent
                     cls  = [col]
                     cls.extend(cols)
+                    sifs = np.asarray(["" in dat[:,j] for j in cols]).flatten()
+                    # just skip this permutation if unable to fix the data
+                    if True in sifs:
+                        print("Not enough clean data to fix other data issues.")
+                        break
                     # define the inputs to the model
                     x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])#.sort_values(by=np.asarray(nhdr)[cols]).to_numpy()
                     # build a simple model
