@@ -199,15 +199,14 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         # save the plot just created
                         plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"grid.png")
                         # forecast plot
-                        x1 = pd.Series(list(range(1,len(pred)+1)),name=", ".join(np.asarray(nhdr)[cols])+" Inputs")
-                        #x1   = pd.Series(pred,name=", ".join(np.asarray(nhdr)[cols])+" Inputs")
+                        x11  = pd.Series(list(range(1,len(pred)+1)),name="Event Number")
                         x2   = pd.Series(fit ,name=nhdr[col]+" Values")
-                        g    = sns.jointplot(x=x1
+                        g    = sns.jointplot(x=x11
                                             ,y=x2
                                             ,kind="reg"
-                                            ,xlim=[1,len(pred)+1])
+                                            ,xlim=[-10,2*len(pred)]
                                             #,xlim=[0.5*min(pred),1.5*max(pred)]
-                                            #,ylim=[0.5*min(fit ),1.5*max(fit )])#,stat_func=r2)#,hue=nhdr[col])
+                                            ,ylim=[0.5*min(fit ),1.5*max(fit )])#,stat_func=r2)#,hue=nhdr[col])
                         g.fig.suptitle("Forecast of "+nhdr[col])
                         # save the plot just created
                         plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"forecast.png")
@@ -235,15 +234,10 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         sns.distplot(res,ax=ax1)
                         ax1.set_title("Histogram of Residuals")
                         # Fitted vs residuals
-                        #x1   = pd.Series(pred,name="Fitted "+nhdr[col])
-                        x1   = pd.Series(list(range(1,len(pred)+1)),name="Fitted "+nhdr[col])
-                        x2   = pd.Series(fit ,name=nhdr[col]+" Values")
-                        sns.kdeplot(x1,x2,ax=ax2,n_levels=40)
-                        sns.regplot(x=x1,y=x2,scatter=False,ax=ax2)
+                        x1   = pd.Series(pred,name="Event Number")
+                        sns.kdeplot(x11,x2,ax=ax2,n_levels=40)
+                        sns.regplot(x=x11,y=x2,scatter=False,ax=ax2)
                         ax2.set_title("Fitted vs. Actual Values")
-                        ax2.set_xlim([0,2*len(pred)])
-                        #ax2.set_xlim([0.5*min(pred),1.5*max(pred)])
-                        #ax2.set_ylim([0.5*min(fit ),1.5*max(fit)])
-                        ax2.set_aspect("equal")
+                        #ax2.set_aspect("equal")
                         # save the plot just created
                         plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"hist"+const.constants.SEP+"fitVres.png")
