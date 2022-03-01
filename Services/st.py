@@ -165,7 +165,8 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
-                    x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])#.sort_values(by=np.asarray(nhdr)[cols]).to_numpy()
+                    x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])
+                    x    = x.sort_values(by=list(range(0,len(x.columns))),axis=1)#sort_values(by=np.asarray(nhdr)[cols],axis=1)#.to_numpy()
                     # build a simple model
                     model= Sequential()
                     # relu at the input layer
