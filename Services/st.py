@@ -172,21 +172,24 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     # relu at the input layer
                     dbnlayers(model,len(cols),len(cols),'relu',False)
                     # the outputs to be fit
-                    fit  = dat[:,col].astype(np.single)
-                    if type(0) in [t for t in map(utils.sif,dat[:,col])] or type(0.0) in [t for t in map(utils.sif,dat[:,col])]:
+                    sifs = [t for t in map(utils.sif,dat[:,col])]
+                    if type(0.0) in sifs:
+                        fit  = dat[:,col].astype(np.single)
                         # floating point column and regression prediction
                         dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
                         # compile the model
-                        model.compile(loss="mean_squared_error",optimizer="sgd")
+                        #model.compile(loss="mean_squared_error",optimizer="sgd")
+                        model.compile(loss="mean_squared_error",optimizer="adam")
                         # define the outputs of the model
                         y    = fit
                     else:
-                        # random field theory to calculate the number of clusters to form
+                        fit  = dat[:,col].astype(np.int8)
+                        # random field theory to calculate the number of clusters to form (or classes)
                         clust= calcN(len(dat))
                         # creating a restricted Boltzmann machine here
                         dbnlayers(model,len(cols),len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
                         # categorical column and classification prediction
-                        dbnlayers(model,clust,len(cols),'sigmoid',False)
+                        dbnlayers(model,clust    ,len(cols),'sigmoid'                                       ,False)
                         # compile the model
                         model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
                         # define the outputs of the model
@@ -210,16 +213,25 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         continue
                     # produce some output
                     if len(preds) > 0:
-                        # we need a data frame for the paired plots
+                        # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
+                        # if classification do an additional plot
+                        if not type(0.0) in sifs:
+                            # get the paired plots and save them
+                            g    = sns.catplot(x=fit,y=pred,data=df,hue=nhdr[col])
+                            g.fig.suptitle(nhdr[col]+" Classification")
+                            # save the plot just created
+                            plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"class.png")
                         # get the paired plots and save them
                         g    = sns.pairplot(df,hue=nhdr[col])
                         g.fig.suptitle(nhdr[col]+" Grid of Marginals")
                         # save the plot just created
                         plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"grid.png")
+                        # x label
+                        xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
                         # forecast plot
-                        x11  = pd.Series(list(range(1,len(pred)+1)),name="Event Number")
-                        x2   = pd.Series(fit ,name=nhdr[col]+" Values")
+                        x11  = pd.Series(list(range(1,len(pred)+1)),name=xlbl)
+                        x2   = pd.Series(fit,name=nhdr[col]+" Values")
                         g    = sns.jointplot(x=x11
                                             ,y=x2
                                             ,kind="reg"
@@ -253,7 +265,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         sns.distplot(res,ax=ax1)
                         ax1.set_title("Histogram of Residuals")
                         # Fitted vs residuals
-                        x1   = pd.Series(pred,name="Event Number")
+                        x1   = pd.Series(pred,name=xlbl)
                         sns.kdeplot(x11,x2,ax=ax2,n_levels=40)
                         sns.regplot(x=x11,y=x2,scatter=False,ax=ax2)
                         ax2.set_title("Fitted vs. Actual Values")

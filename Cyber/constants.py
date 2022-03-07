@@ -64,7 +64,7 @@ class constants():
     VSIZE          = 8
     HOUN_OFFSET    = 10
     #CPU_COUNT      = 1
-    PERMS          = 1
+    PERMS          = 2
     #COLUMNS        = ["Customer reporting outage at least once"
                      #,"Internal NH Crews"
                      #,"Tree Crews"
@@ -72,6 +72,7 @@ class constants():
                      #,"Accounts W/O Power at peak"
                      #,"Broken Poles"]
                      #,"Western Event Level"]
+    XLABEL         = "Storm Event Number"
     COLUMNS        = [
                       #"Year",
                       #"Month",
@@ -88,8 +89,8 @@ class constants():
                       #"Northern Event Level",
                       #"Southern Event Level",
                       #"Western Event Level",
-                      #" Precipitation",
-                      #"Sustained Winds",
+                      " Precipitation",
+                      "Sustained Winds",
                       #"Winds Gusts",
                       #"Temp  High",
                       #"Temp Low",
@@ -97,9 +98,9 @@ class constants():
                       #"Max Wind Gust in MPH",
                       #"Temp  High actual",
                       #"Temp Low actual",
-                      #"Storm Direction",
+                      "Storm Direction",
                       #"Number Primary  Events (IEEE)",
-                      #"Storm Duration (days)",
+                      "Storm Duration (days)",
                       #"Concurrent Events",
                       #"Accounts W/O Power at peak",
                       #"Customer reporting outage at least once (IEEE)",
@@ -109,8 +110,8 @@ class constants():
                       #"Internal NH Crews",
                       #"Additional External Buckets",
                       #"Additional External Diggers",
-                      #"Tree Crews",
-                      #"ES Crews",
+                      "Tree Crews",
+                      "ES Crews",
                       #"Notes",
                       #"Cost (Charges to date)",
                       #"Exclusionary Day(s) ",
@@ -146,9 +147,9 @@ class constants():
                       "Max Wind Gust in MPH",
                       "Temp  High actual",
                       "Temp Low actual",
-                      "Storm Direction",
+                      #"Storm Direction",
                       "Number Primary  Events (IEEE)",
-                      "Storm Duration (days)",
+                      #"Storm Duration (days)",
                       "Concurrent Events",
                       "Accounts W/O Power at peak",
                       "Customer reporting outage at least once (IEEE)",
@@ -158,8 +159,8 @@ class constants():
                       "Internal NH Crews",
                       "Additional External Buckets",
                       "Additional External Diggers",
-                      "Tree Crews",
-                      "ES Crews",
+                      #"Tree Crews",
+                      #"ES Crews",
                       #"Broken Poles",
                       "Notes",
                       "Cost (Charges to date)",
