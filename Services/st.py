@@ -133,6 +133,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
+        sifs = None
         if not (len(d) == 0 or len(d[0]) == 0):
             # if there is something to fix
             if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
@@ -140,28 +141,37 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 indxr= [j for j in range(0,len(dat)) if j not in rows]
                 # string columns will be labeled using wikilabel
                 for i in range(0,len(dat[0])):
-                    sifs = np.asarray([t for t in map(utils.sif,dat[:,i])])
-                    ccd  = np.asarray(list(calcC(dat[:,i])))
+                    # rows of sifs are the actual columns so transpose later
+                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                    vec  = [t for t in map(utils.sif,dat[:,i])]
+                    if not type(sifs) == type(None):
+                        #sifs = np.hstack((sifs,vec))
+                        sifs = np.vstack((sifs,vec))
+                        b    = type(0) in sifs[-1] or type(0.0) in sifs[-1]
+                    else:
+                        sifs = vec
+                        b    = type(0) == sifs     or type(0.0) == sifs
                     if i in cols:
-                        if not (type(0) in sifs or type(0.0) in sifs):
+                        if not b:
                             #wiki = wikilabel(inst,dat[indxr,i],True,True)
+                            ccd  = np.asarray(list(calcC(dat[:,i])))
                             dat[rows,i] = ccd.flatten()[rows]
+                sifs = sifs.transpose() if not type(sifs) == type(None) else None
                 # fix the data by intelligently filling missing values
                 dat  = fixdata(inst,dat,coln)
                 dat  = pd.DataFrame(dat,columns=nhdr)
                 dat  = dat.to_numpy()
         # predict each column and write some output
+        perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
         for col in range(0,len(nhdr)):
-            perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
             for cols in perms:
                 if nhdr[col].lower() in [a.lower() for a in const.constants.COLUMNS] and col not in cols:
                     print([nhdr[col],np.asarray(nhdr)[cols]])
                     # structure which columns are dependent and which are independent
                     cls  = [col]
                     cls.extend(cols)
-                    sifs = np.asarray(["" in dat[:,j] for j in cols]).flatten()
                     # just skip this permutation if unable to fix the data
-                    if True in sifs:
+                    if True in np.asarray(["" in dat[:,j] for j in cols]).flatten():
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
@@ -172,8 +182,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     # relu at the input layer
                     dbnlayers(model,len(cols),len(cols),'relu',False)
                     # the outputs to be fit
-                    sifs = [t for t in map(utils.sif,dat[:,col])]
-                    if type(0.0) in sifs:
+                    if type(0.0) in sifs[:,col]:# or type(0.0) in dat[:,col].astype(np.single):
                         fit  = dat[:,col].astype(np.single)
                         # floating point column and regression prediction
                         dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
@@ -215,18 +224,19 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     if len(preds) > 0:
                         # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
+                        fn   = "images/" + const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls]) + const.constants.SEP
                         # if classification do an additional plot
-                        if not type(0.0) in sifs:
+                        if type(0) in sifs[:,col]:
                             # get the paired plots and save them
-                            g    = sns.catplot(x=fit,y=pred,data=df,hue=nhdr[col])
-                            g.fig.suptitle(nhdr[col]+" Classification")
+                            g    = sns.swarmplot(x=df.columns[0],y=nhdr[col],data=df)
+                            #g.fig.suptitle(nhdr[col]+" Classification")
                             # save the plot just created
-                            plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"class.png")
+                            plt.savefig(fn+"class.png")
                         # get the paired plots and save them
                         g    = sns.pairplot(df,hue=nhdr[col])
                         g.fig.suptitle(nhdr[col]+" Grid of Marginals")
                         # save the plot just created
-                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"grid.png")
+                        plt.savefig(fn+"grid.png")
                         # x label
                         xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
                         # forecast plot
@@ -240,7 +250,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                             ,ylim=[0.5*min(fit ),1.5*max(fit )])#,stat_func=r2)#,hue=nhdr[col])
                         g.fig.suptitle("Forecast of "+nhdr[col])
                         # save the plot just created
-                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"forecast.png")
+                        plt.savefig(fn+"forecast.png")
                         # other plots to show that the built model is markovian
                         # since it will (hopefully) be shown that the errors are
                         # normally distributed
@@ -271,4 +281,4 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         ax2.set_title("Fitted vs. Actual Values")
                         #ax2.set_aspect("equal")
                         # save the plot just created
-                        plt.savefig("images/"+const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])+const.constants.SEP+"hist"+const.constants.SEP+"fitVres.png")
+                        plt.savefig(fn+"fitVres.png")

@@ -2091,20 +2091,20 @@ def fixdata(inst=0,dat=[],coln={}):
                 #
                 # only numeric columns should need fixing at this point
                 if not (len(ip) == 0 or len(op) == 0):
-                    # unrelated redifinition of ndat to be used in the loop
-                    # 
-                    # the order of the outputs/inputs matter in the horizontal stack
-                    # as the model will be picked up as ... outputs as a function of inputs
-                    ndat = np.hstack((op,ip)).astype(np.single)
-                    # create the knowledge graph that holds the "brains"
-                    kgdat= create_kg(inst,ndat,limit=True)
-                    # write the knowledge graph
-                    cls  = [col]
-                    cls.extend(ncols[0:const.consants.MAX_COLS])
-                    dump = [data.write_kg(const.constants.V,inst,list(coln.items()[cls]),k,g,False) for k in kgdat]
-                    dump = [data.write_kg(const.constants.E,inst,list(coln.items()[cls]),k,g,True ) for k in kgdat]
                     # make a data set for each column of data needing replacement values
                     for i in cols:
+                        # unrelated redifinition of ndat to be used in the loop
+                        # 
+                        # the order of the outputs/inputs matter in the horizontal stack
+                        # as the model will be picked up as ... outputs as a function of inputs
+                        ndat = np.hstack((op[:,i],ip)).astype(np.single)
+                        # create the knowledge graph that holds the "brains"
+                        kgdat= create_kg(inst,ndat,limit=True)
+                        # write the knowledge graph
+                        cls  = [i]
+                        cls.extend(ncols[0:const.constants.MAX_COLS])
+                        dump = [data.write_kg(const.constants.V,inst,np.asarray(list(coln.items()))[cls],k,g,False) for k in kgdat]
+                        dump = [data.write_kg(const.constants.E,inst,np.asarray(list(coln.items()))[cls],k,g,True ) for k in kgdat]
                         # need to order the indices to find the right model when predicting values
                         indx = [i]
                         indx.extend(ncols)
