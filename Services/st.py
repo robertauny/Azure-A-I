@@ -171,7 +171,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     cls  = [col]
                     cls.extend(cols)
                     # just skip this permutation if unable to fix the data
-                    if True in np.asarray(["" in dat[:,j] for j in cols]).flatten():
+                    if type("") in [t for t in map(utils.sif,dat[:,cls].astype(str).flatten())]:
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
@@ -182,7 +182,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     # relu at the input layer
                     dbnlayers(model,len(cols),len(cols),'relu',False)
                     # the outputs to be fit
-                    if type(0.0) in sifs[:,col]:# or type(0.0) in dat[:,col].astype(np.single):
+                    if type(0.0) in sifs[:,col]:
                         fit  = dat[:,col].astype(np.single)
                         # floating point column and regression prediction
                         dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
@@ -222,26 +222,29 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         continue
                     # produce some output
                     if len(preds) > 0:
+                        fn   = "images/" + const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls]) + const.constants.SEP
                         # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
-                        fn   = "images/" + const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls]) + const.constants.SEP
-                        # if classification do an additional plot
-                        if type(0) in sifs[:,col]:
-                            # get the paired plots and save them
-                            g    = sns.swarmplot(x=df.columns[0],y=nhdr[col],data=df)
-                            #g.fig.suptitle(nhdr[col]+" Classification")
-                            # save the plot just created
-                            plt.savefig(fn+"class.png")
                         # get the paired plots and save them
                         g    = sns.pairplot(df,hue=nhdr[col])
                         g.fig.suptitle(nhdr[col]+" Grid of Marginals")
                         # save the plot just created
                         plt.savefig(fn+"grid.png")
+                        plt.cla()
+                        plt.clf()
                         # x label
                         xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
                         # forecast plot
                         x11  = pd.Series(list(range(1,len(pred)+1)),name=xlbl)
                         x2   = pd.Series(fit,name=nhdr[col]+" Values")
+                        # if classification do an additional plot
+                        if type(0) in sifs[:,col]:
+                            # get the paired plots and save them
+                            sns.swarmplot(y=x11,x=x2)
+                            # save the plot just created
+                            plt.savefig(fn+"class.png")
+                            plt.cla()
+                            plt.clf()
                         g    = sns.jointplot(x=x11
                                             ,y=x2
                                             ,kind="reg"
@@ -251,6 +254,8 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         g.fig.suptitle("Forecast of "+nhdr[col])
                         # save the plot just created
                         plt.savefig(fn+"forecast.png")
+                        plt.cla()
+                        plt.clf()
                         # other plots to show that the built model is markovian
                         # since it will (hopefully) be shown that the errors are
                         # normally distributed
@@ -282,3 +287,5 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         #ax2.set_aspect("equal")
                         # save the plot just created
                         plt.savefig(fn+"fitVres.png")
+                        plt.cla()
+                        plt.clf()
