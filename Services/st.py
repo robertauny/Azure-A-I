@@ -168,10 +168,13 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         for col in range(0,len(nhdr)):
             for cols in perms:
                 if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
+                    # which loop iteration
                     print([nhdr[col],np.asarray(nhdr)[cols]])
                     # structure which columns are dependent and which are independent
                     cls  = [col]
                     cls.extend(cols)
+                    # file naming convention
+                    fns  = const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])
                     # just skip this permutation if unable to fix the data
                     if type("") in [t for t in map(utils.sif,dat[:,cls].astype(str).flatten())]:
                         print("Not enough clean data to fix other data issues.")
@@ -207,6 +210,9 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
                     # fit the model
                     model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
+                    # save the model
+                    fnm  = "models/" + fns + ".h5"
+                    model.save(fnm)
                     # get some predictions using the same input data since this
                     # is just for simulation to produce graphics
                     pred = model.predict(x)
@@ -224,7 +230,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         continue
                     # produce some output
                     if len(preds) > 0:
-                        fn   = "images/" + const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls]) + const.constants.SEP
+                        fn   = "images/" + fns + const.constants.SEP 
                         # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
                         # get the paired plots and save them
@@ -247,6 +253,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                             plt.savefig(fn+"class.png")
                             plt.cla()
                             plt.clf()
+                        # regression plot
                         g    = sns.jointplot(x=x11
                                             ,y=x2
                                             ,kind="reg"
