@@ -163,9 +163,10 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 dat  = dat.to_numpy()
         # predict each column and write some output
         perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
+        acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
         for col in range(0,len(nhdr)):
             for cols in perms:
-                if nhdr[col].lower() in [a.lower() for a in const.constants.COLUMNS] and col not in cols:
+                if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
                     print([nhdr[col],np.asarray(nhdr)[cols]])
                     # structure which columns are dependent and which are independent
                     cls  = [col]
