@@ -165,6 +165,8 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         # predict each column and write some output
         perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
+        # construct the relaxed data name
+        sfl  = const.constants.SFL if hasattr(const.constants,"SFL") else "models/obj.h5"
         for col in range(0,len(nhdr)):
             for cols in perms:
                 if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
@@ -182,34 +184,31 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     # define the inputs to the model
                     x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])
                     x    = x.sort_values(by=list(x.columns))#sort_values(by=list(range(0,len(x.columns))),axis=1)#sort_values(by=np.asarray(nhdr)[cols],axis=1)#.to_numpy()
-                    # build a simple model
-                    model= Sequential()
-                    # relu at the input layer
-                    dbnlayers(model,len(cols),len(cols),'relu',False)
                     # the outputs to be fit
                     if type(0.0) in sifs[:,col]:
-                        fit  = dat[:,col].astype(np.single)
-                        # floating point column and regression prediction
-                        dbnlayers(model,1,len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
-                        # compile the model
-                        #model.compile(loss="mean_squared_error",optimizer="sgd")
-                        model.compile(loss="mean_squared_error",optimizer="adam")
                         # define the outputs of the model
+                        fit  = dat[:,col].astype(np.single)
                         y    = fit
+                        # floating point column and regression prediction
+                        model= dbn(x.to_numpy()
+                                  ,y
+                                  ,sfl=sfl
+                                  ,loss="mean_squared_error"
+                                  ,optimizer="adam"
+                                  ,rbmact="tanh"
+                                  ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                  ,dbnout=1)
                     else:
-                        fit  = dat[:,col].astype(np.int8)
                         # random field theory to calculate the number of clusters to form (or classes)
                         clust= calcN(len(dat))
-                        # creating a restricted Boltzmann machine here
-                        dbnlayers(model,len(cols),len(cols),'tanh' if ver == const.constants.VER else 'selu',False)
-                        # categorical column and classification prediction
-                        dbnlayers(model,clust    ,len(cols),'sigmoid'                                       ,False)
-                        # compile the model
-                        model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
                         # define the outputs of the model
+                        fit  = dat[:,col].astype(np.int8)
                         y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
-                    # fit the model
-                    model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
+                        # categorical column and classification prediction
+                        model= dbn(x.to_numpy(),y,sfl=sfl,clust=clust)
+                    if model is None:
+                        print("Model is null.")
+                        break
                     # save the model
                     fnm  = "models/" + fns + ".h5"
                     model.save(fnm)
@@ -227,7 +226,8 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     if len(pred) == len(x):
                         preds= np.hstack((pred.reshape((len(pred),1)),x))
                     else:
-                        continue
+                        print("Prediction length doesn't match input data length.")
+                        break
                     # produce some output
                     if len(preds) > 0:
                         fn   = "images/" + fns + const.constants.SEP 
