@@ -250,6 +250,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                             # get the paired plots and save them
                             sns.swarmplot(y=x11,x=x2)
                             # save the plot just created
+                            plt.title("Classification of "+nhdr[col])
                             plt.savefig(fn+"class.png")
                             plt.cla()
                             plt.clf()
