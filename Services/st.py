@@ -102,7 +102,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         dat  = pd.read_csv(fl,encoding="unicode_escape")
         # going to capture the header and data so it can be replaced
         hdr  = list(dat.columns)
-        nhdr = None
+        nhdr = hdr
         if hasattr(const.constants,"DROP" )                                                                  and \
            type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
             drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
@@ -126,7 +126,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             if d == [""] * len(d):
                 dat  = dat.drop(columns=cols[i])
                 chdr.append(i)
-        nhdr = [i for i in nhdr if i not in chdr] if not nhdr is None else dat.columns
+        nhdr = [i for i in nhdr if i not in chdr]
         # now continue on
         dat  = dat.to_numpy()
         #coln = {hdr[k]:k for k in range(0,len(hdr)) if hdr[k] in nhdr}
@@ -155,7 +155,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     if i in cols:
                         if not b:
                             #wiki = wikilabel(inst,dat[indxr,i],True,True)
-                            ccd  = np.asarray(list(calcC(dat[:,i])))
+                            ccd         = np.asarray(list(calcC(dat[:,i])))
                             dat[rows,i] = ccd.flatten()[rows]
                 sifs = sifs.transpose() if not type(sifs) == type(None) else None
                 # fix the data by intelligently filling missing values
