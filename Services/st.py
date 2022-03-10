@@ -102,7 +102,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
         dat  = pd.read_csv(fl,encoding="unicode_escape")
         # going to capture the header and data so it can be replaced
         hdr  = list(dat.columns)
-        nhdr = hdr
+        nhdr = list(np.asarray(hdr).copy())
         if hasattr(const.constants,"DROP" )                                                                  and \
            type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
             drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
