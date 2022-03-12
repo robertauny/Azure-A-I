@@ -76,7 +76,7 @@ class constants():
     COLUMNS        = [
                       #"Year",
                       #"Month",
-                      #"Date",
+                      "Date",
                       #"Season",
                       #"Work Order",
                       #"Activation (No Partial Remote Full)",
@@ -85,7 +85,7 @@ class constants():
                       #"Weather Forecast predicted",
                       #"Weather Forecast Advisory",
                       #"Central Event Level",
-                      "Eastern Event Level",
+                      #"Eastern Event Level",
                       #"Northern Event Level",
                       #"Southern Event Level",
                       #"Western Event Level",
@@ -140,16 +140,16 @@ class constants():
                       "Southern Event Level",
                       "Western Event Level",
                       #" Precipitation",
-                      "Winds Gusts",
+                      #"Winds Gusts",
                       "Temp  High",
                       "Temp Low",
                       "Weather Forecast actual",
                       "Max Wind Gust in MPH",
                       "Temp  High actual",
-                      "Temp Low actual",
+                      #"Temp Low actual",
                       "Storm Direction",
                       "Number Primary  Events (IEEE)",
-                      "Storm Duration (days)",
+                      #"Storm Duration (days)",
                       "Concurrent Events",
                       "Accounts W/O Power at peak",
                       "Customer reporting outage at least once (IEEE)",
@@ -158,7 +158,7 @@ class constants():
                       "OPM Trouble Spots ",
                       "Internal NH Crews",
                       "Additional External Buckets",
-                      "Additional External Diggers",
+                      #"Additional External Diggers",
                       "Tree Crews",
                       "ES Crews",
                       #"Broken Poles",
@@ -166,7 +166,7 @@ class constants():
                       "Cost (Charges to date)",
                       "Exclusionary Day(s) ",
                       "Applied for recovery",
-                      "Sustained Winds"
+                      #"Sustained Winds"
                      ]
     MATCH_ON       = ["Id","PATIENT"]
     # neural network constants
