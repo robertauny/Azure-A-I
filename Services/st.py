@@ -246,7 +246,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         x11  = pd.Series(list(range(1,len(pred)+1)),name=xlbl)
                         x2   = pd.Series(fit,name=nhdr[col]+" Values")
                         # if classification do an additional plot
-                        if type("") in sifs[:,col]:
+                        if not (type(0.0) in sifs[:,col] or type(0) in sifs[:,col]):
                             # get the paired plots and save them
                             sns.swarmplot(y=x11,x=x2)
                             # save the plot just created
