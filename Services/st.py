@@ -157,11 +157,33 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                             #wiki = wikilabel(inst,dat[indxr,i],True,True)
                             ccd         = np.asarray(list(calcC(dat[:,i])))
                             dat[rows,i] = ccd.flatten()[rows]
-                sifs = sifs.transpose() if not type(sifs) == type(None) else None
                 # fix the data by intelligently filling missing values
                 dat  = fixdata(inst,dat,coln)
                 dat  = pd.DataFrame(dat,columns=nhdr)
                 dat  = dat.to_numpy()
+            else:
+                # string columns will be labeled using wikilabel
+                for i in range(0,len(dat[0])):
+                    # rows of sifs are the actual columns so transpose later
+                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                    vec  = [t for t in map(utils.sif,dat[:,i])]
+                    if not type(sifs) == type(None):
+                        #sifs = np.hstack((sifs,vec))
+                        sifs = np.vstack((sifs,vec))
+                    else:
+                        sifs = vec
+        else:
+            # string columns will be labeled using wikilabel
+            for i in range(0,len(dat[0])):
+                # rows of sifs are the actual columns so transpose later
+                #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                vec  = [t for t in map(utils.sif,dat[:,i])]
+                if not type(sifs) == type(None):
+                    #sifs = np.hstack((sifs,vec))
+                    sifs = np.vstack((sifs,vec))
+                else:
+                    sifs = vec
+        sifs = sifs.transpose()
         # predict each column and write some output
         perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
