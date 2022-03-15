@@ -206,19 +206,19 @@ def sif(arg=None):
     #ret  = type(arg)
     ret  = type(None)
     if not (type(arg) == type(None)):
-        try:
-            dump = int(arg)
-            ret  = type(0)
-        except:
+        if type(arg) == type(""):
             try:
-                dump = float(arg)
-                ret  = type(0.0)
+                dump = int(arg)
+                ret  = type(0)
             except:
                 try:
+                    dump = float(arg)
+                    ret  = type(0.0)
+                except:
                     dump = str(arg)
                     ret  = type("")
-                except:
-                    dump = None
+        else:
+            ret  = type(arg)#if type(arg) in [type([]),type(np.asarray([])),type(range(1)),type(pd.DataFrame(list(range(1))))] else type(None)
     return ret
 
 ############################################################################

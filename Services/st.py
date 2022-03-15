@@ -185,7 +185,11 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     sifs = vec
         sifs = sifs.transpose()
         # predict each column and write some output
-        perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
+        if hasattr(const.constants,"PERMS"):
+            if type(0) == utils.sif(const.constants.PERMS):
+                perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
+            else:
+                perms= const.constants.PERMS
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
         # construct the relaxed data name
         sfl  = const.constants.SFL if hasattr(const.constants,"SFL") else "models/obj.h5"
@@ -236,6 +240,9 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     model.save(fnm)
                     # get some predictions using the same input data since this
                     # is just for simulation to produce graphics
+                    #
+                    # yet note that for markov processes of time series, the last prediction
+                    # is the next value in the time series
                     pred = model.predict(x)
                     if len(np.asarray(pred).shape) > 1:
                         p    = []
@@ -264,9 +271,12 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         plt.clf()
                         # x label
                         xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
-                        # forecast plot
-                        x11  = pd.Series(list(range(1,len(pred)+1)),name=xlbl)
-                        x2   = pd.Series(fit,name=nhdr[col]+" Values")
+                        # forecast plot with an extra element to account for the
+                        # markov property allowing the element to be a prediction
+                        # based on the last set of inputs
+                        x11  = pd.Series(list(range(1,len(pred)+1+1)),name=xlbl)
+                        # add the markov prediction for the last element in the time series
+                        x2   = pd.Series(np.append(fit,pred[-1]),name=nhdr[col]+" Values")
                         # if classification do an additional plot
                         if not (type(0.0) in sifs[:,col] or type(0) in sifs[:,col]):
                             # get the paired plots and save them
