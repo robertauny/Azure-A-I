@@ -139,7 +139,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             # if there is something to fix
             if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
                 # indices that actually had data originally
-                indxr= [j for j in range(0,len(dat)) if j not in rows]
+                #indxr= [j for j in range(0,len(dat)) if j not in rows]
                 # string columns will be labeled using wikilabel
                 for i in range(0,len(dat[0])):
                     # rows of sifs are the actual columns so transpose later
