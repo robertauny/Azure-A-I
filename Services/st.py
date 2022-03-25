@@ -35,7 +35,6 @@ from joblib                                         import Parallel,delayed
 from string                                         import punctuation
 from math                                           import ceil,log,exp
 from PIL                                            import ImageDraw,Image
-from scipy                                          import stats
 
 ver  = sys.version.split()[0]
 
@@ -73,15 +72,6 @@ from gremlin_python.driver.driver_remote_connection import DriverRemoteConnectio
 cfg  = config.cfg()
 
 np.random.seed(const.constants.SEED)
-
-############################################################################
-##
-## Purpose:   Use A-I to expand and fix a data set before processing
-##
-############################################################################
-
-def r2(x,y):
-    return stats.pearson(x,y)[0]**2
 
 # an instance number corresponds to the set of constants in one object
 # of the JSON configuration array associated to the set of modules for this app
@@ -286,6 +276,18 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                             plt.savefig(fn+"class.png")
                             plt.cla()
                             plt.clf()
+                            if clust == 2:
+                                # get the roc
+                                utils.utils._roc(      fit.astype(np.int8),pred.astype(np.int8),fn+"roc.png")
+                                # get the precision vs recall
+                                utils.utils._pvr(      fit.astype(np.int8),pred.astype(np.int8),fn+"pvr.png")
+                            # get the precision, recall, f-score
+                            utils.utils._prf(          fit.astype(np.int8),pred.astype(np.int8),fn+"prf.txt")
+                            # get the confusion matrix
+                            utils.utils._confusion(    fit.astype(np.int8),pred.astype(np.int8),fn+"cnf.png")
+                        else:
+                            # get the r-square comparison
+                            utils.utils._r2(fit,pred,fn+"r2.png")
                         # regression plot
                         g    = sns.jointplot(x=x11
                                             ,y=x2

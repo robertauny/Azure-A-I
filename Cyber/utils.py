@@ -32,7 +32,7 @@ import constants as const
 from math                        import log,ceil,floor,sqrt,inf
 from itertools                   import combinations
 from matplotlib                  import colors
-from sklearn.metrics             import roc_curve,RocCurveDisplay,auc,confusion_matrix,ConfusionMatrixDisplay
+from sklearn.metrics             import roc_curve,RocCurveDisplay,auc,confusion_matrix,ConfusionMatrixDisplay,r2_score,PrecisionRecallDisplay,precision_recall_curve,precision_recall_fscore_support
 
 import matplotlib.pyplot         as plt
 import numpy                     as np
@@ -199,6 +199,71 @@ def confusion(tgts=[],prds=[],fl=None):
 
 ############################################################################
 ##
+## Purpose:   Print the precision, recall, fscore
+##
+############################################################################
+def prf(tgts=[],prds=[],fl=None):
+    if (type(tgts) == type([]) or type(tgts) == type(np.asarray([]))) and \
+       (type(prds) == type([]) or type(prds) == type(np.asarray([]))):
+        if not (len(tgts) == 0 or len(prds) == 0):
+            # the false and true positve rate and the threshold
+            dat  = precision_recall_fscore_support(tgts,prds,average=None)
+            # save the image if requested
+            if type(fl) == type(""):
+                try:
+                    np.savetxt(fl,dat)
+                except:
+                    print("Unable to write " + dat)
+            else:
+                print(dat)
+    return
+
+############################################################################
+##
+## Purpose:   Precision vs Recall
+##
+############################################################################
+def pvr(tgts=[],prds=[],fl=None):
+    if (type(tgts) == type([]) or type(tgts) == type(np.asarray([]))) and \
+       (type(prds) == type([]) or type(prds) == type(np.asarray([]))):
+        if not (len(tgts) == 0 or len(prds) == 0):
+            # the false and true positve rate and the threshold
+            pre,rec,_  = precision_recall_curve(tgts,prds)
+            disp = PrecisionRecallDisplay(precision=pre,recall=rec)
+            disp.plot()
+            # save the image if requested
+            if type(fl) == type(""):
+                plt.savefig(fl)
+            else:
+                plt.show()
+    return
+
+############################################################################
+##
+## Purpose:   R-square
+##
+############################################################################
+def r2(tgts=[],prds=[],fl=None):
+    if (type(tgts) == type([]) or type(tgts) == type(np.asarray([]))) and \
+       (type(prds) == type([]) or type(prds) == type(np.asarray([]))):
+        if not (len(tgts) == 0 or len(prds) == 0):
+            fig,ax = plt.subplots()
+            ax.scatter(tgts,prds)
+            ax.plot([tgts.min(),tgts.max()],[prds.min(),prds.max()],'k--',lw=4)
+            ax.set_xlabel('Actual')
+            ax.set_ylabel('Predicted')
+            #regression line
+            ax.plot(tgts,prds)
+            plt.annotate("r-squared = {:.3f}".format(r2_score(tgts,prds)),(0,1))
+            # save the image if requested
+            if type(fl) == type(""):
+                plt.savefig(fl)
+            else:
+                plt.show()
+    return
+
+############################################################################
+##
 ## Purpose:   Check if argument is a string, int or float
 ##
 ############################################################################
@@ -251,3 +316,12 @@ class utils():
     @staticmethod
     def _confusion(tgts=[],prds=[],fl=None):
         return confusion(tgts,prds,fl)
+    @staticmethod
+    def _prf(tgts=[],prds=[],fl=None):
+        return prf(tgts,prds,fl)
+    @staticmethod
+    def _pvr(tgts=[],prds=[],fl=None):
+        return pvr(tgts,prds,fl)
+    @staticmethod
+    def _r2(tgts=[],prds=[],fl=None):
+        return r2(tgts,prds,fl)
