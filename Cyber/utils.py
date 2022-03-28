@@ -32,7 +32,7 @@ import constants as const
 from math                        import log,ceil,floor,sqrt,inf
 from itertools                   import combinations
 from matplotlib                  import colors
-from sklearn.metrics             import roc_curve,RocCurveDisplay,auc,confusion_matrix,ConfusionMatrixDisplay,r2_score,PrecisionRecallDisplay,precision_recall_curve,precision_recall_fscore_support
+from sklearn.metrics             import roc_curve,RocCurveDisplay,auc,confusion_matrix,ConfusionMatrixDisplay,r2_score,PrecisionRecallDisplay,precision_recall_curve,precision_score,recall_score
 
 import matplotlib.pyplot         as plt
 import numpy                     as np
@@ -207,7 +207,9 @@ def prf(tgts=[],prds=[],fl=None):
        (type(prds) == type([]) or type(prds) == type(np.asarray([]))):
         if not (len(tgts) == 0 or len(prds) == 0):
             # the false and true positve rate and the threshold
-            dat  = precision_recall_fscore_support(tgts,prds,average=None)
+            pre  = precision_score(tgts,prds,average="weighted")
+            rec  =    recall_score(tgts,prds,average="weighted")
+            dat  = "  ".join(["precision: "+str(pre),"recall: "+str(rec)])
             # save the image if requested
             if type(fl) == type(""):
                 try:
