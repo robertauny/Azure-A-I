@@ -36,14 +36,14 @@ import utils
 ver  = sys.version.split()[0]
 
 if ver == const.constants.VER:
-    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU
+    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer
     from            keras.models                            import Sequential,load_model,Model,clone_model
     from            keras.utils.np_utils                    import to_categorical
     from            keras.callbacks                         import ModelCheckpoint
     from            keras.preprocessing.text                import Tokenizer
     from            keras                                   import backend
 else:
-    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU
+    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer
     from tensorflow.keras.models                            import Sequential,load_model,Model,clone_model
     from tensorflow.keras.utils                             import to_categorical
     from tensorflow.keras.callbacks                         import ModelCheckpoint
@@ -157,6 +157,24 @@ def calcC(vals=None,clust=None):
 
 ############################################################################
 ##
+## Purpose:   Deep belief network support class for residuals
+##
+############################################################################
+class ResLayer(Layer):
+    def __init__(self,enc,**kwargs):
+        super(ResLayer,self).__init__(**kwargs)
+        self.enc = enc
+
+    def call(self):
+        nenc = Dense(list(self.enc.shape)[1],input_shape=self.enc.shape,activation='linear')(self.enc)
+        model= Model(inputs=self.enc,outputs=nenc)
+        return model.layers[len(model.layers)-1]
+
+    def compute_output_shape(self,input_shape):
+        return input_shape
+
+############################################################################
+##
 ## Purpose:   Deep belief network support function
 ##
 ############################################################################
@@ -164,6 +182,10 @@ def dbnlayers(model=None,outp=const.constants.OUTP,shape=None,act=None,useact=Fa
     if not (type(model) == type(None) or outp < const.constants.OUTP or shape == None or type(act) == type(None)):
         if type(shape) in [type(0),type([]),type(np.asarray([])),type(())]:
             shp  = (shape,) if type(shape) == type(0) else shape
+            # auto-encode the input data using the rectified linear unit
+            enc1 = Dense(outp,input_shape=shp,activation='relu')
+            # add the input layer to the model
+            model.add(enc1)
             if not useact:
                 # encode the input data using the rectified linear unit
                 enc  = Dense(outp,input_shape=shp,activation=act)
@@ -182,47 +204,14 @@ def dbnlayers(model=None,outp=const.constants.OUTP,shape=None,act=None,useact=Fa
                 enc  = Activation(act)
                 # add the input layer to the model
                 model.add(enc)
-    return
-
-############################################################################
-##
-## Purpose:   Deep belief network support function for residuals
-##
-############################################################################
-def reslayers(model=None,outp=const.constants.OUTP,shape=None):
-    if not (type(model) == type(None) or outp < const.constants.OUTP or shape == None):
-        if type(shape) in [type(0),type([]),type(np.asarray([])),type(())]:
-            shp  = (shape,) if type(shape) == type(0) else shape
-            # the inputs obtained from the most recent prior layer
-            inp  = model.layers[len(model.layers)-1].output
-            # encode the input data using the rectified linear unit
-            enc  = Dense(outp,input_shape=shp,activation='relu')
+            # calculate the residuals
+            inp1 = Subtract()([enc1.output,enc.output])
+            # auto-encode the input data using the linear unit
+            enc1 = Dense(outp,input_shape=shp,activation='linear')
             # add the input layer to the model
-            model.add(enc)
-            # normalize the data between zero and one for accuracy and generalizability
-            enc  = BatchNormalization()
-            # add the input layer to the model
-            model.add(enc)
-            # another fully connected dense layer that will aid in the residual calculations
-            enc  = Dense(list(inp.shape)[1],input_shape=shp)
-            # add the input layer to the model
-            model.add(enc)
-            # get the outputs from the last layer to compute the residuals
-            fout = model.layers[len(model.layers)-1].output
+            model.add(enc1)
             # add the residuals to the filtered output from before we started
-            enc  = Input(tensor=Add()([inp,fout]))
-            # add the input layer to the model
-            model.add(enc)
-            # another fully connected dense layer
-            enc  = Dense(outp,input_shape=inp.shape)
-            # add the input layer to the model
-            model.add(enc)
-            # linearize one more time
-            enc  = ReLU()
-            # add the input layer to the model
-            model.add(enc)
-            # normalize the data between zero and one for accuracy and generalizability
-            enc  = BatchNormalization()
+            enc  = ResLayer(Add()([inp1,enc1.output])).call()
             # add the input layer to the model
             model.add(enc)
     return
@@ -370,20 +359,14 @@ def dbn(inputs=[]
                     # add another layer to change the structure of the network if needed based on clusters
                     if not (clust <= 0):
                         dbnlayers(model,clust,dim,rbmact,useact)
-                        # add a residuals layer
-                        reslayers(model,clust,clust)
                     else:
                         dbnlayers(model,odim ,dim,rbmact,useact)
-                        # add a residuals layer
-                        reslayers(model,odim ,odim )
         # add another layer for a different kind of model, such as a regression model
         if not (type(dbnact) == type(None) or dbnout <= 0):
             # preceding layers plus this layer now perform auto encoding
             dbnlayers(model,M,odim,'tanh' if ver == const.constants.VER else 'selu',useact)
             # requested model at the output layer of this RBM
             dbnlayers(model,dbnout,M,dbnact,useact)
-            # add a residuals layer
-            reslayers(model,dbnout,dbnout)
         # optimize using the typical categorical cross entropy loss function with root mean square optimizer to find weights
         model.compile(loss=loss,optimizer=optimizer)
         if not (type(sfl) == type(None)):

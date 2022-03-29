@@ -157,7 +157,7 @@ def dextend(dat1={},k=None,v=None):
 ############################################################################
 def dextend1(dat1={},dat2={}):
     # number of cpu cores
-    nc   = mp.cpu_count()
+    nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
     ret  = Parallel(n_jobs=nc)(delayed(dextend)(dat1,k,dat2[k]) for k in dat2.keys())
     return ret
 
@@ -179,7 +179,7 @@ def extend(dat1=[],dat2=[]):
 ############################################################################
 def extend1(dat1=[],dat2=[]):
     # number of cpu cores
-    nc   = mp.cpu_count()
+    nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
     ret  = Parallel(n_jobs=nc)(delayed(extend)(dat1,dat2[i]) for i in range(0,len(dat2)))
     return ret
 
@@ -222,7 +222,7 @@ def label(dat=[]):
     # number of data points in all clusters to label
     sz   = len(dat)
     if not (sz == 0):
-        num_cores = mp.cpu_count()
+        num_cores = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # which cluster has been identified for storing the data
         ret  = Parallel(n_jobs=num_cores)(delayed(store)(dat[i]) for i in range(0,sz))
         # initialize a 2-D array for the counts of elements in a cluster
@@ -841,7 +841,7 @@ def mostly(dat=[],rdat=[],cols=[],preds=[],pre=0):
     psz  = len(preds)
     if not (sz == 0 or rsz == 0 or csz == 0 or psz == 0 or pre <= 0):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # character-wise append of most frequent characters in each feature of the list of strings
         # the data are strings that have been converted into character arrays
         # with each character further being converted into its inverted ordinal representation
@@ -889,7 +889,7 @@ def most(dat=[],rdat=[],cols=[],preds=[],pre=0):
     sz   = len(dat)
     if not (sz == 0 or pre < 0):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # character-wise append of most frequent characters in each feature of the list of strings
         cdat = Parallel(n_jobs=nc)(delayed(chars)(dat[i],pre) for i in range(0,sz))
         cdat = np.asarray(cdat)
@@ -914,7 +914,7 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
     sz   = len(dat)
     if not (sz == 0):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # length of longest string in the list
         ssz  = max([len(x) for i,x in enumerate(dat)])
         # numeric representations of the strings in the list
@@ -1287,7 +1287,7 @@ def ocre(imgs=[]):
     ret  = None
     if not (len(imgs) == 0):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # converted images
         ret  = Parallel(n_jobs=nc)(delayed(pil2array)(imgs[i]) for i in range(0,len(imgs)))
     return ret
@@ -1322,7 +1322,7 @@ def cognitive(wtyp=const.constants.OCR,pdfs=[],inst=const.constants.BVAL,objd=Fa
     ret  = None
     if not (wtyp == None or len(pdfs) == 0 or inst <= const.constants.BVAL):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         if wtyp in [const.constants.OCR,const.constants.IMG]:
             # converted images
             if wtyp == const.constants.OCR:
@@ -1886,7 +1886,7 @@ def edges(clus=None,rows=[],limit=False):
     ret  = None
     if not (clus == None or len(rows) == 0):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # append the data point row numbers of those data points that are connected to the i-th data point in the current cluster
         #
         # have to sourround [x] so that extend doesn't separate the characters
@@ -1912,7 +1912,7 @@ def create_kg_ve(inst=const.constants.BVAL,dat=[],lbls=[],lbl=None,ve=None,limit
     ret  = None
     if not (inst <= const.constants.BVAL or len(dat) == 0 or len(lbls) == 0 or lbl == None or ve == None):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         if ve == const.constants.V:
             # only need to append the unique id defined by the row label to the data row
             # this is the set of vertices for each data point in the data set
@@ -1950,7 +1950,7 @@ def build_kg(inst,dat=[],brn={},splits=2,limit=False):
         # make sure to get the right subset of the data
         l    = list(map(int,lbl.split(const.constants.SEP)))
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # make the predictions
         prds = model.predict(np.asarray(dat)[:,l[1:]])
         #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
@@ -1999,7 +1999,7 @@ def create_kg(inst=const.constants.BVAL,dat=[],splits=2,permu=[],limit=False):
     ret  = {const.constants.V:[],const.constants.E:[]}
     if not (inst <= const.constants.BVAL or len(dat) == 0 or splits < 2):
         # number of cpu cores
-        nc   = mp.cpu_count()
+        nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # generate the brains
         brns = brain(dat,splits,permu)
         # generate the vertices and edges
