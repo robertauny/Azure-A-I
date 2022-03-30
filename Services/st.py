@@ -237,7 +237,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                     if len(np.asarray(pred).shape) > 1:
                         p    = []
                         for row in list(pred):
-                            p.extend(j for j,x in enumerate(row) if x == max(row))
+                            p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
                         pred = np.asarray(p)
                     else:
                         pred = np.asarray(list(pred))
