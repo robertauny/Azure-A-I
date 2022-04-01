@@ -180,6 +180,8 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                 perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
             else:
                 perms= const.constants.PERMS
+        else:
+            perms= data.permute(list(range(0,len(nhdr))),mine=False,l=len(nhdr))
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
         # construct the relaxed data name
         sfl  = const.constants.SFL if hasattr(const.constants,"SFL") else "models/obj.h5"
