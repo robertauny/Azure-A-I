@@ -2141,7 +2141,12 @@ def fixdata(inst=0,dat=[],coln={}):
                                 if not (type(model) == type(None)):
                                     ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
                                     ip1  = ip1[    :,ncols] if not (                   len(ip1) == 0) else []
-                                    dat[nrow,col] = np.asarray(model.predict(ip1.astype(np.single))).flatten()
+                                    if not (len(ip1) == 0):
+                                        dat[nrow,col] = np.asarray(model.predict(ip1.astype(np.single))).flatten()
+                                    else:
+                                        if type("") in utils.sif(dat[:,col]):
+                                            #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                            dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
                                 else:
                                     if type("") in utils.sif(dat[:,col]):
                                         #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
