@@ -1953,16 +1953,18 @@ def build_kg(inst,dat=[],brn={},splits=2,limit=False):
         nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
         # make the predictions
         prds = model.predict(np.asarray(dat)[:,l[1:]])
-        #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
-        preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*(len(l)-1))) for i in range(0,len(prds)))
-        # generate the labels for the data
-        lbls = label(preds)
-        # create the vertices
-        v    = create_kg_ve(inst,dat,lbls,lbl,const.constants.V,limit)
-        # create the edges
-        e    = create_kg_ve(inst,dat,lbls,lbl,const.constants.E,limit)
-        ret[const.constants.V] = v
-        ret[const.constants.E] = e
+        # need to be sure that the predictions don't contain NaNs
+        if not np.float32("nan") in np.asarray(prds).flatten():
+            #preds= to_categorical(np.sum(prds,axis=1),num_classes=splits**(2*len(l)))
+            preds= Parallel(n_jobs=nc)(delayed(to_categorical)([j for j,x in enumerate(prds[i]) if x == max(prds[i])][0],num_classes=splits**(2*(len(l)-1))) for i in range(0,len(prds)))
+            # generate the labels for the data
+            lbls = label(preds)
+            # create the vertices
+            v    = create_kg_ve(inst,dat,lbls,lbl,const.constants.V,limit)
+            # create the edges
+            e    = create_kg_ve(inst,dat,lbls,lbl,const.constants.E,limit)
+            ret[const.constants.V] = v
+            ret[const.constants.E] = e
     return ret 
 
 ############################################################################
@@ -2022,14 +2024,14 @@ def checkdata(dat=[]):
         # check which rows have any null values and remove them
         #
         # doing rows first since a null row will eliminate all columns
-        rows = [i for i in range(0,len(ret)) if type("") in [t for t in map(utils.sif,ret[i])]]
+        rows = [i for i in range(0,len(ret)) if type("") in utils.sif(ret[i])]
         # have to check that we still have rows of data
         if not (len(ret) == len(rows)):
             # for the return, we will remove all rows/cols that have empty (null) strings
             ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
         # check which columns have any null values and remove them
         d1   = ret.transpose()
-        cols = [i for i in range(0,len(d1)) if type("") in [t for t in map(utils.sif,d1[i])]]
+        cols = [i for i in range(0,len(d1)) if type("") in utils.sif(d1[i])]
         if not (len(ret[0]) == len(cols)):
             ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
     return ret,rows,cols
@@ -2078,77 +2080,81 @@ def fixdata(inst=0,dat=[],coln={}):
                 # get the remote graph traversal
                 g    = graph.traversal().withRemote(conn)
                 # set of columns that don't need fixing
-                nrows= [i for i in range(0,len(dat   )) if i not in rows]
+                nrows= [i for i in range(0,len(dat   )) if i not in  rows]
+                nrow = [j for j in range(0,len(dat   )) if j not in nrows]
                 # set of columns that don't need fixing
-                ncols= [i for i in range(0,len(dat[0])) if i not in cols]
+                ncols= [i for i in range(0,len(dat[0])) if i not in  cols]
+                # all rows with values
+                ndat =  dat[nrows,    :] if not (len(nrows) == 0                  ) else []
                 # inputs for importance are the subset of rows that have values
-                ip   = dat[nrows,:]
-                ip   =  ip[:    ,ncols[0:const.constants.MAX_COLS]]
+                ip   = ndat[    :,ncols] if not (len(ncols) == 0 or len(ndat) == 0) else []
                 # outputs for importance calculated as categorical labels
-                op   = dat[nrows, :]
-                op   =  op[:    , cols                            ]
-                # do we have data to build models and a knowledge graph
+                op   = ndat[    :, cols] if not (len( cols) == 0 or len(ndat) == 0) else []
+                # do we have data to build models
                 #
                 # only numeric columns should need fixing at this point
+                #
+                # floating point column and regression prediction
                 if not (len(ip) == 0 or len(op) == 0):
-                    # make a data set for each column of data needing replacement values
-                    for i in cols:
-                        # unrelated redifinition of ndat to be used in the loop
-                        # 
-                        # the order of the outputs/inputs matter in the horizontal stack
-                        # as the model will be picked up as ... outputs as a function of inputs
-                        ndat = np.hstack((op[:,i],ip)).astype(np.single)
-                        # create the knowledge graph that holds the "brains"
-                        kgdat= create_kg(inst,ndat,limit=True)
-                        # write the knowledge graph
-                        cls  = [i]
-                        cls.extend(ncols[0:const.constants.MAX_COLS])
-                        dump = [data.write_kg(const.constants.V,inst,np.asarray(list(coln.items()))[cls],k,g,False) for k in kgdat]
-                        dump = [data.write_kg(const.constants.E,inst,np.asarray(list(coln.items()))[cls],k,g,True ) for k in kgdat]
-                        # need to order the indices to find the right model when predicting values
-                        indx = [i]
-                        indx.extend(ncols)
-                        # thought function will give us the predictions for replacement in the original data set
-                        for j in rows:
-                            tht      = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if type("") == utils.sif(dat[j,i]) else []
-                            dat[j,i] = tht[0][0]                                                                                        if len(tht) > 0                    else dat[j,i]
-                            # data can still be the null string so
-                            # just take the most frequent item
-                            if type("") == utils.sif(dat[j,i]):
-                                dat[j,i] = ceil(np.median(dat[nrows,i].astype(np.single)))
+                    model= dbn(ip
+                              ,op
+                              ,sfl=None
+                              ,loss="mean_squared_error"
+                              ,optimizer="adam"
+                              ,rbmact="tanh"
+                              ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                              ,dbnout=len(cols))
+                    if not (type(model) == type(None)):
+                        ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
+                        ip1  = ip1[    :,ncols] if not (len(ncols) == 0 or len(ip1) == 0) else []
+                        dat[nrow,cols] = np.asarray(model.predict(ip1.astype(np.single))).reshape((len(nrow),len(cols)))
+                    else:
+                        for col in cols:
+                            if type("") in utils.sif(dat[:,col]):
+                                #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
                 else:
-                    for col in cols:
-                        # set of columns that don't need fixing
-                        nrows= [i for i in range(0,len(dat[:,col])) if utils.sif(dat[i,col]) in [type(0),type(0.0)]]
-                        # inputs for importance are the subset of rows that have values
-                        ip   = dat[nrows,    :]
-                        ip   =  ip[:    ,ncols[0:const.constants.MAX_COLS]]
-                        # outputs for importance calculated as categorical labels
-                        op   = dat[nrows,    :]
-                        op   =  op[:    , col                             ]
-                        # unrelated redifinition of ndat to be used in the loop
-                        # 
-                        # the order of the outputs/inputs matter in the horizontal stack
-                        # as the model will be picked up as ... outputs as a function of inputs
-                        ndat = np.hstack((np.asarray(op).reshape((len(op),1)),ip)).astype(np.single)
-                        # create the knowledge graph that holds the "brains"
-                        kgdat= create_kg(inst,ndat,limit=True)
-                        # write the knowledge graph
-                        cls  = [col]
-                        cls.extend(ncols[0:const.constants.MAX_COLS])
-                        dump = [data.write_kg(const.constants.V,inst,np.asarray(list(coln.items()))[cls],k,g,False) for k in kgdat]
-                        dump = [data.write_kg(const.constants.E,inst,np.asarray(list(coln.items()))[cls],k,g,True ) for k in kgdat]
-                        # need to order the indices to find the right model when predicting values
-                        indx = [col]
-                        indx.extend(ncols)
-                        # thought function will give us the predictions for replacement in the original data set
-                        for j in rows:
-                            tht        = list(thought(inst,np.asarray(list(coln.items()))[indx],dat[j,ncols].astype(np.single)).values()) if type("") == utils.sif(dat[j,col]) else []
-                            dat[j,col] = tht[0][0]                                                                                        if len(tht) > 0                      else dat[j,col]
-                            # data can still be the null string so
-                            # just take the most frequent item
-                            if type("") == utils.sif(dat[j,col]):
-                                dat[j,col] = ceil(np.median(dat[nrows,col].astype(np.single)))
+                    if len(ndat) == 0:
+                        for col in cols:
+                            nrows= [i for i in range(0,len(dat[:,col])) if     utils.sif(dat[i,col]) in [type(0),type(0.0)]]
+                            nrow = [j for j in range(0,len(dat       )) if not j                     in nrows              ]
+                            # all rows with values
+                            ndat =  dat[nrows,    :] if not  len(nrows) == 0                    else []
+                            # inputs for importance are the subset of rows that have values
+                            ip   = ndat[    :,ncols] if not (len(ncols) == 0 or len(ndat) == 0) else []
+                            # outputs for importance calculated as categorical labels
+                            op   = ndat[    :, col ] if not (                   len(ndat) == 0) else []
+                            # do we have data to build models
+                            #
+                            # only numeric columns should need fixing at this point
+                            #
+                            # floating point column and regression prediction
+                            if not (len(ip) == 0 or len(op) == 0):
+                                model= dbn(ip
+                                          ,op
+                                          ,sfl=None
+                                          ,loss="mean_squared_error"
+                                          ,optimizer="adam"
+                                          ,rbmact="tanh"
+                                          ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                          ,dbnout=1)
+                                if not (type(model) == type(None)):
+                                    ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
+                                    ip1  = ip1[    :,ncols] if not (                   len(ip1) == 0) else []
+                                    dat[nrow,col] = np.asarray(model.predict(ip1.astype(np.single))).flatten()
+                                else:
+                                    if type("") in utils.sif(dat[:,col]):
+                                        #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                        dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                            else:
+                                if type("") in utils.sif(dat[:,col]):
+                                    #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                    dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                    else:
+                        for col in cols:
+                            if type("") in utils.sif(dat[:,col]):
+                                #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
     return ret
 
 ############################################################################
