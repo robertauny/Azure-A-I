@@ -327,7 +327,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         ax1.set_title("Histogram of Residuals")
                         # Fitted vs residuals
                         x1   = pd.Series(pred,name=xlbl)
-                        sns.kdeplot(x11,x2,ax=ax2,n_levels=40)
+                        sns.kdeplot(x11,x2,ax=ax2,n_levels=40,xlim=[min(x11)-1,max(x11)+1])
                         sns.regplot(x=x11,y=x2,scatter=False,ax=ax2)
                         ax2.set_title("Fitted vs. Actual Values")
                         #ax2.set_aspect("equal")

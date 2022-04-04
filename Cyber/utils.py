@@ -190,6 +190,7 @@ def confusion(tgts=[],prds=[],fl=None):
             cm   = confusion_matrix(tgts,prds)
             disp = ConfusionMatrixDisplay(confusion_matrix=cm)
             disp.plot()
+            plt.axis([min(tgts),max(tgts),min(prds),max(prds)])
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
@@ -209,11 +210,13 @@ def prf(tgts=[],prds=[],fl=None):
             # the false and true positve rate and the threshold
             pre  = precision_score(tgts,prds,average="weighted")
             rec  =    recall_score(tgts,prds,average="weighted")
-            dat  = "  ".join(["precision: "+str(pre),"recall: "+str(rec)])
+            dat  = "\n".join(["precision: "+str(pre),"recall: "+str(rec)])
             # save the image if requested
             if type(fl) == type(""):
                 try:
-                    np.savetxt(fl,dat)
+                    with open(fl,"w") as f:
+                        f.write(dat)
+                        f.close()
                 except:
                     print("Unable to write " + dat)
             else:
