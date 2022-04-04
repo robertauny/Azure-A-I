@@ -190,7 +190,9 @@ def confusion(tgts=[],prds=[],fl=None):
             cm   = confusion_matrix(tgts,prds)
             disp = ConfusionMatrixDisplay(confusion_matrix=cm)
             disp.plot()
-            plt.axis([min(tgts),max(tgts),min(prds),max(prds)])
+            mn   = min(min(tgts),min(prds))
+            mx   = max(max(tgts),max(prds))
+            plt.axis([mn,mx,mn,mx])
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
