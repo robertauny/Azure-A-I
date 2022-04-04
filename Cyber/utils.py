@@ -192,7 +192,7 @@ def confusion(tgts=[],prds=[],fl=None):
             disp.plot()
             mn   = min(min(tgts),min(prds))
             mx   = max(max(tgts),max(prds))
-            plt.axis([mn,mx,mn,mx])
+            #plt.axis([mn,mx,mn,mx])
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
