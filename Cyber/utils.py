@@ -373,7 +373,7 @@ def r2(tgts=[],prds=[],fl=None):
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
-                close()
+                plt.close()
             else:
                 plt.show()
             plt.cla()
