@@ -37,7 +37,7 @@ from sklearn.metrics             import roc_curve,RocCurveDisplay,auc,confusion_
 import matplotlib.pyplot         as plt
 import numpy                     as np
 import pandas                    as pd
-import seaborn                   as sn
+import seaborn                   as sns
 import tensorflow                as tf
 
 import os
@@ -147,13 +147,16 @@ def pclrs(mat=[],fl=None):
             # reshape the data for the heat map
             lm   = list(np.asarray(lm).reshape((dim,dim)))
             # now to map the variance indicators to colors
-            disp = sn.heatmap(pd.DataFrame(lm))#,annot=True,annot_kws={"size":16})
+            disp = sns.heatmap(pd.DataFrame(lm))#,annot=True,annot_kws={"size":16})
             disp.plot()
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
+                plt.close()
             else:
                 plt.show()
+            plt.cla()
+            plt.clf()
     return
 
 ############################################################################
@@ -173,8 +176,11 @@ def roc(tgts=[],scrs=[],fl=None):
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
+                plt.close()
             else:
                 plt.show()
+            plt.cla()
+            plt.clf()
     return
 
 ############################################################################
@@ -196,8 +202,11 @@ def confusion(tgts=[],prds=[],fl=None):
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
+                plt.close()
             else:
                 plt.show()
+            plt.cla()
+            plt.clf()
     return
 
 ############################################################################
@@ -241,8 +250,107 @@ def pvr(tgts=[],prds=[],fl=None):
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
+                plt.close()
             else:
                 plt.show()
+            plt.cla()
+            plt.clf()
+    return
+
+############################################################################
+##
+## Purpose:   Pair plot of marginal distributions of inputs
+##
+############################################################################
+def pair(df=None,fl=None,title=None):
+    if not type(df) == type(None):
+        # pair plot of marginals
+        g    = sns.pairplot(df,hue=title)
+        if type(title) == type(""):
+            g.fig.suptitle(title+" Grid of Marginals")
+        # save the image if requested
+        if type(fl) == type(""):
+            plt.savefig(fl)
+            plt.close()
+        else:
+            plt.show()
+        plt.cla()
+        plt.clf()
+    return
+
+############################################################################
+##
+## Purpose:   Swarm plot of classifications
+##
+############################################################################
+def swarm(tgts=None,prds=None,fl=None,title=None):
+    if not (type(tgts) == type(None) or type(prds) == type(None)):
+        # get the paired plots and save them
+        sns.swarmplot(y=tgts,x=prds)
+        if type(title) == type(""):
+            plt.title("Classification of "+title)
+        # save the image if requested
+        if type(fl) == type(""):
+            plt.savefig(fl)
+            plt.close()
+        else:
+            plt.show()
+        plt.cla()
+        plt.clf()
+    return
+
+############################################################################
+##
+## Purpose:   Joint plot of regression outputs
+##
+############################################################################
+def joint(tgts=[],prds=[],xlim=[],ylim=[],fl=None,title=None):
+    if (not (type(tgts) == type(None) or type(prds) == type(None)))   and \
+       (type(xlim) == type([]) or type(xlim) == type(np.asarray([]))) and \
+       (type(ylim) == type([]) or type(ylim) == type(np.asarray([]))):
+        # regression plot
+        g    = sns.jointplot(x=tgts
+                            ,y=prds
+                            ,kind="reg"
+                            ,xlim=xlim
+                            ,ylim=ylim)
+        if type(title) == type(""):
+            g.fig.suptitle("Forecast of "+title)
+        # save the image if requested
+        if type(fl) == type(""):
+            plt.savefig(fl)
+            plt.close()
+        else:
+            plt.show()
+        plt.cla()
+        plt.clf()
+    return
+
+############################################################################
+##
+## Purpose:   Plot of fit vs residuals
+##
+############################################################################
+def fitVres(tgts=[],prds=[],res=[],fl=None):
+    if (not (type(tgts) == type(None) or type(tgts) == type(None)))   and \
+       (type(res ) == type([]) or type(res ) == type(np.asarray([]))):
+        # Two plots
+        fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
+        # Histogram of residuals
+        sns.distplot(res,ax=ax1)
+        ax1.set_title("Histogram of Residuals")
+        # Fitted vs residuals
+        sns.kdeplot(tgts,prds,ax=ax2,n_levels=40,xlim=[min(tgts)-1,max(tgts)+1])
+        sns.regplot(x=tgts,y=prds,scatter=False,ax=ax2)
+        ax2.set_title("Fitted vs. Actual Values")
+        # save the image if requested
+        if type(fl) == type(""):
+            plt.savefig(fl)
+            plt.close()
+        else:
+            plt.show()
+        plt.cla()
+        plt.clf()
     return
 
 ############################################################################
@@ -265,8 +373,11 @@ def r2(tgts=[],prds=[],fl=None):
             # save the image if requested
             if type(fl) == type(""):
                 plt.savefig(fl)
+                close()
             else:
                 plt.show()
+            plt.cla()
+            plt.clf()
     return
 
 ############################################################################
@@ -332,6 +443,18 @@ class utils():
     @staticmethod
     def _pvr(tgts=[],prds=[],fl=None):
         return pvr(tgts,prds,fl)
+    @staticmethod
+    def _pair(df=None,fl=None,title=None):
+        return pair(df,fl,title)
+    @staticmethod
+    def _swarm(tgts=[],prds=[],fl=None,title=None):
+        return swarm(tgts,prds,fl,title)
+    @staticmethod
+    def _joint(tgts=[],prds=[],xlim=[],ylim=[],fl=None,title=None):
+        return joint(tgts,prds,xlim,ylim,fl,title)
+    @staticmethod
+    def _fitVres(tgts=[],prds=[],res=[],fl=None):
+        return fitVres(tgts,prds,res,fl)
     @staticmethod
     def _r2(tgts=[],prds=[],fl=None):
         return r2(tgts,prds,fl)

@@ -255,12 +255,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
                         # get the paired plots and save them
-                        g    = sns.pairplot(df,hue=nhdr[col])
-                        g.fig.suptitle(nhdr[col]+" Grid of Marginals")
-                        # save the plot just created
-                        plt.savefig(fn+"grid.png")
-                        plt.cla()
-                        plt.clf()
+                        utils.utils._pair(             df,fn+"grid.png",nhdr[col])
                         # x label
                         xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
                         # forecast plot with an extra element to account for the
@@ -271,13 +266,9 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         x2   = pd.Series(np.append(fit,pred[-1]),name=nhdr[col]+" Values")
                         # if classification do an additional plot
                         if not (type(0.0) in sifs[:,col] or type(0) in sifs[:,col]):
-                            # get the paired plots and save them
-                            sns.swarmplot(y=x11,x=x2)
-                            # save the plot just created
-                            plt.title("Classification of "+nhdr[col])
-                            plt.savefig(fn+"class.png")
-                            plt.cla()
-                            plt.clf()
+                            # get the swarm plots of the classification
+                            utils.utils._swarm(        x11,x2,fn+"class.png",nhdr[col])
+                            # these plots only work for binary classifications
                             if clust == 2:
                                 # get the roc
                                 utils.utils._roc(      fit.astype(np.int8),pred.astype(np.int8),fn+"roc.png")
@@ -291,17 +282,7 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                             # get the r-square comparison
                             utils.utils._r2(fit,pred,fn+"r2.png")
                         # regression plot
-                        g    = sns.jointplot(x=x11
-                                            ,y=x2
-                                            ,kind="reg"
-                                            ,xlim=[-10,2*len(pred)]
-                                            #,xlim=[0.5*min(pred),1.5*max(pred)]
-                                            ,ylim=[0.5*min(fit ),1.5*max(fit )])#,stat_func=r2)#,hue=nhdr[col])
-                        g.fig.suptitle("Forecast of "+nhdr[col])
-                        # save the plot just created
-                        plt.savefig(fn+"forecast.png")
-                        plt.cla()
-                        plt.clf()
+                        utils.utils._joint(            x11,x2,[-10,2*len(pred)],[0.5*min(fit ),1.5*max(fit )],fn+"forecast.png",nhdr[col])
                         # other plots to show that the built model is markovian
                         # since it will (hopefully) be shown that the errors are
                         # normally distributed
@@ -320,18 +301,5 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         #
                         # residual errors (noise)
                         res  = pred - np.asarray(list(fit))
-                        # Two plots
-                        fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
-                        # Histogram of residuals
-                        sns.distplot(res,ax=ax1)
-                        ax1.set_title("Histogram of Residuals")
-                        # Fitted vs residuals
-                        x1   = pd.Series(pred,name=xlbl)
-                        sns.kdeplot(x11,x2,ax=ax2,n_levels=40,xlim=[min(x11)-1,max(x11)+1])
-                        sns.regplot(x=x11,y=x2,scatter=False,ax=ax2)
-                        ax2.set_title("Fitted vs. Actual Values")
-                        #ax2.set_aspect("equal")
-                        # save the plot just created
-                        plt.savefig(fn+"fitVres.png")
-                        plt.cla()
-                        plt.clf()
+                        # fit vs residuals plot
+                        utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")
