@@ -71,6 +71,10 @@ from eli5.sklearn                import PermutationImportance
 from sklearn.feature_selection   import SelectFromModel
 from sklearn.svm                 import SVC
 
+# gremlin imports
+from gremlin_python.structure.graph                 import Graph
+from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
+
 import requests
 import io
 import json
