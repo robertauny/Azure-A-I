@@ -71,10 +71,6 @@ from eli5.sklearn                import PermutationImportance
 from sklearn.feature_selection   import SelectFromModel
 from sklearn.svm                 import SVC
 
-# gremlin imports
-from gremlin_python.structure.graph                 import Graph
-from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
-
 import requests
 import io
 import json
@@ -2052,33 +2048,6 @@ def fixdata(inst=0,dat=[],coln={}):
         if not (len(d) == 0 or len(d[0]) == 0):
             # if there is something to fix
             if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
-                # for those remaining rows, we want to keep track of any columns
-                # that have missing values, as we will only model with completely
-                # full rows/columns
-                #
-                # for the rows that are left, we will use to fill missing values
-                #
-                # first we will determine importance of each feature, with the reason
-                # being, we will be modeling each feature in the data set as a function
-                # of the top features as determined by importance
-                #
-                # first we will make use of the central limit theorem when making the
-                # assumption that the original data set is a mixed bag of normals that
-                # we want to separate (cluster)
-                #
-                # implicitly, we are making use of a result from the random cluster model
-                # that allows us to determine the number of clusters based upon the assumption
-                # of normality, plus ordering that gives uniformity
-                #
-                # now we will build "brains" from the transformed data that will do the "thinking"
-                # for us when we want to replace missing values in the original data set
-                #
-                # instantiate a JanusGraph object
-                graph= Graph()
-                # connection to the remote server
-                conn = DriverRemoteConnection(data.url_kg(inst),'g')
-                # get the remote graph traversal
-                g    = graph.traversal().withRemote(conn)
                 # set of columns that don't need fixing
                 nrows= [i for i in range(0,len(dat   )) if i not in  rows]
                 nrow = [j for j in range(0,len(dat   )) if j not in nrows]

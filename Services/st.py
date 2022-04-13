@@ -65,10 +65,6 @@ import matplotlib.pyplot as plt
 import csv
 import glob
 
-# gremlin imports
-from gremlin_python.structure.graph                 import Graph
-from gremlin_python.driver.driver_remote_connection import DriverRemoteConnection
-
 cfg  = config.cfg()
 
 np.random.seed(const.constants.SEED)
