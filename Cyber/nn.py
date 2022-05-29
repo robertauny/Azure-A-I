@@ -331,11 +331,11 @@ def dbn(inputs=[]
             if J == 0:
                 dim  = odim
             else:
-                dim  = S * odim
+                dim  = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * dim > const.constants.MAX_DIM else S * dim
             # next layers using the scaled exponential linear unit (Gibbs distribution) are siblings
             dbnlayers(model,dim,odim,'tanh' if ver == const.constants.VER else 'selu',useact)
             # redefine the input and output dimensions for the binary layers
-            odim = S * dim
+            odim = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * odim > const.constants.MAX_DIM else S * odim
             # next layers using the softmax are binary layers
             #
             # note that by using dense layers of ANNs we can use back propagation within each RBM and across

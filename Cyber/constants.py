@@ -29,14 +29,15 @@
 
 class constants():
     # miscellaneous constants
-    CONFIG         = "dtna.json"
+    CONFIG         = "carrier.json"
     TEST           = "test.json"
     BVAL           = -1
-    MAX_CLUSTERS   = 3#10
-    MAX_FEATURES   = 3 #>= 3
-    MAX_SPLITS     = MAX_FEATURES
-    MAX_COLS       = MAX_FEATURES
+    MAX_CLUSTERS   = 100#10
+    MAX_FEATURES   = 100 #>= 3
+    MAX_SPLITS     = 10#MAX_FEATURES
+    MAX_COLS       = 10#MAX_FEATURES
     MAX_ROWS       = 10
+    MAX_DIM        = 81
     V              = "vertices"
     E              = "edges"
     MDL            = "model"
@@ -63,8 +64,8 @@ class constants():
     PRED_H_SHIFT   = 15
     VSIZE          = 8
     HOUN_OFFSET    = 10
-    #CPU_COUNT      = 1
-    PERMS          = 2
+    CPU_COUNT      = 1
+    PERMS          = 11
     #COLUMNS        = ["Customer reporting outage at least once"
                      #,"Internal NH Crews"
                      #,"Tree Crews"
@@ -116,7 +117,7 @@ class constants():
                       #"Cost (Charges to date)",
                       #"Exclusionary Day(s) ",
                       #"Applied for recovery",
-                      #"Broken Poles"
+                      "Broken Poles"
                      ]
     TARGETS        = ["REASONCODE"]
     #DATES          = ["Date"]
@@ -135,12 +136,12 @@ class constants():
                       "Weather Forecast predicted",
                       "Weather Forecast Advisory",
                       "Central Event Level",
-                      #"Eastern Event Level",
+                      "Eastern Event Level",
                       "Northern Event Level",
                       "Southern Event Level",
-                      "Western Event Level",
+                      #"Western Event Level",
                       #" Precipitation",
-                      #"Winds Gusts",
+                      "Winds Gusts",
                       "Temp  High",
                       "Temp Low",
                       "Weather Forecast actual",
@@ -151,14 +152,14 @@ class constants():
                       "Number Primary  Events (IEEE)",
                       #"Storm Duration (days)",
                       "Concurrent Events",
-                      "Accounts W/O Power at peak",
+                      #"Accounts W/O Power at peak",
                       "Customer reporting outage at least once (IEEE)",
-                      "Customer reporting outage at least once",
+                      #"Customer reporting outage at least once",
                       "DTN Trouble spots",
                       "OPM Trouble Spots ",
                       "Internal NH Crews",
                       "Additional External Buckets",
-                      #"Additional External Diggers",
+                      "Additional External Diggers",
                       "Tree Crews",
                       "ES Crews",
                       #"Broken Poles",
@@ -188,7 +189,7 @@ class constants():
     BSZ            = 64
     LDIM           = 256
     VSPLIT         = 0.2
-    SFL            = "models/dtna.h5"
+    SFL            = "models/carrier.h5"
     TRAIN_PCT      = 0.8
     MAX_PREDS      = 100#0
     BASE_LR        = 0.0002
