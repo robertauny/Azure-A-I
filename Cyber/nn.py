@@ -166,7 +166,7 @@ class ResLayer(Layer):
         self.enc = enc
 
     def call(self):
-        nenc = Dense(list(self.enc.shape)[1],input_shape=self.enc.shape,activation='linear')(self.enc)
+        nenc = Dense(list(self.enc.shape)[1],input_shape=self.enc.shape,activation='tanh' if ver == const.constants.VER else 'selu')(self.enc)
         model= Model(inputs=self.enc,outputs=nenc)
         return model.layers[len(model.layers)-1]
 
@@ -207,7 +207,7 @@ def dbnlayers(model=None,outp=const.constants.OUTP,shape=None,act=None,useact=Fa
             # calculate the residuals
             inp1 = Subtract()([enc1.output,enc.output])
             # auto-encode the input data using the linear unit
-            enc1 = Dense(outp,input_shape=shp,activation='linear')
+            enc1 = Dense(outp,input_shape=shp,activation='tanh' if ver == const.constants.VER else 'selu')
             # add the input layer to the model
             model.add(enc1)
             # add the residuals to the filtered output from before we started
