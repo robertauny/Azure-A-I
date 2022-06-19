@@ -61,11 +61,12 @@ from PIL                         import Image
 from scipy                       import stats
 from glob                        import glob 
 
-import multiprocessing       as mp
-import numpy                 as np
-import pandas                as pd
-import tensorflow            as tf
-import xml.etree.ElementTree as ET
+import multiprocessing               as mp
+import numpy                         as np
+import pandas                        as pd
+import tensorflow                    as tf
+import tensorflow_model_optimization as tfmot
+import xml.etree.ElementTree         as ET
 
 import os
 
@@ -172,6 +173,26 @@ class ResLayer(Layer):
 
     def compute_output_shape(self,input_shape):
         return input_shape
+
+############################################################################
+##
+## Purpose:   Deep belief network support function for clustering
+##
+############################################################################
+def clustering(mdl=None,clust=0):
+    model= mdl
+    if not (type(mdl) == type(None) or clust <= 0):
+        wghts= tfmot.clustering.keras.cluster_weights
+        cent = tfmot.clustering.keras.CentroidInitialization
+        parms= {'number_of_clusters': clust, 'cluster_centroids_init': cent.LINEAR}
+        # cluster a model
+        model= wghts(mdl,**parms)
+        # use smaller learning rate for fine-tuning clustered model
+        opt  = tf.keras.optimizers.Adam(learning_rate=const.constants.BASE_LR if hasattr(const.constants,"BASE_LR") else 1e-5)
+        model.compile(loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                     ,optimizer=opt
+                     ,metrics=['accuracy'])
+    return model
 
 ############################################################################
 ##

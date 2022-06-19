@@ -219,7 +219,12 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         fit  = dat[:,col].astype(np.int8)
                         y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
                         # categorical column and classification prediction
-                        model= dbn(x.to_numpy(),y,sfl=sfl,clust=clust)
+                        #
+                        # sample the data set when building the clustering model
+                        model= dbn(x.iloc[random.sample(list(range(0,max(clust,np.int64(ceil(const.constants.VSPLIT*len(x))))))),:].to_numpy(),y,sfl=sfl,clust=clust)
+                        # first model is a classifier that will be passed into the next model that will do the clustering
+                        # then once centroids are known, any predictions will be relative to those centroids
+                        model=clustering(model,clust)
                     if model is None:
                         print("Model is null.")
                         break
