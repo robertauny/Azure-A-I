@@ -27,14 +27,17 @@
 ##
 ############################################################################
 
+import includes
+
 from joblib                                         import Parallel, delayed
 from itertools                                      import combinations,combinations_with_replacement
 from string                                         import punctuation
 
 import os
-import sys
 import traceback
 import logging
+import sys
+import subprocess
 
 from sodapy                                         import Socrata
 
@@ -52,12 +55,83 @@ import constants       as const
 
 from nn                                             import dbn
 
+if "snowflake" in const.constants.INCLUDES and \
+   "snowflake-connector-python" in const.constants.INCLUDES or "snowflake-connector-python[pandas]" in const.constants.INCLUDES:
+    import snowflake.connector
+    from   snowflake.connector.pandas_tools import pd_writer
+
 # read the default json config file
 cfg  = config.cfg()
 
 np.random.seed(const.constants.SEED)
 
 logging.disable(logging.WARNING)
+
+############################################################################
+##
+## Purpose:   Snowflake data return
+##
+############################################################################
+def get_all_rows(sql=""):
+    ret  = None
+    if type(sql) == type("") and len(sql) > 0:
+        try:
+            ctx         = snowflake.connector.connect(user=username
+                                                     ,password=password
+                                                     ,account=''
+                                                     ,warehouse=''
+                                                     ,database=''
+                                                     ,schema=''
+                                                     ,role='')
+            cs          = ctx.cursor()
+            allrows     = cs.execute(sql).fetchall()
+            ret         = pd.DataFrame(allrows)
+            ret.columns = pd.DataFrame(list(cs.description)).iloc[:,0].to_list()
+            print("Total rows extracted: ",len(ret))
+            cs.close()
+        except Exception as e:
+            ret  = e
+    return ret
+
+############################################################################
+##
+## Purpose:   Snowflake write after modeling
+##
+############################################################################
+def insert_to_snowflake(df=None,table=""):
+    ret  = "failure"
+    if type(df) == type(pd.DataFrame()) and type(table) == type("") and len(table) > 0:
+        if not (inst <= const.constants.BVAL or lpill == 0):
+            # ordering of the data elements in the JSON file
+            src  = cfg["instances"][inst]["src"]["index"]
+            typ  = cfg["instances"][inst]["src"]["types"]["snowflake"]
+            # Snowflake host
+            host = cfg["instances"][inst]["sources"][src][typ]["connection"]["host" ]
+            # generated Snowflake username
+            user = cfg["instances"][inst]["sources"][src][typ]["connection"]["user" ]
+            # generated Snowflake password
+            passw= cfg["instances"][inst]["sources"][src][typ]["connection"]["pass" ]
+            # Snowflake DB
+            db   = cfg["instances"][inst]["sources"][src][typ]["connection"]["db"   ]
+            # generated Snowflake api token
+            schem= cfg["instances"][inst]["sources"][src][typ]["connection"]["schem"]
+            # Snowflake WH
+            wh   = cfg["instances"][inst]["sources"][src][typ]["connection"]["wh"   ]
+            # generated Snowflake role
+            role = cfg["instances"][inst]["sources"][src][typ]["connection"]["role" ]
+            engine = create_engine(URL(
+                                       account   = host
+                                      ,user      = user
+                                      ,password  = passw
+                                      ,database  = db
+                                      ,schema    = schem
+                                      ,warehouse = wh
+                                      ,role      = role
+                                  ))
+            df.to_sql(table,engine,if_exists='append',index=False,index_label=None,chunksize=15000)
+            print("sucessfully inserted into snowflake")
+            ret  = "success"
+    return "success"
 
 ############################################################################
 ##

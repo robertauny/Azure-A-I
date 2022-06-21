@@ -66,6 +66,31 @@ class constants():
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
     PERMS          = 11
+    INCLUDES       = [
+                      ["pip","install","snowflake"                         ]
+                     ,["pip","install","snowflake-connector-python[pandas]"]
+                     ,["pip","install","snowflake.sqlalchemy==1.2.4"       ]
+                     ,["pip","install","pyhdb"                             ]
+                     ,["pip","install","joblib"                            ]
+                     ,["pip","install","pillow"                            ]
+                     ,["pip","install","tensorflow"                        ]
+                     ,["pip","install","pdf2image"                         ]
+                     ,["pip","install","scipy"                             ]
+                     ,["pip","install","pytesseract"                       ]
+                     ,["pip","install","gremlinpython"                     ]
+                     ,["pip","install","bertopic"                          ]
+                     ,["pip","install","spacy"                             ]
+                     ,["pip","install","textblob"                          ]
+                     ,["pip","install","eli5"                              ]
+                     ,["pip","install","opencv-python"                     ]
+                     ,["pip","install","imutils"                           ]
+                     ,["pip","install","matplotlib"                        ]
+                     ,["pip","install","seaborn"                           ]
+                     ,["pip","install","tensorflow-model-optimization"     ]
+                     ,["pip","install","sodapy"                            ]
+                     ,["pip","install","pandasql"                          ]
+                     #,["yum","install","mesa-libGL"                        ]
+                     ]
     #COLUMNS        = ["Customer reporting outage at least once"
                      #,"Internal NH Crews"
                      #,"Tree Crews"
@@ -73,11 +98,11 @@ class constants():
                      #,"Accounts W/O Power at peak"
                      #,"Broken Poles"]
                      #,"Western Event Level"]
-    XLABEL         = "Storm Event Number"
-    COLUMNS        = [
+    XLABEL         = "Event Number"#"Storm Event Number"
+    #COLUMNS        = [
                       #"Year",
                       #"Month",
-                      "Date",
+                      #"Date",
                       #"Season",
                       #"Work Order",
                       #"Activation (No Partial Remote Full)",
@@ -117,59 +142,59 @@ class constants():
                       #"Cost (Charges to date)",
                       #"Exclusionary Day(s) ",
                       #"Applied for recovery",
-                      "Broken Poles"
-                     ]
-    TARGETS        = ["REASONCODE"]
+                      #"Broken Poles"
+                     #]
+    #TARGETS        = ["REASONCODE"]
     #DATES          = ["Date"]
     #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
     #DROP           = ["Date","Year","Month","Date","Season","Work Order","Activation (No Partial Remote Full)","Work Order"]
     #DROP           = ["Date","Work Order"]
-    DROP           = [
+    #DROP           = [
                       #"Year",
                       #"Month",
                       #"Date",
-                      "Season",
-                      "Work Order",
-                      "Activation (No Partial Remote Full)",
-                      "Storm Call",
-                      "Advisory Issued",
-                      "Weather Forecast predicted",
-                      "Weather Forecast Advisory",
-                      "Central Event Level",
-                      "Eastern Event Level",
-                      "Northern Event Level",
-                      "Southern Event Level",
+                      #"Season",
+                      #"Work Order",
+                      #"Activation (No Partial Remote Full)",
+                      #"Storm Call",
+                      #"Advisory Issued",
+                      #"Weather Forecast predicted",
+                      #"Weather Forecast Advisory",
+                      #"Central Event Level",
+                      #"Eastern Event Level",
+                      #"Northern Event Level",
+                      #"Southern Event Level",
                       #"Western Event Level",
                       #" Precipitation",
-                      "Winds Gusts",
-                      "Temp  High",
-                      "Temp Low",
-                      "Weather Forecast actual",
-                      "Max Wind Gust in MPH",
-                      "Temp  High actual",
+                      #"Winds Gusts",
+                      #"Temp  High",
+                      #"Temp Low",
+                      #"Weather Forecast actual",
+                      #"Max Wind Gust in MPH",
+                      #"Temp  High actual",
                       #"Temp Low actual",
-                      "Storm Direction",
-                      "Number Primary  Events (IEEE)",
+                      #"Storm Direction",
+                      #"Number Primary  Events (IEEE)",
                       #"Storm Duration (days)",
-                      "Concurrent Events",
+                      #"Concurrent Events",
                       #"Accounts W/O Power at peak",
-                      "Customer reporting outage at least once (IEEE)",
+                      #"Customer reporting outage at least once (IEEE)",
                       #"Customer reporting outage at least once",
-                      "DTN Trouble spots",
-                      "OPM Trouble Spots ",
-                      "Internal NH Crews",
-                      "Additional External Buckets",
-                      "Additional External Diggers",
-                      "Tree Crews",
-                      "ES Crews",
+                      #"DTN Trouble spots",
+                      #"OPM Trouble Spots ",
+                      #"Internal NH Crews",
+                      #"Additional External Buckets",
+                      #"Additional External Diggers",
+                      #"Tree Crews",
+                      #"ES Crews",
                       #"Broken Poles",
-                      "Notes",
-                      "Cost (Charges to date)",
-                      "Exclusionary Day(s) ",
-                      "Applied for recovery",
+                      #"Notes",
+                      #"Cost (Charges to date)",
+                      #"Exclusionary Day(s) ",
+                      #"Applied for recovery",
                       #"Sustained Winds"
-                     ]
-    MATCH_ON       = ["Id","PATIENT"]
+                     #]
+    #MATCH_ON       = ["Id","PATIENT"]
     # neural network constants
     OUTP           = 1
     SHAPE          = 3
