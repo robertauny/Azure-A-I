@@ -36,20 +36,22 @@ import utils
 ver  = sys.version.split()[0]
 
 if ver == const.constants.VER:
-    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer
+    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
     from            keras.models                            import Sequential,load_model,Model,clone_model
     from            keras.utils.np_utils                    import to_categorical
     from            keras.callbacks                         import ModelCheckpoint
     from            keras.preprocessing.text                import Tokenizer
     from            keras                                   import backend
+    from            keras.applications                      import DenseNet121
 else:
-    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer
+    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
     from tensorflow.keras.models                            import Sequential,load_model,Model,clone_model
     from tensorflow.keras.utils                             import to_categorical
     from tensorflow.keras.callbacks                         import ModelCheckpoint
     from tensorflow.keras.preprocessing.text                import Tokenizer
     from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
     from tensorflow.keras                                   import backend
+    from tensorflow.keras.applications                      import DenseNet121
 
 from joblib                      import Parallel,delayed
 from math                        import log,ceil,floor,sqrt,inf
@@ -314,15 +316,16 @@ def dbn(inputs=[]
                 M    = min(len(ip[0  ]),props)
         else:
             M    = props
-        # inputs have M columns and any number of rows, while output has M columns and any number of rows
-        #
-        # encode the input data using the rectified linear unit
-        dbnlayers(model,M,ip.shape[1:],'relu',useact)
         # add other encodings that are being passed in the encs array
         if not (type(encs) == type(None)):
             if not (len(encs) == 0):
                 for enc in encs:
                     model.add(enc)
+        else:
+            # inputs have M columns and any number of rows, while output has M columns and any number of rows
+            #
+            # encode the input data using the rectified linear unit
+            dbnlayers(model,M,ip.shape[1:],'relu',useact)
         # if M > const.constants.MAX_FEATURES, then we will embed the inputs in a lower dimensional space of dimension const.constants.MAX_FEATURES
         #
         # embed the inputs into a lower dimensional space if M > min(const.constants.MAX_FEATURES,props)
@@ -390,6 +393,8 @@ def dbn(inputs=[]
             dbnlayers(model,dbnout,M,dbnact,useact)
         # optimize using the typical categorical cross entropy loss function with root mean square optimizer to find weights
         model.compile(loss=loss,optimizer=optimizer)
+        x    = ip.astype(np.single)
+        y    = op.astype(np.single)
         if not (type(sfl) == type(None)):
             # construct the relaxed file name
             #
@@ -403,15 +408,13 @@ def dbn(inputs=[]
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
             vpct = 1.0 - (const.constants.TRAIN_PCT if hasattr(const.constants,"TRAIN_PCT") else 0.8)
-            x    = ip.astype(np.single)
-            y    = op.astype(np.single)
             if vpct * len(x) <= 1:
                 # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
                 # fit the model using the flattened inputs and outputs
                 if ver == const.constants.VER:
-                    model.fit(x=ip,y=op,nb_epoch =epochs,verbose=verbose)
+                    model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose)
                 else:
-                    model.fit(x=ip,y=op,   epochs=epochs,verbose=verbose)
+                    model.fit(x=x,y=y,   epochs=epochs,verbose=verbose)
             else:
                 if ver == const.constants.VER:
                     model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose,callbacks=[chkpt],validation_split=vpct)
@@ -423,8 +426,6 @@ def dbn(inputs=[]
                 nsfl = fln + const.constants.SEP + dt + flt
                 model.save(nsfl)
         else:
-            x    = ip.astype(np.single)
-            y    = op.astype(np.single)
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
             if ver == const.constants.VER:
@@ -847,6 +848,227 @@ def nn_split(pfl=None,mfl=None):
         trow2        = [j for j in range(0,len(dat)) if j not in trow1]
         ret["test" ] = dat.iloc[trow2,:].to_numpy().copy()
     return ret
+
+############################################################################
+##
+## Purpose:   Return the subset of data rows that are full
+##
+############################################################################
+def checkdata(dat=[]):
+    ret  = []
+    rows = []
+    cols = []
+    if type(dat) in [type([]),type(np.asarray([]))] and len(dat) > 0:
+        ret  = np.asarray(dat).copy()
+        # check which rows have any null values and remove them
+        #
+        # doing rows first since a null row will eliminate all columns
+        rows = [i for i in range(0,len(ret)) if type("") in utils.sif(ret[i])]
+        # have to check that we still have rows of data
+        if not (len(ret) == len(rows)):
+            # for the return, we will remove all rows/cols that have empty (null) strings
+            ret  = ret[  [i for i in range(0,len(ret   )) if i not in rows],:] if len(rows) > 0 else ret
+        # check which columns have any null values and remove them
+        d1   = ret.transpose()
+        cols = [i for i in range(0,len(d1)) if type("") in utils.sif(d1[i])]
+        if not (len(ret[0]) == len(cols)):
+            ret  = ret[:,[i for i in range(0,len(ret[0])) if i not in cols]  ] if len(cols) > 0 else ret
+    return ret,rows,cols
+
+############################################################################
+##
+## Purpose:   Fix a data set using simulated thought in a knowledge brain
+##
+############################################################################
+def fixdata(inst=0,dat=[],coln={}):
+    ret  = dat
+    if inst > const.constants.BVAL                                     and \
+       type(dat ) in [type([]),type(np.asarray([]))] and len(dat ) > 0 and \
+       type(coln) ==  type({})                       and len(coln) > 0:
+        # check which rows/columns have any null values and remove them
+        d,rows,cols = checkdata(dat)
+        # have to check that we still have rows/columns of data
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # if there is something to fix
+            if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
+                # set of columns that don't need fixing
+                nrows= [i for i in range(0,len(dat   )) if i not in  rows]
+                nrow = [j for j in range(0,len(dat   )) if j not in nrows]
+                # set of columns that don't need fixing
+                ncols= [i for i in range(0,len(dat[0])) if i not in  cols]
+                # all rows with values
+                ndat =  dat[nrows,    :] if not (len(nrows) == 0                  ) else []
+                # inputs for importance are the subset of rows that have values
+                ip   = ndat[    :,ncols] if not (len(ncols) == 0 or len(ndat) == 0) else []
+                # outputs for importance calculated as categorical labels
+                op   = ndat[    :, cols] if not (len( cols) == 0 or len(ndat) == 0) else []
+                # do we have data to build models
+                #
+                # only numeric columns should need fixing at this point
+                #
+                # floating point column and regression prediction
+                if not (len(ip) == 0 or len(op) == 0):
+                    model= dbn(ip
+                              ,op
+                              ,sfl=None
+                              ,loss="mean_squared_error"
+                              ,optimizer="adam"
+                              ,rbmact="tanh"
+                              ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                              ,dbnout=len(cols))
+                    if not (type(model) == type(None)):
+                        ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
+                        ip1  = ip1[    :,ncols] if not (len(ncols) == 0 or len(ip1) == 0) else []
+                        dat[nrow,cols] = np.asarray(model.predict(ip1.astype(np.single))).reshape((len(nrow),len(cols)))
+                    else:
+                        for col in cols:
+                            if type("") in utils.sif(dat[:,col]):
+                                #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                else:
+                    if len(ndat) == 0:
+                        for col in cols:
+                            nrows= [i for i in range(0,len(dat[:,col])) if     utils.sif(dat[i,col]) in [type(0),type(0.0)]]
+                            nrow = [j for j in range(0,len(dat       )) if not j                     in nrows              ]
+                            # all rows with values
+                            ndat =  dat[nrows,    :] if not  len(nrows) == 0                    else []
+                            # inputs for importance are the subset of rows that have values
+                            ip   = ndat[    :,ncols] if not (len(ncols) == 0 or len(ndat) == 0) else []
+                            # outputs for importance calculated as categorical labels
+                            op   = ndat[    :, col ] if not (                   len(ndat) == 0) else []
+                            # do we have data to build models
+                            #
+                            # only numeric columns should need fixing at this point
+                            #
+                            # floating point column and regression prediction
+                            if not (len(ip) == 0 or len(op) == 0):
+                                model= dbn(ip
+                                          ,op
+                                          ,sfl=None
+                                          ,loss="mean_squared_error"
+                                          ,optimizer="adam"
+                                          ,rbmact="tanh"
+                                          ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                          ,dbnout=1)
+                                if not (type(model) == type(None)):
+                                    ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
+                                    ip1  = ip1[    :,ncols] if not (                   len(ip1) == 0) else []
+                                    if not (len(ip1) == 0):
+                                        dat[nrow,col] = np.asarray(model.predict(ip1.astype(np.single))).flatten()
+                                    else:
+                                        if type("") in utils.sif(dat[:,col]):
+                                            #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                            dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                else:
+                                    if type("") in utils.sif(dat[:,col]):
+                                        #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                        dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                            else:
+                                if type("") in utils.sif(dat[:,col]):
+                                    #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                    dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+                    else:
+                        for col in cols:
+                            if type("") in utils.sif(dat[:,col]):
+                                #dat[nrow,col] = [ceil(np.median(dat[nrows,col].astype(np.single)))] * len(nrow)
+                                dat[nrow,col] = [ceil(np.mean(dat[nrows,col].astype(np.single)))] * len(nrow)
+    return ret
+
+############################################################################
+##
+## Purpose:   Data cleansing activities
+##
+############################################################################
+def nn_cleanse(inst=0,d=None):
+    dat  = np.asarray([])
+    if type(d) == type(pd.DataFrame()):
+        dat  = d.copy()
+        # going to capture the header and data so it can be replaced
+        hdr  = list(dat.columns)
+        nhdr = list(np.asarray(hdr).copy())
+        if hasattr(const.constants,"DROP" )                                                                  and \
+           type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
+            drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
+            dat  = dat.drop(columns=const.constants.DROP )
+            dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
+            nhdr = [i for i in  hdr if i not in dhdr]
+        if hasattr(const.constants,"DATES")                                                                  and \
+           type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
+            dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
+            dat  = dat.drop(columns=const.constants.DATES)
+            thdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DATES]])
+            nhdr = [i for i in nhdr if i not in thdr]
+        # replace any NaNs
+        dat  = np.asarray([[str(x).lower().replace("nan","") for x in row] for row in dat.to_numpy()])
+        dat  = pd.DataFrame(dat,columns=nhdr)
+        # remove any completely null columns
+        cols = list(dat.columns)
+        chdr = []
+        for i in range(0,len(cols)):
+            d    = dat.iloc[:,i].to_list()
+            if d == [""] * len(d):
+                dat  = dat.drop(columns=cols[i])
+                chdr.append(i)
+        nhdr = [i for i in nhdr if i not in chdr]
+        # now continue on
+        dat  = dat.to_numpy()
+        #coln = {hdr[k]:k for k in range(0,len(hdr)) if hdr[k] in nhdr}
+        coln = {h:i for i,h in enumerate(nhdr)}
+        # check which rows/columns have any null values and remove them
+        d,rows,cols = checkdata(dat)
+        # have to check that we still have rows/columns of data
+        sifs = None
+        if not (len(d) == 0 or len(d[0]) == 0):
+            # if there is something to fix
+            if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
+                # indices that actually had data originally
+                #indxr= [j for j in range(0,len(dat)) if j not in rows]
+                # string columns will be labeled using wikilabel
+                for i in range(0,len(dat[0])):
+                    # rows of sifs are the actual columns so transpose later
+                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                    vec  = utils.sif(dat[:,i])
+                    if not type(sifs) == type(None):
+                        #sifs = np.hstack((sifs,vec))
+                        sifs = np.vstack((sifs,vec))
+                        b    = type(0) in sifs[-1] or type(0.0) in sifs[-1]
+                    else:
+                        sifs = vec
+                        b    = type(0) == sifs     or type(0.0) == sifs
+                    if i in cols:
+                        if not b:
+                            #wiki = wikilabel(inst,dat[indxr,i],True,True)
+                            #ccd         = np.asarray(list(calcC(dat[:,i])))
+                            ccd         = np.asarray(list(calcC(dat[:,i],len(utils.utils._unique(dat[:,i])))))
+                            dat[rows,i] = ccd.flatten()[rows]
+            else:
+                # string columns will be labeled using wikilabel
+                for i in range(0,len(dat[0])):
+                    # rows of sifs are the actual columns so transpose later
+                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                    vec  = utils.sif(dat[:,i])
+                    if not type(sifs) == type(None):
+                        #sifs = np.hstack((sifs,vec))
+                        sifs = np.vstack((sifs,vec))
+                    else:
+                        sifs = vec
+        else:
+            # string columns will be labeled using wikilabel
+            for i in range(0,len(dat[0])):
+                # rows of sifs are the actual columns so transpose later
+                #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
+                vec  = utils.sif(dat[:,i])
+                if not type(sifs) == type(None):
+                    #sifs = np.hstack((sifs,vec))
+                    sifs = np.vstack((sifs,vec))
+                else:
+                    sifs = vec
+        sifs = sifs.transpose()
+        # fix the data by intelligently filling missing values
+        dat  = fixdata(inst,dat,coln)
+        dat  = pd.DataFrame(dat,columns=nhdr)
+        dat  = dat.to_numpy()
+    return {"nhdr":nhdr,"dat":dat,"sifs":sifs}
 
 ############################################################################
 ##

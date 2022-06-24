@@ -15,19 +15,21 @@
 
 ############################################################################
 ##
-## File:      st.py
+## File:      tl.py
 ##
-## Purpose:   Clean data and make predictions
+## Purpose:   Transfer learning and domain adaptation.
 ##
 ## Parameter: N/A
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Feb. 10, 2022
+## Date:      Jun. 13, 2022
 ##
 ############################################################################
 
 import sys
+
+import includes
 
 import constants as const
 
@@ -39,22 +41,24 @@ from PIL                                            import ImageDraw,Image
 ver  = sys.version.split()[0]
 
 if ver == const.constants.VER:
+    from            keras.layers                            import Dense
     from            keras.models                            import Sequential,load_model,Model
     from            keras.utils.np_utils                    import to_categorical
     from            keras.preprocessing.text                import Tokenizer
     from            keras.preprocessing.sequence            import pad_sequences
 else:
+    from tensorflow.keras.layers                            import Dense
     from tensorflow.keras.models                            import Sequential,load_model,Model
     from tensorflow.keras.utils                             import to_categorical
     from tensorflow.keras.preprocessing.text                import Tokenizer
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
-from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store
-from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,nn_cleanse
+from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
+from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse
 
 import config
-import data
 import utils
+import data
 
 import numpy             as np
 import pandas            as pd
@@ -62,6 +66,7 @@ import multiprocessing   as mp
 import seaborn           as sns
 import matplotlib.pyplot as plt
 
+import os
 import csv
 import glob
 import random
@@ -78,19 +83,40 @@ inst = 0
 src  = cfg["instances"][inst]["src"]["index"]
 typ  = cfg["instances"][inst]["src"]["types"]["main"]
 fls  = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
+flx  = cfg["instances"][inst]["sources"][src][typ]["connection"]["xfile"]
 fold = cfg["instances"][inst]["sources"][src][typ]["connection"]["fold"]
 
 # we will get the subset of data rows/columns that are all non-null
 # and make a determination of string vs. numeric
 #
 # strings will be labeled using wikilabel
-if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
+if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
+   (os.path.exists(flx) and os.stat(flx).st_size > 0):
+    sfl  = const.constants.SFL if hasattr(const.constants,"SFL") else "models/obj.h5"
+    # get the transfer learning data set ready for use
+    tdat = pd.read_csv(flx,encoding="unicode_escape")
+    cdat = nn_cleanse(inst,tdat)
+    tnhdr= cdat["nhdr"]
+    tdat = cdat["dat" ]
+    # define the inputs to the model
+    xt   = pd.DataFrame(tdat.astype(np.single),columns=np.asarray(tnhdr))
+    xt   = xt.to_numpy()
+    # pretrained model
+    mdlr = dbn(xt
+              ,xt
+              ,loss="mean_squared_error"
+              ,optimizer="adam"
+              ,rbmact="tanh"
+              ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+              ,dbnout=len(xt[0]))
+    for layer in mdlr.layers:
+        layer.trainable=False
     for fl in fls:
         dat  = pd.read_csv(fl,encoding="unicode_escape")
-        ndat = nn_cleanse(inst,dat)
-        nhdr = ndat["nhdr"]
-        dat  = ndat["dat" ]
-        sifs = ndat["sifs"]
+        cdat = nn_cleanse(inst,dat)
+        nhdr = cdat["nhdr"]
+        dat  = cdat["dat" ]
+        sifs = cdat["sifs"]
         # predict each column and write some output
         if hasattr(const.constants,"PERMS"):
             if type(0) == utils.sif(const.constants.PERMS):
@@ -101,7 +127,6 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
             perms= data.permute(list(range(0,len(nhdr))),mine=False,l=len(nhdr))
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
         # construct the relaxed data name
-        sfl  = const.constants.SFL if hasattr(const.constants,"SFL") else "models/obj.h5"
         for col in range(0,len(nhdr)):
             for cols in perms:
                 if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
@@ -117,18 +142,19 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
-                    x    = pd.DataFrame(dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])
-                    #x    = x.sort_values(by=list(x.columns))#sort_values(by=list(range(0,len(x.columns))),axis=1)#sort_values(by=np.asarray(nhdr)[cols],axis=1)#.to_numpy()
+                    x    = pd.DataFrame( dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])
                     # the outputs to be fit
-                    #if type(0.0) in sifs[:,col]:
                     if not type("") in sifs[:,col]:
                         # define the outputs of the model
-                        fit  = dat[:,col].astype(np.single)
-                        y    = fit
-                        # floating point column and regression prediction
+                        fit  =  dat[:,col].astype(np.single)
+                        y    =  fit
+                        # main model
                         model= dbn(x.to_numpy()
                                   ,y
                                   ,sfl=sfl
+                                  ,encs=[Dense(len(xt[0]),input_shape=(len(cols ),),activation='relu'                                          )
+                                        ,mdlr
+                                        ,Dense(len(cols ),input_shape=(len(xt[0]),),activation='tanh' if ver == const.constants.VER else 'selu')]
                                   ,loss="mean_squared_error"
                                   ,optimizer="adam"
                                   ,rbmact="tanh"
@@ -136,14 +162,21 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                   ,dbnout=1)
                     else:
                         # random field theory to calculate the number of clusters to form (or classes)
-                        clust= calcN(len(dat))
+                        #clust= calcN(len(dat))
+                        clust= len(unique(dat[:,col]))
                         # define the outputs of the model
                         fit  = dat[:,col].astype(np.int8)
                         y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
                         # categorical column and classification prediction
                         #
                         # sample the data set when building the clustering model
-                        model= dbn(x.iloc[random.sample(list(range(0,len(x))),max(clust,np.int64(floor(const.constants.VSPLIT*len(x))))),:].to_numpy(),y,sfl=sfl,clust=clust)
+                        model= dbn(x.iloc[random.sample(list(range(0,len(x))),max(clust,np.int64(floor(const.constants.VSPLIT*len(x))))),:].to_numpy()
+                                  ,y
+                                  ,sfl=sfl
+                                  ,encs=[Dense(len(xt[0]),input_shape=(len(cols ),),activation='relu'                                          )
+                                        ,mdlr
+                                        ,Dense(len(cols ),input_shape=(len(xt[0]),),activation='tanh' if ver == const.constants.VER else 'selu')]
+                                  ,clust=clust)
                         # first model is a classifier that will be passed into the next model that will do the clustering
                         # then once centroids are known, any predictions will be relative to those centroids
                         model=clustering(model,clust)
