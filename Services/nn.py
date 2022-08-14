@@ -120,7 +120,7 @@ def calcN(pts=None):
 ## Purpose:   Random cluster theory for formation
 ##
 ############################################################################
-def calcC(vals=None,clust=None):
+def calcC(vals=None,clust=None,keys=None):
     ret  = None
     # can't use categoricals for the labels here
     # throws an error for the list of things in the first column being longer than the number of labels
@@ -156,6 +156,15 @@ def calcC(vals=None,clust=None):
         for i in rints:
             tvals.extend([[i] for j in range((i-1)*sints,min(i*sints,len(vals)))])
         ret  = np.asarray([[int(i[0])] for i in np.asarray(tvals)[np.argsort(svals)]])
+        # if the caller wants the key/value pairs then return them
+        if keys is not None and type(keys) == type({}):
+            # the integer values for the categoricals
+            v    = np.asarray(tvals)[np.argsort(svals)]
+            # vals and svals are the same length, but vals are in the original ordering
+            for i in range(0,len(vals)):
+                # dictionary is unique
+                if vals[i] not in keys:
+                    keys[vals[i]] = int(v[i][0])
     return ret
 
 ############################################################################
@@ -980,18 +989,23 @@ def fixdata(inst=0,dat=[],coln={}):
 ##
 ############################################################################
 def nn_cleanse(inst=0,d=None):
-    dat  = np.asarray([])
+    nhdr = None
+    dat  = None
+    sifs = None
+    keys = None
     if type(d) == type(pd.DataFrame()):
         dat  = d.copy()
         # going to capture the header and data so it can be replaced
         hdr  = list(dat.columns)
         nhdr = list(np.asarray(hdr).copy())
+        # drop any columns that have been configured to be dropped in constants.py
         if hasattr(const.constants,"DROP" )                                                                  and \
            type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
             drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
             dat  = dat.drop(columns=const.constants.DROP )
             dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
             nhdr = [i for i in  hdr if i not in dhdr]
+        # drop any dates that have been configured to be dropped in constants.py
         if hasattr(const.constants,"DATES")                                                                  and \
            type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
             dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
@@ -1012,63 +1026,41 @@ def nn_cleanse(inst=0,d=None):
         nhdr = [i for i in nhdr if i not in chdr]
         # now continue on
         dat  = dat.to_numpy()
-        #coln = {hdr[k]:k for k in range(0,len(hdr)) if hdr[k] in nhdr}
+        # the remaining columns turned into a dictionary
         coln = {h:i for i,h in enumerate(nhdr)}
         # check which rows/columns have any null values and remove them
         d,rows,cols = checkdata(dat)
         # have to check that we still have rows/columns of data
-        sifs = None
         if not (len(d) == 0 or len(d[0]) == 0):
-            # if there is something to fix
-            if len(rows) in range(1,len(dat)) or len(cols) in range(1,len(dat[0])):
-                # indices that actually had data originally
-                #indxr= [j for j in range(0,len(dat)) if j not in rows]
-                # string columns will be labeled using wikilabel
-                for i in range(0,len(dat[0])):
-                    # rows of sifs are the actual columns so transpose later
-                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
-                    vec  = utils.sif(dat[:,i])
-                    if not type(sifs) == type(None):
-                        #sifs = np.hstack((sifs,vec))
-                        sifs = np.vstack((sifs,vec))
-                        b    = type(0) in sifs[-1] or type(0.0) in sifs[-1]
-                    else:
-                        sifs = vec
-                        b    = type(0) == sifs     or type(0.0) == sifs
-                    if i in cols:
-                        if not b:
-                            #wiki = wikilabel(inst,dat[indxr,i],True,True)
-                            #ccd         = np.asarray(list(calcC(dat[:,i])))
-                            ccd         = np.asarray(list(calcC(dat[:,i],len(utils.utils._unique(dat[:,i])))))
-                            dat[rows,i] = ccd.flatten()[rows]
-            else:
-                # string columns will be labeled using wikilabel
-                for i in range(0,len(dat[0])):
-                    # rows of sifs are the actual columns so transpose later
-                    #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
-                    vec  = utils.sif(dat[:,i])
-                    if not type(sifs) == type(None):
-                        #sifs = np.hstack((sifs,vec))
-                        sifs = np.vstack((sifs,vec))
-                    else:
-                        sifs = vec
-        else:
-            # string columns will be labeled using wikilabel
+            keys = []
             for i in range(0,len(dat[0])):
+                key  = None
+                # string columns will be labeled using wikilabel
                 # rows of sifs are the actual columns so transpose later
-                #vec  = np.asarray([t for t in map(utils.sif,dat[:,i])]).reshape((1,len(dat)))
                 vec  = utils.sif(dat[:,i])
                 if not type(sifs) == type(None):
-                    #sifs = np.hstack((sifs,vec))
                     sifs = np.vstack((sifs,vec))
+                    b    = type(0) in sifs[-1] or type(0.0) in sifs[-1]
                 else:
                     sifs = vec
-        sifs = sifs.transpose()
+                    b    = type(0) == sifs     or type(0.0) == sifs
+                if not b:
+                    #wiki = wikilabel(inst,dat[indxr,i],True,True)
+                    key  = {}
+                    ccd  = np.asarray(list(calcC(dat[:,i],len(utils.utils._unique(dat[:,i])),key)))
+                    # if there is something to fix
+                    if i in cols:
+                        dat[rows,i] = ccd.flatten()[rows]
+                keys.append(key)
+            sifs = sifs.transpose()
         # fix the data by intelligently filling missing values
         dat  = fixdata(inst,dat,coln)
         dat  = pd.DataFrame(dat,columns=nhdr)
         dat  = dat.to_numpy()
-    return {"nhdr":nhdr,"dat":dat,"sifs":sifs}
+    return {"nhdr":nhdr if nhdr is not None else np.asarray([])
+           ,"dat" : dat if dat  is not None else np.asarray([])
+           ,"sifs":sifs if sifs is not None else np.asarray([])
+           ,"keys":keys if keys is not None else np.asarray([])}
 
 ############################################################################
 ##

@@ -84,7 +84,8 @@ src  = cfg["instances"][inst]["src"]["index"]
 typ  = cfg["instances"][inst]["src"]["types"]["main"]
 fls  = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
 flx  = cfg["instances"][inst]["sources"][src][typ]["connection"]["xfile"]
-fold = cfg["instances"][inst]["sources"][src][typ]["connection"]["fold"]
+foldi= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldi"]
+foldm= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldm"]
 
 # we will get the subset of data rows/columns that are all non-null
 # and make a determination of string vs. numeric
@@ -102,6 +103,25 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
     xt   = pd.DataFrame(tdat.astype(np.single),columns=np.asarray(tnhdr))
     xt   = xt.to_numpy()
     # pretrained model
+    #
+    # for an iot model where the data resides closer to its source
+    # and a local model runs at the source, we can perform transfer
+    # learning using a pretrained model on a larger data set
+    #
+    # to keep the size of the model smaller while minimizing execution times
+    # the larger data set can be sampled to obtain a minimal representation
+    # of the underlying distribution while also capturing other nuances that
+    # may not be present in the data set at one source
+    #
+    # to accomplish this, we will assume that the data are normally distributed
+    # and apply an order statistic ... the result is a beta distributed data set
+    # about which we can argue that its parameters can be chosen such that the
+    # resulting beta distribution is actually uniform in nature ... this follows
+    # from the Markov property (sequence of dependent random variables, one for each
+    # data source, such that successive samples capture all information about all preceding
+    # samples, and the most recent sample only depends upon its most recent predecessor)
+    #
+    # after ordering, we assume uniformity of the distribution that was sampled accordingly
     mdlr = dbn(xt
               ,xt
               ,loss="mean_squared_error"
@@ -109,24 +129,41 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
               ,rbmact="tanh"
               ,dbnact='tanh' if ver == const.constants.VER else 'selu'
               ,dbnout=len(xt[0]))
+    # don't want to retrain the layers of the pre-trained model
+    #
+    # if these layers are trainable, then an error will persist
     for layer in mdlr.layers:
         layer.trainable=False
+    # files containing more data that should be cleaned and prepared
+    #
+    # modify this file logic if the data is being read from a DB or other source
     for fl in fls:
+        # read the current data file
         dat  = pd.read_csv(fl,encoding="unicode_escape")
+        # use other deep learning methods to cleanse the current data set
         cdat = nn_cleanse(inst,dat)
+        # the set of returns after the cleansing
+        #
+        # header of all columns remaining (some may have been configured to be left out see constants.py)
         nhdr = cdat["nhdr"]
+        # the data corresponding to the columns that were cleansed
         dat  = cdat["dat" ]
+        # the data types of the columns in question ... these should be auto-detected
+        #
+        # at present, we are only concerned with continuous (floating point) and categorical (strings converted to integer)
         sifs = cdat["sifs"]
-        # predict each column and write some output
+        # predict each column and write some output for the columns defined in perms
         if hasattr(const.constants,"PERMS"):
+            # length of the permutation of columns in the data set is defined in constants.py
             if type(0) == utils.sif(const.constants.PERMS):
                 perms= data.permute(list(range(0,len(nhdr))),mine=False,l=const.constants.PERMS)
             else:
                 perms= const.constants.PERMS
         else:
             perms= data.permute(list(range(0,len(nhdr))),mine=False,l=len(nhdr))
+        # the set of columns that should remain in the data set (configured in constants.py)
         acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else nhdr
-        # construct the relaxed data name
+        # construct the relaxed data name and build some models
         for col in range(0,len(nhdr)):
             for cols in perms:
                 if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
@@ -149,6 +186,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         fit  =  dat[:,col].astype(np.single)
                         y    =  fit
                         # main model
+                        #
+                        # the main model employs the pretrained model after converting the inputs to be
+                        # of the same dimension expected by the pretrained model
+                        #
+                        # to make this work, we add a dense layer (before and after) the pretrained model
+                        # with the after dense layer being needed to make the outputs match what's expected
+                        # at the input layer of the first layer of the remaining deep learning modeling
                         model= dbn(x.to_numpy()
                                   ,y
                                   ,sfl=sfl
@@ -164,9 +208,19 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         # random field theory to calculate the number of clusters to form (or classes)
                         #clust= calcN(len(dat))
                         clust= len(unique(dat[:,col]))
+                        keys = {}
                         # define the outputs of the model
                         fit  = dat[:,col].astype(np.int8)
-                        y    = to_categorical(calcC(fit,clust).flatten(),num_classes=clust)
+                        y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
+                        # main model
+                        #
+                        # the main model employs the pretrained model after converting the inputs to be
+                        # of the same dimension expected by the pretrained model
+                        #
+                        # to make this work, we add a dense layer (before and after) the pretrained model
+                        # with the after dense layer being needed to make the outputs match what's expected
+                        # at the input layer of the first layer of the remaining deep learning modeling
+                        #
                         # categorical column and classification prediction
                         #
                         # sample the data set when building the clustering model
@@ -184,7 +238,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         print("Model is null.")
                         break
                     # save the model
-                    fnm  = "models/" + fns + ".h5"
+                    mdir = foldm + "/" + fns + "/"
+                    if not os.path.exists(mdir):
+                        os.makedirs(mdir,exist_ok=True)
+                    fnm  = mdir + fns + ".h5"
                     model.save(fnm)
                     # get some predictions using the same input data since this
                     # is just for simulation to produce graphics
@@ -207,13 +264,19 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # produce some output
                     if len(preds) > 0:
-                        fn   = "images/" + fns + const.constants.SEP 
+                        idir = foldi + "/" + fns + "/"
+                        if not os.path.exists(idir):
+                            os.makedirs(idir,exist_ok=True)
+                        fn   = idir + fns + const.constants.SEP 
                         # we need a data frame for the paired and categorial plots
                         df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
                         # get the paired plots and save them
                         utils.utils._pair(             df,fn+"grid.png",nhdr[col])
                         # x label
-                        xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
+                        if len(x.to_numpy()[0]) > 1:
+                            xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
+                        else:
+                            xlbl = x.columns[0]
                         # forecast plot with an extra element to account for the
                         # markov property allowing the element to be a prediction
                         # based on the last set of inputs

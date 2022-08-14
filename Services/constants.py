@@ -29,7 +29,7 @@
 
 class constants():
     # miscellaneous constants
-    CONFIG         = "carrier.json"
+    CONFIG         = "iot.json"
     TEST           = "test.json"
     BVAL           = -1
     MAX_CLUSTERS   = 100#10
@@ -65,31 +65,90 @@ class constants():
     VSIZE          = 8
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
-    PERMS          = 11
+    PERMS          = 2#11
     INCLUDES       = [
-                      ["pip","install","snowflake"                         ]
-                     ,["pip","install","snowflake-connector-python[pandas]"]
-                     ,["pip","install","snowflake.sqlalchemy==1.2.4"       ]
-                     ,["pip","install","pyhdb"                             ]
-                     ,["pip","install","joblib"                            ]
-                     ,["pip","install","pillow"                            ]
-                     ,["pip","install","tensorflow"                        ]
-                     ,["pip","install","pdf2image"                         ]
-                     ,["pip","install","scipy"                             ]
-                     ,["pip","install","pytesseract"                       ]
-                     ,["pip","install","gremlinpython"                     ]
-                     ,["pip","install","bertopic"                          ]
-                     ,["pip","install","spacy"                             ]
-                     ,["pip","install","textblob"                          ]
-                     ,["pip","install","eli5"                              ]
-                     ,["pip","install","opencv-python"                     ]
-                     ,["pip","install","imutils"                           ]
-                     ,["pip","install","matplotlib"                        ]
-                     ,["pip","install","seaborn"                           ]
-                     ,["pip","install","tensorflow-model-optimization"     ]
-                     ,["pip","install","sodapy"                            ]
-                     ,["pip","install","pandasql"                          ]
-                     #,["yum","install","mesa-libGL"                        ]
+                      ["pip"                 ,"install","snowflake"                         ]
+                     ,["pip"                 ,"install","snowflake-connector-python[pandas]"]
+                     ,["pip"                 ,"install","snowflake.sqlalchemy==1.2.4"       ]
+                     ,["pip"                 ,"install","pyhdb"                             ]
+                     ,["pip"                 ,"install","joblib"                            ]
+                     ,["pip"                 ,"install","pillow"                            ]
+                     ,["pip"                 ,"install","tensorflow"                        ]
+                     ,["pip"                 ,"install","pdf2image"                         ]
+                     ,["pip"                 ,"install","scipy"                             ]
+                     ,["pip"                 ,"install","pytesseract"                       ]
+                     ,["pip"                 ,"install","gremlinpython"                     ]
+                     ,["pip"                 ,"install","bertopic"                          ]
+                     ,["pip"                 ,"install","spacy"                             ]
+                     ,["pip"                 ,"install","textblob"                          ]
+                     ,["pip"                 ,"install","eli5"                              ]
+                     ,["pip"                 ,"install","opencv-python"                     ]
+                     ,["pip"                 ,"install","imutils"                           ]
+                     ,["pip"                 ,"install","matplotlib"                        ]
+                     ,["pip"                 ,"install","seaborn"                           ]
+                     ,["pip"                 ,"install","tensorflow-model-optimization"     ]
+                     ,["pip"                 ,"install","sodapy"                            ]
+                     ,["pip"                 ,"install","pandasql"                          ]
+                     ,["R CMD INSTALL DBI"                                                  ]
+                     ,["R CMD INSTALL dplyr"                                                ]
+                     ,["R CMD INSTALL dbplyr"                                               ]
+                     ,["R CMD INSTALL odbc"                                                 ]
+                     ,["R CMD INSTALL rjson"                                                ]
+                     #,["yum"                 ,"install","mesa-libGL"                        ]
+                     ]
+    COLUMNS        = [
+                      "BU"
+                     ,"FY"
+                     ,"Prod No Short"
+                     ,"Prod No"
+                     ,"Prod Description"
+                     ,"Bill To Address"
+                     ,"End User"
+                     ,"SO No"
+                     ,"SO Line No"
+                     ,"Order Type"
+                     ,"Shipped Quantity"
+                     ,"Original Order Quanity"
+                     ,"Req Ship Date"
+                     ,"Sch Pick Date"
+                     ,"Shipped Date"
+                     ,"Ext. Cost"
+                     ,"Ext. Price"
+                     ,"SO Cat."
+                     ,"Status Code - Last"
+                     ,"Status Code - Next"
+                     ,"Prod Line"
+                     ,"Bill To Name"
+                     ,"Region"
+                     ,"Prod Family"
+                     ,"Sales Order Category"
+                     ]
+    DROP           = [
+                      "BU"
+                     ,"FY"
+                     ,"Prod No Short"
+                     ,"Prod No"
+                     ,"Prod Description"
+                     ,"Bill To Address"
+                     ,"End User"
+                     ,"SO No"
+                     ,"SO Line No"
+                     ,"Order Type"
+                     #,"Shipped Quantity"
+                     #,"Original Order Quanity"
+                     ,"Req Ship Date"
+                     ,"Sch Pick Date"
+                     ,"Shipped Date"
+                     #,"Ext. Cost"
+                     #,"Ext. Price"
+                     ,"SO Cat."
+                     ,"Status Code - Last"
+                     ,"Status Code - Next"
+                     #,"Prod Line"
+                     ,"Bill To Name"
+                     ,"Region"
+                     ,"Prod Family"
+                     ,"Sales Order Category"
                      ]
     #COLUMNS        = ["Customer reporting outage at least once"
                      #,"Internal NH Crews"
@@ -99,6 +158,9 @@ class constants():
                      #,"Broken Poles"]
                      #,"Western Event Level"]
     XLABEL         = "Event Number"#"Storm Event Number"
+    #TARGETS        = ["REASONCODE"]
+    #DATES          = ["Date"]
+    #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
     #COLUMNS        = [
                       #"Year",
                       #"Month",
@@ -144,9 +206,6 @@ class constants():
                       #"Applied for recovery",
                       #"Broken Poles"
                      #]
-    #TARGETS        = ["REASONCODE"]
-    #DATES          = ["Date"]
-    #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
     #DROP           = ["Date","Year","Month","Date","Season","Work Order","Activation (No Partial Remote Full)","Work Order"]
     #DROP           = ["Date","Work Order"]
     #DROP           = [
@@ -214,7 +273,7 @@ class constants():
     BSZ            = 64
     LDIM           = 256
     VSPLIT         = 0.2
-    SFL            = "models/carrier.h5"
+    SFL            = "models/iot.h5"
     TRAIN_PCT      = 0.8
     MAX_PREDS      = 100#0
     BASE_LR        = 0.0002
