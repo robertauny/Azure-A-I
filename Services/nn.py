@@ -352,6 +352,8 @@ def dbn(inputs=[]
         # the loop variable counts the number of restricted boltzmann machines (RBM)
         # that are defined by the 2 extra layers that are added to the model
         # note that we should always have M RBMs, one for each property of the data
+        #
+        # calculation of a solution to clust = S ** (2 * M) for (2 * M)
         #for J in range(0,M):
         itr  = 2 * M - 1 if hasattr(const.constants,"BVAL") and clust == const.constants.BVAL else int(ceil(log(clust,S))) - 1
         for J in range(0,itr):
