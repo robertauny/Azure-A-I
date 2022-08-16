@@ -2191,6 +2191,17 @@ def ai_testing(M=500,N=3):
     # give uniformity by other arguments from the same theory that allows calculation of the number of clusters ... then, get the reverse
     # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
 
+    # test the data correction neural network function
+    # output should be "robert", overwriting corrupt data and misclassifications
+    bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy','Robert','R0bert','R0b3rt']
+    rnd  = [np.random.randint(0,len(bdat))]
+    for i in range(0,len(bdat)-1):
+        rnd.append(np.random.randint(0,len(bdat)))
+    bdat = np.asarray(bdat)[rnd]
+    print(bdat)
+    corr = correction(bdat)
+    print(corr)
+
     #nvals[:,0]=list(range(1,len(nvals)+1))#[i/len(nvals) for i in range(len(nvals))]
     #nvals=np.float64(nvals)
     nvs  = calcC(nvals[:,1])
@@ -2264,16 +2275,6 @@ def ai_testing(M=500,N=3):
         print(label(pvals))
     else:
         print("Label model is null.")
-    # test the data correction neural network function
-    # output should be "robert", overwriting corrupt data and misclassifications
-    bdat = ['robert','robert','robert','r0bert','rob3rt','r0b3rt','andre','murphy','murphy','Robert','R0bert','R0b3rt']
-    rnd  = [np.random.randint(0,len(bdat))]
-    for i in range(0,len(bdat)-1):
-        rnd.append(np.random.randint(0,len(bdat)))
-    bdat = np.asarray(bdat)[rnd]
-    print(bdat)
-    corr = correction(bdat)
-    print(corr)
     # generate some random errors in my name to test the correction function
     bdat = ['robert' for i in range(0,m)]
     name = ['r','o','b','e','r','t']

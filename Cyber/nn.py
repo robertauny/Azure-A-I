@@ -352,7 +352,9 @@ def dbn(inputs=[]
         # the loop variable counts the number of restricted boltzmann machines (RBM)
         # that are defined by the 2 extra layers that are added to the model
         # note that we should always have M RBMs, one for each property of the data
-        for J in range(0,M):
+        #for J in range(0,M):
+        itr  = 2 * M - 1 if hasattr(const.constants,"BVAL") and clust == const.constants.BVAL else int(ceil(log(clust,S))) - 1
+        for J in range(0,itr):
             # the dimensionality will be computed in the loop as what's specified in
             # the writings works well for binary splits and 2 properties, but the loop
             # can be generalized to make the computation a bit better
@@ -364,11 +366,13 @@ def dbn(inputs=[]
             if J == 0:
                 dim  = odim
             else:
-                dim  = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * dim > const.constants.MAX_DIM else S * dim
+                #dim  = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * dim > const.constants.MAX_DIM else S * dim
+                dim  = S * dim
             # next layers using the scaled exponential linear unit (Gibbs distribution) are siblings
             dbnlayers(model,dim,odim,'tanh' if ver == const.constants.VER else 'selu',useact)
             # redefine the input and output dimensions for the binary layers
-            odim = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * odim > const.constants.MAX_DIM else S * odim
+            #odim = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * odim > const.constants.MAX_DIM else S * odim
+            odim = S * odim
             # next layers using the softmax are binary layers
             #
             # note that by using dense layers of ANNs we can use back propagation within each RBM and across
@@ -1086,8 +1090,8 @@ def nn_gibbs(dat=None):
 ############################################################################
 class NN():
     @classmethod
-    def _split(self,dfl=None,tfl=None,jfl=None):
-        return nn_split(dfl,tfl,jfl)
+    def _split(self,pfl=None,mfl=None):
+        return nn_split(pfl,mfl)
     @classmethod
     def _gibbs(self,dat=None):
         return nn_gibbs(dat)
@@ -1097,14 +1101,13 @@ class NN():
 ## Purpose:   Testing
 ##
 ############################################################################
-def nn_testing(M=500,N=3,dfl="/home/robert/data/csv/patients.csv",tfl="/home/robert/data/csv/medications.csv",jfl="/home/robert/data/csv/procedures.csv"):
+def nn_testing(M=500,N=3,pfl="/home/robert/data/csv/patients.csv",mfl="/home/robert/data/csv/medications.csv"):
     ret  = {"orig":None,"mod":None,"smth":None}
-    if (os.path.exists(dfl) and os.stat(dfl).st_size > 0) and \
-       (os.path.exists(tfl) and os.stat(tfl).st_size > 0) and \
-       (os.path.exists(jfl) and os.stat(jfl).st_size > 0):
+    if (os.path.exists(pfl) and os.stat(pfl).st_size > 0) and \
+       (os.path.exists(mfl) and os.stat(mfl).st_size > 0):
         nn   = NN()
         # split the dataset into train and test sets
-        split= nn._split(dfl,tfl,jfl)
+        split= nn._split(pfl,mfl)
         # during the model build we will output validation accuracy
         #
         # as one more output, we will plot the accuracy vs
