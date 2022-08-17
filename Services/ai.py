@@ -347,7 +347,7 @@ def brain(dat=[],splits=2,permu=[]):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=0,coln=[],dat=None,res=True):
+def thought(inst=0,coln=[],dat=None,res=True,g=None):
     ret  = {}
     if not (inst == None or len(coln) == 0):
         # ordering of the data elements in the JSON file
@@ -359,7 +359,7 @@ def thought(inst=0,coln=[],dat=None,res=True):
             # in the DB and return the one corresponding to the label 
             #
             # neural networks obtained from the DB later ... None for now
-            df   = data.read_kg(inst,coln)
+            df   = data.read_kg(inst,coln,g=g)
             # labels for each cluster
             lbls = df["labels"]
             for m in range(0,len(lbls)):
@@ -426,10 +426,15 @@ def thought(inst=0,coln=[],dat=None,res=True):
                             # load the clustering model and make the cluster prediction for this data point
                             mdl  = load_model(fl)
                             pred = store(mdl.predict(pt).flatten(),True)
-                            # is the correct cluster being predicted, as referenced by the list pred
-                            if int(lbls[m][(e+1):]) in pred:
+                            # the next line has the effect of us taking the last prediction that matches
+                            if True:
+                                # is the correct cluster being predicted, as referenced by the list pred
+                                #
                                 # regression neural networks for the predicted cluster
                                 nnet = str(df["nns"][m])
+                                num  = int(lbls[m][(e+1):])
+                                if not num in pred:
+                                    nnet = nnet.replace(str(num),str(pred[0]))
                                 # what we want to do is to use the regression network for this brain
                                 # where the brain is obtained as the set of values in the dictionary
                                 # coln and make the number of requested predictions preds ... this network
@@ -479,7 +484,8 @@ def thought(inst=0,coln=[],dat=None,res=True):
                                         # A Predictive Model using the Markov Property
                                         residuals    = np.asarray(rmdl.predict(np.asarray(rdat)-prds[:,0]))[:,0] if   \
                                                        res                                                       else \
-                                                       [np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
+                                                       0.0
+                                                       #[np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
                                         ret[lbls[m]] = prds[:,0] + residuals
         except Exception as err:
             ret["error"] = str(err)
@@ -2133,6 +2139,91 @@ def importance(ip=[],op=[],model=None):
 
 # *************** TESTING *****************
 
+def ai_graph_testing(M=500,N=3):
+    # number of data points, properties and splits
+    m    = M
+    p    = N
+    if p > const.constants.MAX_FEATURES:
+        p    = const.constants.MAX_FEATURES
+    #s    = p + 1
+    s    = p
+    # uniformly sample values between 0 and 1
+    #ivals= np.random.sample(size=(500,3))
+    ivals= np.random.sample(size=(m,p))
+    # test ocr
+    # set the default instance number
+    inst = 0
+    # get the default configuration
+    cfg  = config.cfg()
+    # ordering of the data elements in the JSON file
+    src  = cfg["instances"][inst]["src"]["index"]
+    typ  = cfg["instances"][inst]["src"]["types"]["glove"]
+    # glove file
+    gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
+    print(gfl)
+    # create the data for the sample knowledge graph
+    #
+    # create columns names (normally obtained by var.dtype.names)
+    f    = open(gfl[0])
+    nvals= np.asarray([row.split() for row in f.readlines()])
+    f.close()
+    vals = min(p,len(nvals[0]))
+    # can't use categoricals for the labels here
+    # throws an error for the list of things in the first column being longer than the number of labels
+    # yet this is ok for this application since all words in our corpus
+    # that's captured by the GloVe model bave non-zero probability of co-occurrence
+    # thus all words connect in one cluster (random field theory and markov property)
+    # which will be the case for floating pint labels sent to to_categorical
+    #
+    # because of the single brain (single model) forced by the last parameter to create_kg
+    # all other columns in the data set will be used to model the single first column
+    #
+    # the only other things is to change the behavior of which data points are connected
+    # to which and this will involve a little higher order probability theory which
+    # states that we have full connectivity, i.e. one cluster if each node in a network
+    # connects to O(logN) of its neighbors, where N is the total number of nodes
+    #
+    # the first column can be turned into categoricals by considering the theory that allows for choosing the number of clusters.
+    # Then, by separability, the marginal of the first column's cluster distribution can be learned using a DBN where categorical
+    # labels (using the number of clusters) as the output
+    #
+    # order of the categoricals are found as such
+    #
+    # sort the first column to obtain the sort order indices ... calculate the number of clusters and divide the data uniformly
+    # with labels represented in the right proportion ... uniformity is legitimate by the Central Limit Theorem giving an
+    # assumption of normality of the first column, but we order it, which allows us to assume a beta distribution whose parameters
+    # give uniformity by other arguments from the same theory that allows calculation of the number of clusters ... then, get the reverse
+    # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
+
+    #nvals[:,0]=list(range(1,len(nvals)+1))#[i/len(nvals) for i in range(len(nvals))]
+    #nvals=np.float64(nvals)
+    nvs  = calcC(nvals[:,1])
+    nvs1 = nvals[:,1:].astype(float)
+    print(nvs); print(len(nvs)); print(nvals.shape)
+    nvals= np.hstack((nvs,nvs1))
+    print(nvals[:,0])
+    # create column names (normally obtained by var.dtype.names)
+    coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    print(coln); print(coln.items()); print(list(coln.items()))
+    # create the data for the sample knowledge graph
+    kgdat= create_kg(0,ivals,s,limit=True)
+    print(kgdat[0])
+    # instantiate a JanusGraph object
+    graph= Graph()
+    # connection to the remote server
+    conn = DriverRemoteConnection(data.url_kg(inst),'g')
+    # get the remote graph traversal
+    g    = graph.traversal().withRemote(conn)
+    # write the knowledge graph
+    print([data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat])
+    #print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
+    print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
+    # test the thought function with the default number of predictions 3
+    print(thought(inst,list(coln.items())                                             ,g=g))
+    print(thought(inst,list(coln.items()),                                   res=False,g=g))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1))          ,g=g))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1)),res=False,g=g))
+
 def ai_testing(M=500,N=3):
     # number of data points, properties and splits
     m    = M
@@ -2230,11 +2321,12 @@ def ai_testing(M=500,N=3):
     g    = graph.traversal().withRemote(conn)
     # write the knowledge graph
     print([data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat])
+    #print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
     print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
     # test the thought function with the default number of predictions 3
-    print(thought(inst,list(coln.items())                                             ))
+    print(thought(inst,list(coln.items())                                             ,g=g))
     print(thought(inst,list(coln.items()),                                   res=False))
-    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1))          ))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1))          ,g=g))
     print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1)),res=False))
     # test glove output
     g    = extendglove(["README.txt","README.txt"],gfl[0])
