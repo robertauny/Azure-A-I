@@ -388,7 +388,7 @@ def dbn(inputs=[]
             # and closed to give rise to the correct cluster structure in the hidden layers defined above
             # so that the tuning through back propagation leads to the equilibrium distribution that can be color
             # coded into distinct regions of connected clusters ... see the writings for an example
-            if not (J == M - 1):
+            if not (J == itr - 1):
                 #dbnlayers(model,odim,dim,'sigmoid',useact)
                 dbnlayers(model,odim,dim,rbmact,useact)
             else:
