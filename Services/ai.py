@@ -421,8 +421,8 @@ def thought(inst=0,coln=[],dat=None,res=True,g=None):
                                         dump = thought(inst,coln,d[i],res)
                                         for key in list(dump.keys()):
                                             ret[key+"["+str(i)+"]"] = dump[key]
-                                    preds= 0
-                        if not (preds == 0):
+                                    preds= -1
+                        if preds > 0:
                             # load the clustering model and make the cluster prediction for this data point
                             mdl  = load_model(fl)
                             pred = store(mdl.predict(pt).flatten(),True)
@@ -487,6 +487,10 @@ def thought(inst=0,coln=[],dat=None,res=True,g=None):
                                                        0.0
                                                        #[np.random.normal(mpt,np.sqrt((i+1)*vpt),1)[0] for i in range(0,preds)][0]
                                         ret[lbls[m]] = prds[:,0] + residuals
+                        else:
+                            if preds == 0:
+                                # no prediction to be made because most likely there is no data
+                                ret[lbls[m]] = np.asarray([])
         except Exception as err:
             ret["error"] = str(err)
     return ret
