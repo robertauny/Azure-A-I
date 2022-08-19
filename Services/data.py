@@ -27,7 +27,8 @@
 ##
 ############################################################################
 
-import includes
+# install required packages and modules
+#import includes
 
 from joblib                                         import Parallel, delayed
 from itertools                                      import combinations,combinations_with_replacement
@@ -40,6 +41,7 @@ import sys
 import subprocess
 
 from sodapy                                         import Socrata
+from datetime                                       import datetime
 
 # gremlin imports
 from gremlin_python.structure.graph                 import Graph
@@ -49,6 +51,7 @@ import pandas          as pd
 import pandasql        as ps
 import numpy           as np
 import multiprocessing as mp
+import networkx        as nx
 
 import config
 import constants       as const
@@ -421,65 +424,41 @@ def read_kg(inst=const.constants.BVAL,coln=[],g=None):
             if not (len(fls) == 0 or len(fls[0]) == 0):
                 for fl in fls:
                     # file keys and values
-                    fkeys= list(fl.keys())
+                    fkeys= list(fl.keys  ())
                     fvals= list(fl.values())
                     # add the file from which the data came
-                    ret["fl"].append(home+"/data/"+fvals[0])
+                    ret["fl"    ].extend([home     +"/data/"+fvals[i]       for i in range(0,len(fvals)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
                     # add the label for this file
-                    ret["labels"].append(fkeys[0])
+                    ret["labels"].extend([                   fkeys[i]       for i in range(0,len(fkeys)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
                     # add the neural network for this file
-                    ret["nns"].append("models/"+fkeys[0]+".h5")
+                    ret["nns"   ].extend(["models/"+         fkeys[i]+".h5" for i in range(0,len(fkeys)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
+                    # if the data was dropped (drop == True), then re-add it to the graph
                     if drop:
-                        # read the data for this file
-                        g.io(ret["fl"][0]).read().iterate()
+                        # merge the graph data files if needed
+                        if len(ret["fl"]) > 1:
+                            dt   = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                            tfl  = "/tmp/graphml" + dt + ".xml"
+                            G    = nx.Graph()
+                            for j in range(0,len(ret["fl"])):
+                                G    = nx.compose(G,nx.read_graphml(ret["fl"][j]))
+                            nx.write_graphml(G,tfl)
+                            # read the data for this file
+                            g.io(tfl).read().iterate()
+                            # clean up after ourselves
+                            os.unlink(tfl)
+                        else:
+                            # read the data for this file
+                            g.io(ret["fl"][0]).read().iterate()
                     # get the data set
-                    dat  = g.V().hasLabel(fkeys[0]).valueMap(True).toList()
+                    dat  = []
+                    for fk in fkeys:
+                        d    = g.V().hasLabel(fk).valueMap(True).toList()
+                        dat  = np.vstack((dat,d))
+                    ret["dat"].append(dat)
+                    # drop all of the data that was just loaded
                     if drop:
-                        # drop all of the data that was just loaded
                         g.E().drop().iterate()
                         g.V().drop().iterate()
-                    # parse the data set into what we want, assuming that the label
-                    # consists of instance, brain, cluster and row numbers
-                    if not (len(dat) == 0):
-                        datk = unique([list(dat[j].keys()) for j in range(0,len(dat))])[0]
-                        datv = [list(dat[j].values()) for j in range(0,len(dat))]
-                        cdat = []
-                        ddat = []
-                        for k,key in enumerate(ckeys):
-                            for d,x in enumerate(datk):
-                                if str(x).translate(str.maketrans('','',punctuation)).lower() in key:
-                                    cdat.append(k)
-                                    ddat.append(d)
-                                    break
-                        if not (len(cdat) == 0):
-                            if len(cdat) == len(ckeys):
-                                ndat = []
-                                for j in range(0,len(dat)):
-                                    row  = []
-                                    for i in ddat:
-                                        row.append(datv[j][i][0])
-                                    ndat.append(row)
-                                # add the data for this file
-                                #
-                                # the data has the markov property so that
-                                # each data point is the sum of the previous
-                                # data point and zero-mean white noise
-                                # but our data is almost certainly to not be zero mean so
-                                # we will generate the data using the sample median and variance
-                                #
-                                # median
-                                md   = np.median(np.asarray(ndat).astype(np.float),axis=0)
-                                # variance
-                                var  = np.var(np.asarray(ndat).astype(np.float),axis=0)
-                                # the data
-                                ret["dat"].append(md )
-                                ret["dat"].append(var)
-                            else:
-                                ret  = read_kg(inst,np.asarray(coln)[cdat],None)
-                        else:
-                            ret["dat"].append([None])
-                    else:
-                        ret["dat"].append([None])
             else:
                 ret["dat"].append([None])
             if drop:
