@@ -422,43 +422,41 @@ def read_kg(inst=const.constants.BVAL,coln=[],g=None):
             # read all files matching the current pattern determined by lbl
             fls  = [{fl[0:fl.rfind(ext)]:fl for fl in f if fl.rfind(ext) > -1 and fl[0:fl.rfind(const.constants.SEP)] == lbl} for r,d,f in os.walk(home+"/data/")]
             if not (len(fls) == 0 or len(fls[0]) == 0):
-                for fl in fls:
+                for fl in fls[0]:
                     # file keys and values
-                    fkeys= list(fl.keys  ())
-                    fvals= list(fl.values())
-                    # add the file from which the data came
-                    ret["fl"    ].extend([home     +"/data/"+fvals[i]       for i in range(0,len(fvals)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
-                    # add the label for this file
-                    ret["labels"].extend([                   fkeys[i]       for i in range(0,len(fkeys)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
-                    # add the neural network for this file
-                    ret["nns"   ].extend(["models/"+         fkeys[i]+".h5" for i in range(0,len(fkeys)) if os.path.exists("models/"+fkeys[i]+".h5") and os.stat("models/"+fkeys[i]+".h5").st_size > 0])
-                    # if the data was dropped (drop == True), then re-add it to the graph
-                    if drop:
-                        # merge the graph data files if needed
-                        if len(ret["fl"]) > 1:
-                            dt   = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-                            tfl  = "/tmp/graphml" + dt + ".xml"
-                            G    = nx.Graph()
-                            for j in range(0,len(ret["fl"])):
-                                G    = nx.compose(G,nx.read_graphml(ret["fl"][j]))
-                            nx.write_graphml(G,tfl)
-                            # read the data for this file
-                            g.io(tfl).read().iterate()
-                            # clean up after ourselves
-                            os.unlink(tfl)
-                        else:
-                            # read the data for this file
-                            g.io(ret["fl"][0]).read().iterate()
-                    # get the data set
-                    dat  = []
-                    for fk in fkeys:
-                        d    = g.V().hasLabel(fk).valueMap(True).toList()
-                        dat  = np.vstack((dat,d))
-                    ret["dat"].append(dat)
-                    # drop all of the data that was just loaded
-                    if drop:
-                        g.E().drop().iterate()
-                        g.V().drop().iterate()
+                    fkeys= fl
+                    fvals= fls[0][fkeys]
+                    if os.path.exists("models/"+fkeys+".h5") and os.stat("models/"+fkeys+".h5").st_size > 0:
+                        # add the file from which the data came
+                        ret["fl"    ].append(home     +"/data/"+fvals      )
+                        # add the label for this file
+                        ret["labels"].append(                   fkeys      )
+                        # add the neural network for this file
+                        ret["nns"   ].append("models/"+         fkeys+".h5")
+                        # if the data was dropped (drop == True), then re-add it to the graph
+                        if drop:
+                            # merge the graph data files if needed
+                            if len(ret["fl"]) > 1:
+                                dt   = datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
+                                tfl  = "/tmp/graphml" + dt + ".xml"
+                                G    = nx.Graph()
+                                for j in range(0,len(ret["fl"])):
+                                    G    = nx.compose(G,nx.read_graphml(ret["fl"][j]))
+                                nx.write_graphml(G,tfl)
+                                # read the data for this file
+                                g.io(tfl).read().iterate()
+                                # clean up after ourselves
+                                os.unlink(tfl)
+                            else:
+                                # read the data for this file
+                                g.io(ret["fl"][0]).read().iterate()
+                        # get the data set
+                        dat  = g.V().hasLabel(fkeys).valueMap(True).toList()
+                        ret["dat"].append(dat)
+                        # drop all of the data that was just loaded
+                        if drop:
+                            g.E().drop().iterate()
+                            g.V().drop().iterate()
             else:
                 ret["dat"].append([None])
             if drop:
