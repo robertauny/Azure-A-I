@@ -443,7 +443,7 @@ def read_kg(inst=const.constants.BVAL,coln=[],g=None):
                                 for j in range(0,len(ret["fl"])):
                                     G    = nx.compose(G,nx.read_graphml(ret["fl"][j]))
                                 nx.write_graphml(G,tfl)
-                                # read the data for this file
+                                # read the combined data for this file
                                 g.io(tfl).read().iterate()
                                 # clean up after ourselves
                                 os.unlink(tfl)
@@ -451,8 +451,22 @@ def read_kg(inst=const.constants.BVAL,coln=[],g=None):
                                 # read the data for this file
                                 g.io(ret["fl"][0]).read().iterate()
                         # get the data set
-                        dat  = g.V().hasLabel(fkeys).valueMap(True).toList()
-                        ret["dat"].append(dat)
+                        dicts= g.V().hasLabel(fkeys).valueMap(True).toList()
+                        dat  = None
+                        # the data from the graph is returned as dictionaries containing
+                        # the true id and specified id, along with the column data
+                        # 
+                        # construct the column data into an array
+                        for d in dicts:
+                            row  = [d[key][0] for key in list(d.keys()) if key in ckeys]
+                            dat  = row if type(dat) == type(None) else np.vstack((dat,row))
+                        # make sure we are only adding new things to the return
+                        if type(dat) is not type(None):
+                            if not len(ret["dat"]) == 0:
+                                if np.asarray(dat).all() is not np.asarray(ret["dat"][len(ret["dat"])-1]).all():
+                                    ret["dat"].append(dat)
+                            else:
+                                ret["dat"].append(dat)
                         # drop all of the data that was just loaded
                         if drop:
                             g.E().drop().iterate()
