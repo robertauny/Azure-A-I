@@ -347,7 +347,7 @@ def brain(dat=[],splits=2,permu=[]):
 ## Purpose:   Correct model for predicting future data as a service
 ##
 ############################################################################
-def thought(inst=0,coln=[],dat=None,res=True,g=None):
+def thought(inst=0,coln=[],dat=None,res=True,g=None,dframe=None):
     ret  = {}
     if not (inst == None or len(coln) == 0):
         # ordering of the data elements in the JSON file
@@ -359,12 +359,12 @@ def thought(inst=0,coln=[],dat=None,res=True,g=None):
             # in the DB and return the one corresponding to the label 
             #
             # neural networks obtained from the DB later ... None for now
-            df   = data.read_kg(inst,coln,g=g)
+            df   = data.read_kg(inst,coln,g=g) if type(dframe) == type(None) else dframe
             # labels for each cluster
             lbls = df["labels"]
             for m in range(0,len(lbls)):
                 # beginning and end indices in the label string that need to be removed to find the brain
-                b    = lbls[m].find(const.constants.SEP) + 1
+                b    = lbls[m]. find(const.constants.SEP) + 1
                 #e    = lbls[m].rfind(ext) - 1
                 e    = lbls[m].rfind(const.constants.SEP)
                 # file for the clustering model
@@ -372,6 +372,8 @@ def thought(inst=0,coln=[],dat=None,res=True,g=None):
                 if os.path.exists(fl) and os.path.getsize(fl) > 0:
                     pt   = []
                     if not type(dat) == type(None):
+                        # since we have data, then just make sure that it is formatted properly
+                        # if there are more than one data points, we will use recursion to process each pt
                         d    = np.asarray(dat)
                         shp  = list(d.shape)
                         if len(shp) == 1:
@@ -381,7 +383,7 @@ def thought(inst=0,coln=[],dat=None,res=True,g=None):
                                 pt   = np.resize(d[0],(1,len(d[0])))
                             else:
                                 for i in range(0,len(d)):
-                                    dump = thought(inst,coln,d[i],res)
+                                    dump = thought(inst,coln,d[i],res,g,df)
                                     for key in list(dump.keys()):
                                         ret[key+"["+str(i)+"]"] = dump[key]
                                 return ret
