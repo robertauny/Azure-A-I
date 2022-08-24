@@ -145,10 +145,12 @@ def unique(l=[]):
     ret  = []
     if not (len(l) == 0):
         s    = l
-        if type(s[0]) == type([]):
+        if type(s[0]) in [type([]),type(np.asarray([]))]:
             s    = [tuple(t) for t in s]
+        if type(s[0]) == type({}):
+            s    = [list(s[j].items()) for j in range(0,len(s))][0]
         ret  = list(set(s))
-        if type(s[0]) == type([]):
+        if type(s[0]) in [type([]),type(np.asarray([]))]:
             ret  = [list(t) for t in ret]
     return np.asarray(ret)
 
