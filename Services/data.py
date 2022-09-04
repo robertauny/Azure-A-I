@@ -602,10 +602,13 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                         # identify the file and save the data from the current cluster
                         fl   = "models/" + ret[0][0] + ".h5"
                         mdl.save(fl)
+                    # drop the data at each iteration as the graph should contain only the current cluster's data
+                    g.E().drop().iterate()
+                    g.V().drop().iterate()
             # drop all of the data that was just loaded
-            if drop:
-                g.E().drop().iterate()
-                g.V().drop().iterate()
+            #if drop:
+                #g.E().drop().iterate()
+                #g.V().drop().iterate()
         else:
             if stem == const.constants.ENTS:
                 # read the graph associated with this sequence of columns
@@ -618,10 +621,13 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                     if write_we(ret,coln,kgdat,g):
                         # write the graph to disk
                         g.io(kg["fl"][0]).write().iterate()
+                        # drop the data at each iteration as the graph should contain only the current cluster's data
+                        g.E().drop().iterate()
+                        g.V().drop().iterate()
                 # drop all of the data that was just loaded
-                if drop:
-                    g.E().drop().iterate()
-                    g.V().drop().iterate()
+                #if drop:
+                    #g.E().drop().iterate()
+                    #g.V().drop().iterate()
             else:
                 if stem == const.constants.CONS:
                     # read the graph associated with this sequence of columns
@@ -670,10 +676,13 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                                     ret  = [write_ve(const.constants.V,cols,["word",words[0],kgdat[1][k][0],kgdat[1][k][1]],g)]
                     # write the graph to disk
                     g.io(kg["fl"][0]).write().iterate()
+                    # drop the data at each iteration as the graph should contain only the current cluster's data
+                    g.E().drop().iterate()
+                    g.V().drop().iterate()
                     # drop all of the data that was just loaded
-                    if drop:
-                        g.E().drop().iterate()
-                        g.V().drop().iterate()
+                    #if drop:
+                        #g.E().drop().iterate()
+                        #g.V().drop().iterate()
                 else:
                     # just a placeholder for the moment
                     # call the appropriate function in the future
