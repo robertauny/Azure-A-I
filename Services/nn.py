@@ -1007,17 +1007,21 @@ def nn_cleanse(inst=0,d=None):
         # drop any columns that have been configured to be dropped in constants.py
         if hasattr(const.constants,"DROP" )                                                                  and \
            type(const.constants.DROP ) in [type([]),type(np.asarray([]))] and len(const.constants.DROP ) > 0:
-            drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
-            dat  = dat.drop(columns=const.constants.DROP )
-            dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
-            nhdr = [i for i in  hdr if i not in dhdr]
+            cols = [c for c in const.constants.DROP if c in nhdr]
+            if not len(cols) == 0:
+                drop = dat.iloc[:,[hdr.index(i) for i in const.constants.DROP ]].to_numpy().copy()
+                dat  = dat.drop(columns=const.constants.DROP )
+                dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DROP ]])
+                nhdr = [i for i in  hdr if i not in dhdr]
         # drop any dates that have been configured to be dropped in constants.py
         if hasattr(const.constants,"DATES")                                                                  and \
            type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
-            dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
-            dat  = dat.drop(columns=const.constants.DATES)
-            thdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DATES]])
-            nhdr = [i for i in nhdr if i not in thdr]
+            cols = [c for c in const.constants.DROP if c in nhdr]
+            if not len(cols) == 0:
+                dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
+                dat  = dat.drop(columns=const.constants.DATES)
+                thdr = list(np.asarray(hdr)[[hdr.index(i) for i in const.constants.DATES]])
+                nhdr = [i for i in nhdr if i not in thdr]
         # replace any NaNs
         dat  = np.asarray([[str(x).lower().replace("nan","") for x in row] for row in dat.to_numpy()])
         dat  = pd.DataFrame(dat,columns=nhdr)
@@ -1063,6 +1067,7 @@ def nn_cleanse(inst=0,d=None):
         dat  = fixdata(inst,dat,coln)
         dat  = pd.DataFrame(dat,columns=nhdr)
         dat  = dat.to_numpy()
+        dat[dat == ""] = "0"
     return {"nhdr":nhdr if nhdr is not None else np.asarray([])
            ,"dat" : dat if dat  is not None else np.asarray([])
            ,"sifs":sifs if sifs is not None else np.asarray([])
