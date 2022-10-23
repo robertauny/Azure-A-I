@@ -23,7 +23,7 @@
 ##
 ## Creator:   Robert A. Murphy
 ##
-## Date:      Jun. 13, 2022
+## Date:      Jun. 13, 2021
 ##
 ############################################################################
 
@@ -103,10 +103,6 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
     xt   = pd.DataFrame(tdat.astype(np.single),columns=np.asarray(tnhdr))
     xt   = xt.to_numpy()
     # pretrained model
-    #
-    # for an iot model where the data resides closer to its source
-    # and a local model runs at the source, we can perform transfer
-    # learning using a pretrained model on a larger data set
     #
     # to keep the size of the model smaller while minimizing execution times
     # the larger data set can be sampled to obtain a minimal representation
@@ -207,10 +203,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     else:
                         # random field theory to calculate the number of clusters to form (or classes)
                         #clust= calcN(len(dat))
-                        clust= len(unique(dat[:,col]))
+                        clust= max(2,len(unique(dat[:,col])))
                         keys = {}
                         # define the outputs of the model
-                        fit  = dat[:,col].astype(np.int8)
+                        fit  = dat[:,col].astype(np.single).astype(np.int8)
                         y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
                         # main model
                         #
