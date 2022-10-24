@@ -169,7 +169,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     cls  = [col]
                     cls.extend(cols)
                     # file naming convention
-                    fns  = const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cls])
+                    fns1 = const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cols])
+                    fns  = nhdr[col] + const.constants.SEP + fns1
                     # just skip this permutation if unable to fix the data
                     if type("") in utils.sif(dat[:,cls].astype(str).flatten()):
                         print("Not enough clean data to fix other data issues.")
@@ -271,7 +272,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         utils.utils._pair(             df,fn+"grid.png",nhdr[col])
                         # x label
                         if len(x.to_numpy()[0]) > 1:
-                            xlbl = const.constants.XLABEL if hasattr(const.constants,"XLABEL") else "Event Number"
+                            xlbl = "Enumeration of " + fns1 + " values"
                         else:
                             xlbl = x.columns[0]
                         # forecast plot with an extra element to account for the
