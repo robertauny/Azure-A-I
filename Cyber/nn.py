@@ -839,7 +839,9 @@ def nn_split(pfl=None,mfl=None):
                 # merge the data
                 dat  = dat.merge(mfl,how="inner").fillna(0)
         # drop certain columns if requested
-        dat  = dat.drop(columns=const.constants.DROP) if hasattr(const.constants,"DROP") else dat
+        if hasattr(const.constants,"DROP"):
+            cols = [c for c in const.constants.DROP if c in list(dat.columns)]
+            dat  = dat.drop(columns=cols) if not len(cols) == 0 else dat
         # move target columns to the end if requested
         if hasattr(const.constants,"TARGETS") and (type(const.constants.TARGETS) == type([]) or type(const.constants.TARGETS) == type(np.asarray([]))):
             cols         = dat.columns.tolist()

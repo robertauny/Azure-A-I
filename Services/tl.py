@@ -175,11 +175,12 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
-                    x    = pd.DataFrame( dat[:,cols].astype(np.single),columns=np.asarray(nhdr)[cols])
+                    sdat = nn_split(pd.DataFrame(dat[:,cls].astype(np.single)))
+                    x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                     # the outputs to be fit
                     if not type("") in sifs[:,col]:
                         # define the outputs of the model
-                        fit  =  dat[:,col].astype(np.single)
+                        fit  =  sdat["train"][:,0]
                         y    =  fit
                         # main model
                         #
@@ -203,10 +204,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     else:
                         # random field theory to calculate the number of clusters to form (or classes)
                         #clust= calcN(len(dat))
-                        clust= max(2,len(unique(dat[:,col])))
+                        clust= max(2,len(unique(sdat["train"][:,0])))
                         keys = {}
                         # define the outputs of the model
-                        fit  = dat[:,col].astype(np.single).astype(np.int8)
+                        fit  = sdat["train"][:,0].astype(np.int8)
                         y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
                         # main model
                         #
@@ -244,7 +245,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     #
                     # yet note that for markov processes of time series, the last prediction
                     # is the next value in the time series
-                    pred = model.predict(x)
+                    pred = model.predict(sdat["test"][:,1:])
                     if len(np.asarray(pred).shape) > 1:
                         p    = []
                         for row in list(pred):
@@ -253,8 +254,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     else:
                         pred = np.asarray(list(pred))
                     # stack the recent predictions with the original inputs
-                    if len(pred) == len(x):
-                        preds= np.hstack((pred.reshape((len(pred),1)),x))
+                    if len(pred) == len(sdat["test"]):
+                        preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"][:,1:]))
                     else:
                         print("Prediction length doesn't match input data length.")
                         break
@@ -278,7 +279,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         # based on the last set of inputs
                         x11  = pd.Series(list(range(1,len(pred)+1+1)),name=xlbl)
                         # add the markov prediction for the last element in the time series
-                        x2   = pd.Series(np.append(fit,pred[-1]),name=nhdr[col]+" Values")
+                        x2   = pd.Series(np.append(sdat["test"][:,0],pred[-1]),name=nhdr[col]+" Values")
                         # if classification do an additional plot
                         if not (type(0.0) in sifs[:,col] or type(0) in sifs[:,col]):
                             # get the swarm plots of the classification
@@ -286,18 +287,18 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # these plots only work for binary classifications
                             if clust == 2:
                                 # get the roc
-                                utils.utils._roc(      fit.astype(np.int8),pred.astype(np.int8),fn+"roc.png")
+                                utils.utils._roc(      sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"roc.png")
                                 # get the precision vs recall
-                                utils.utils._pvr(      fit.astype(np.int8),pred.astype(np.int8),fn+"pvr.png")
+                                utils.utils._pvr(      sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"pvr.png")
                             # get the precision, recall, f-score
-                            utils.utils._prf(          fit.astype(np.int8),pred.astype(np.int8),fn+"prf.txt")
+                            utils.utils._prf(          sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"prf.txt")
                             # get the confusion matrix
-                            utils.utils._confusion(    fit.astype(np.int8),pred.astype(np.int8),fn+"cnf.png")
+                            utils.utils._confusion(    sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"cnf.png")
                         else:
                             # get the r-square comparison
-                            utils.utils._r2(fit,pred,fn+"r2.png")
+                            utils.utils._r2(sdat["test"][:,0],pred,fn+"r2.png")
                         # regression plot
-                        utils.utils._joint(            x11,x2,[-10,2*len(pred)],[0.5*min(fit ),1.5*max(fit )],fn+"forecast.png",nhdr[col])
+                        utils.utils._joint(            x11,x2,[-10,2*len(pred)],[0.5*min(sdat["test"][:,0] ),1.5*max(sdat["test"][:,0] )],fn+"forecast.png",nhdr[col])
                         # other plots to show that the built model is markovian
                         # since it will (hopefully) be shown that the errors are
                         # normally distributed
@@ -315,6 +316,6 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         # on the last measurement plus more additive noise
                         #
                         # residual errors (noise)
-                        res  = pred - np.asarray(list(fit))
+                        res  = pred - np.asarray(list(sdat["test"][:,0]))
                         # fit vs residuals plot
                         utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")
