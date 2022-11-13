@@ -29,7 +29,7 @@
 
 class constants():
     # miscellaneous constants
-    CONFIG         = "iot.json"
+    CONFIG         = "mrc.json"
     TEST           = "test.json"
     BVAL           = -1
     MAX_CLUSTERS   = 100#10
@@ -65,194 +65,26 @@ class constants():
     VSIZE          = 8
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
-    PERMS          = 2#11
-    INCLUDES       = [
-                      ["pip"                 ,"install","snowflake"                         ]
-                     ,["pip"                 ,"install","snowflake-connector-python[pandas]"]
-                     ,["pip"                 ,"install","snowflake.sqlalchemy==1.2.4"       ]
-                     ,["pip"                 ,"install","pyhdb"                             ]
-                     ,["pip"                 ,"install","joblib"                            ]
-                     ,["pip"                 ,"install","pillow"                            ]
-                     ,["pip"                 ,"install","tensorflow"                        ]
-                     ,["pip"                 ,"install","pdf2image"                         ]
-                     ,["pip"                 ,"install","scipy"                             ]
-                     ,["pip"                 ,"install","pytesseract"                       ]
-                     ,["pip"                 ,"install","gremlinpython"                     ]
-                     ,["pip"                 ,"install","bertopic"                          ]
-                     ,["pip"                 ,"install","spacy"                             ]
-                     ,["pip"                 ,"install","textblob"                          ]
-                     ,["pip"                 ,"install","eli5"                              ]
-                     ,["pip"                 ,"install","opencv-python"                     ]
-                     ,["pip"                 ,"install","imutils"                           ]
-                     ,["pip"                 ,"install","matplotlib"                        ]
-                     ,["pip"                 ,"install","seaborn"                           ]
-                     ,["pip"                 ,"install","tensorflow-model-optimization"     ]
-                     ,["pip"                 ,"install","sodapy"                            ]
-                     ,["pip"                 ,"install","pandasql"                          ]
-                     ,["R CMD INSTALL DBI"                                                  ]
-                     ,["R CMD INSTALL dplyr"                                                ]
-                     ,["R CMD INSTALL dbplyr"                                               ]
-                     ,["R CMD INSTALL odbc"                                                 ]
-                     ,["R CMD INSTALL rjson"                                                ]
-                     #,["yum"                 ,"install","mesa-libGL"                        ]
-                     ]
+    PERMS          = [[0,1,2,3]]#2#11# either a constant used in range or the column numbers of the inputs (outputs found automatically)
     COLUMNS        = [
-                      "BU"
-                     ,"FY"
-                     ,"Prod No Short"
-                     ,"Prod No"
-                     ,"Prod Description"
-                     ,"Bill To Address"
-                     ,"End User"
-                     ,"SO No"
-                     ,"SO Line No"
-                     ,"Order Type"
-                     ,"Shipped Quantity"
-                     ,"Original Order Quanity"
-                     ,"Req Ship Date"
-                     ,"Sch Pick Date"
-                     ,"Shipped Date"
-                     ,"Ext. Cost"
-                     ,"Ext. Price"
-                     ,"SO Cat."
-                     ,"Status Code - Last"
-                     ,"Status Code - Next"
-                     ,"Prod Line"
-                     ,"Bill To Name"
-                     ,"Region"
-                     ,"Prod Family"
-                     ,"Sales Order Category"
+                      "Fraud"
+                     ,"ORIGIN_IP"
+                     ,"DEST_IP"
+                     ,"CLICKS"
+                     ,"dt"
                      ]
-    DROP           = [
-                      "BU"
-                     ,"FY"
-                     ,"Prod No Short"
-                     ,"Prod No"
-                     ,"Prod Description"
-                     ,"Bill To Address"
-                     ,"End User"
-                     ,"SO No"
-                     ,"SO Line No"
-                     ,"Order Type"
-                     #,"Shipped Quantity"
-                     #,"Original Order Quanity"
-                     ,"Req Ship Date"
-                     ,"Sch Pick Date"
-                     ,"Shipped Date"
-                     #,"Ext. Cost"
-                     #,"Ext. Price"
-                     ,"SO Cat."
-                     ,"Status Code - Last"
-                     ,"Status Code - Next"
-                     #,"Prod Line"
-                     ,"Bill To Name"
-                     ,"Region"
-                     ,"Prod Family"
-                     ,"Sales Order Category"
-                     ]
-    #COLUMNS        = ["Customer reporting outage at least once"
-                     #,"Internal NH Crews"
-                     #,"Tree Crews"
-                     #,"ES Crews"
-                     #,"Accounts W/O Power at peak"
-                     #,"Broken Poles"]
-                     #,"Western Event Level"]
+    #DROP           = [
+                      #Fraud
+                     #,ORIGIN_IP
+                     #,DEST_IP
+                     #,CLICKS
+                     #,dt
+                     #]
     XLABEL         = "Event Number"#"Storm Event Number"
     #TARGETS        = ["REASONCODE"]
-    #DATES          = ["Date"]
+    DATES          = ["dt"]
     #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
-    #COLUMNS        = [
-                      #"Year",
-                      #"Month",
-                      #"Date",
-                      #"Season",
-                      #"Work Order",
-                      #"Activation (No Partial Remote Full)",
-                      #"Storm Call",
-                      #"Advisory Issued",
-                      #"Weather Forecast predicted",
-                      #"Weather Forecast Advisory",
-                      #"Central Event Level",
-                      #"Eastern Event Level",
-                      #"Northern Event Level",
-                      #"Southern Event Level",
-                      #"Western Event Level",
-                      #" Precipitation",
-                      #"Sustained Winds",
-                      #"Winds Gusts",
-                      #"Temp  High",
-                      #"Temp Low",
-                      #"Weather Forecast actual",
-                      #"Max Wind Gust in MPH",
-                      #"Temp  High actual",
-                      #"Temp Low actual",
-                      #"Storm Direction",
-                      #"Number Primary  Events (IEEE)",
-                      #"Storm Duration (days)",
-                      #"Concurrent Events",
-                      #"Accounts W/O Power at peak",
-                      #"Customer reporting outage at least once (IEEE)",
-                      #"Customer reporting outage at least once",
-                      #"DTN Trouble spots",
-                      #"OPM Trouble Spots ",
-                      #"Internal NH Crews",
-                      #"Additional External Buckets",
-                      #"Additional External Diggers",
-                      #"Tree Crews",
-                      #"ES Crews",
-                      #"Notes",
-                      #"Cost (Charges to date)",
-                      #"Exclusionary Day(s) ",
-                      #"Applied for recovery",
-                      #"Broken Poles"
-                     #]
-    #DROP           = ["Date","Year","Month","Date","Season","Work Order","Activation (No Partial Remote Full)","Work Order"]
-    #DROP           = ["Date","Work Order"]
-    #DROP           = [
-                      #"Year",
-                      #"Month",
-                      #"Date",
-                      #"Season",
-                      #"Work Order",
-                      #"Activation (No Partial Remote Full)",
-                      #"Storm Call",
-                      #"Advisory Issued",
-                      #"Weather Forecast predicted",
-                      #"Weather Forecast Advisory",
-                      #"Central Event Level",
-                      #"Eastern Event Level",
-                      #"Northern Event Level",
-                      #"Southern Event Level",
-                      #"Western Event Level",
-                      #" Precipitation",
-                      #"Winds Gusts",
-                      #"Temp  High",
-                      #"Temp Low",
-                      #"Weather Forecast actual",
-                      #"Max Wind Gust in MPH",
-                      #"Temp  High actual",
-                      #"Temp Low actual",
-                      #"Storm Direction",
-                      #"Number Primary  Events (IEEE)",
-                      #"Storm Duration (days)",
-                      #"Concurrent Events",
-                      #"Accounts W/O Power at peak",
-                      #"Customer reporting outage at least once (IEEE)",
-                      #"Customer reporting outage at least once",
-                      #"DTN Trouble spots",
-                      #"OPM Trouble Spots ",
-                      #"Internal NH Crews",
-                      #"Additional External Buckets",
-                      #"Additional External Diggers",
-                      #"Tree Crews",
-                      #"ES Crews",
-                      #"Broken Poles",
-                      #"Notes",
-                      #"Cost (Charges to date)",
-                      #"Exclusionary Day(s) ",
-                      #"Applied for recovery",
-                      #"Sustained Winds"
-                     #]
+    DTFORMAT       = "%s"
     #MATCH_ON       = ["Id","PATIENT"]
     # neural network constants
     OUTP           = 1
@@ -273,7 +105,7 @@ class constants():
     BSZ            = 64
     LDIM           = 256
     VSPLIT         = 0.2
-    SFL            = "models/iot.h5"
+    SFL            = "models/mrc.h5"
     TRAIN_PCT      = 0.8
     MAX_PREDS      = 100#0
     BASE_LR        = 0.0002

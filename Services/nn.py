@@ -857,7 +857,10 @@ def nn_split(pfl=None,mfl=None):
             cols         = dat.columns.tolist()
             for i in range(0,len(cols)):
                 if cols[i] in const.constants.DATES:
-                    dat[cols[i]] = datetime.datetime.strptime(dat.iloc[:,i],const.constants.DTFORMAT)
+                    if hasattr(const.constants,"DTFORMAT"):
+                        dat[cols[i]] = datetime.datetime.strptime(dat.iloc[:,i],const.constants.DTFORMAT)
+                    else:
+                        dat          = dat.drop(columns=cols[i])
         # get a train and test data set
         tpct         = const.constants.TRAIN_PCT if hasattr(const.constants,"TRAIN_PCT") else 0.8
         trow1        = np.random.randint(0,len(dat),int(ceil(tpct*len(dat))))
@@ -1016,14 +1019,14 @@ def nn_cleanse(inst=0,d=None):
                 dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
                 nhdr = [i for i in  hdr if i not in dhdr]
         # drop any dates that have been configured to be dropped in constants.py
-        if hasattr(const.constants,"DATES")                                                                  and \
-           type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
-            cols = [c for c in const.constants.DATES if c in nhdr]
-            if not len(cols) == 0:
+        #if hasattr(const.constants,"DATES")                                                                  and \
+           #type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
+            #cols = [c for c in const.constants.DATES if c in nhdr]
+            #if not len(cols) == 0:
                 #dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
-                dat  = dat.drop(columns=cols)
-                thdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
-                nhdr = [i for i in nhdr if i not in thdr]
+                #dat  = dat.drop(columns=cols)
+                #thdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
+                #nhdr = [i for i in nhdr if i not in thdr]
         # replace any NaNs
         dat  = np.asarray([[str(x).lower().replace("nan","") for x in row] for row in dat.to_numpy()])
         dat  = pd.DataFrame(dat,columns=nhdr)
