@@ -2,6 +2,10 @@ import pandas as pd
 import numpy  as np
 import datetime
 
+import constants as const
+
+from joblib import Parallel,delayed
+
 def power(val):
     ret  = "Power_Module_6"
     if val >    0.0 and val <=  2000.0:
@@ -16,18 +20,28 @@ def power(val):
         ret  = "Power_Module_5"
     return ret
 
+def hdates(df,row):
+    cols = list(df.columns)
+    ret  = None
+    dat  = datetime.datetime.strptime(df.iloc[row,cols.index("dt")],"%m/%d/%Y")
+    while np.int8(dat.strftime("%d")) >= 2:
+        df.iloc[row,cols.index("dt")] = (dat-pd.Timedelta(days=1)).strftime("%m/%d/%Y")
+        ret                           = ret.append(pd.DataFrame(df.to_numpy()[row,:].reshape((1,len(cols))),columns=cols)) \
+                                        if ret is not None                                                                 \
+                                        else       pd.DataFrame(df.to_numpy()[row,:].reshape((1,len(cols))),columns=cols)
+        dat                           = datetime.datetime.strptime(df.iloc[row,cols.index("dt")],"%m/%d/%Y")
+    return ret
+
 def dates(df):
     cdf  = df.copy()
-    cols = list(cdf.columns)
     ret  = None
-    for row in range(0,len(cdf)):
-        dat  = datetime.datetime.strptime(cdf.iloc[row,cols.index("dt")],"%m/%d/%Y")
-        while np.int8(dat.strftime("%d")) >= 2:
-            cdf.iloc[row,cols.index("dt")] = (dat-pd.Timedelta(days=1)).strftime("%m/%d/%Y")
-            ret                            = ret.append(pd.DataFrame(cdf.to_numpy()[row,:].reshape((1,len(cols))),columns=cols)) \
-                                             if ret is not None                                                                  \
-                                             else       pd.DataFrame(cdf.to_numpy()[row,:].reshape((1,len(cols))),columns=cols)
-            dat                            = datetime.datetime.strptime(cdf.iloc[row,cols.index("dt")],"%m/%d/%Y")
+    # number of cpu cores for multiprocessing
+    nc   = const.constants.CPU_COUNT if hasattr(const.constants,"CPU_COUNT") else mp.cpu_count()
+    if nc > 1:
+        ret  = Parallel(n_jobs=nc)(delayed(hdates)(cdf,row) for row in range(0,len(cdf)))
+    else:
+        for row in range(0,len(cdf)):
+            ret  = ret.append(hdates(cdf,row)) if ret is not None else hdates(cdf,row)
     return ret
 
 sku1                            = "ORIGIN_IP"
