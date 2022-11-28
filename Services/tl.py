@@ -250,6 +250,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     if len(np.asarray(pred).shape) > 1:
                         p    = []
                         for row in list(pred):
+                            # start = 1 forces cluster labels to begin with 1,2,...
+                            #p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
                             p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
                         pred = np.asarray(p)
                     else:
