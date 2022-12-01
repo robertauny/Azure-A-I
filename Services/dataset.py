@@ -44,11 +44,15 @@ def dates(df):
             ret  = ret.append(hdates(cdf,row)) if ret is not None else hdates(cdf,row)
     return ret
 
+def click(df):
+    return np.int64(df[0].astype(np.float64)*100) if df[1] == 1 else df[0]
+
 sku1                            = "ORIGIN_IP"
 sku2                            = "DEST_IP"
 clicks                          = "CLICKS"
 
-dat0                            = pd.read_csv("/mnt/data/csv/airconditioning.csv")
+dat0                            = pd.read_csv("/mnt/data/csv/airconditioningtest.csv")
+#dat0                            = pd.read_csv("/mnt/data/csv/airconditioning.csv")
 
 dat1                            = dat0.copy()
 dat1[sku1  ]                    = list(range(1,len(dat1)+1))
@@ -86,5 +90,7 @@ dat8["Part"]                    = list(map(lambda x: x.replace("copper_condenser
 dat8["Part"]                    = list(map(lambda x: x.replace("aluminum_alloy_condenser_coil","glass"),dat8["Part"]))
 dat2                            = dat2.append([dat3,dat4,dat7,dat8],ignore_index=True)
 dat2                            = dat2[[cols[c] for c in range(len(cols)) if c in [cols.index("dt"),cols.index(clicks),cols.index(sku1),cols.index(sku2)]]]
-dat2["Fraud"]                   = list(map(lambda x: 1 if x > 0.5 else 0, np.random.sample(size=dat2[clicks].to_numpy().shape)))
+dat2["Fraud"]                   = list(map(lambda x: 1 if x < 0.01 else 0, np.random.sample(size=dat2[clicks].to_numpy().shape)))
+cols                            = list(dat2.columns)
+dat2[clicks]                    = list(map(click,dat2[[cols[c] for c in range(len(cols)) if c in [cols.index(clicks),cols.index("Fraud")]]].to_numpy()))
 dat2.to_csv("/mnt/data/csv/clicks.csv",index=False)

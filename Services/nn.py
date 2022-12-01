@@ -150,7 +150,8 @@ def calcC(vals=None,clust=None,keys=None):
     # sort order and apply it to the labels and this is the label ordering for use as the outputs with original first column as inputs to the DBN
     if not (type(vals) == type(None) or len(vals) == 0):
         svals= np.argsort(vals)
-        rints= list(range(1,clust if clust is not None and clust >= 2 else calcN(len(vals))+1))
+        #rints= list(range(1,clust if clust is not None and clust >= 2 else calcN(len(vals))+1))
+        rints= list(range(0,clust if clust is not None and clust >= 2 else calcN(len(vals))))
         sints= int(ceil(len(vals)/len(rints)))
         tvals= []
         for i in rints:

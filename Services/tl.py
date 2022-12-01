@@ -252,7 +252,11 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         for row in list(pred):
                             # start = 1 forces cluster labels to begin with 1,2,...
                             #p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
-                            p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
+                            #p.extend(j for j,x in enumerate(row,start=1) if x == max(abs(row)))
+                            # in clustering, we find the centroids furthest from the center of all data
+                            # the labels in this case are just the numeric values assigned in order
+                            # and the data should be closest to this label
+                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
                         pred = np.asarray(p)
                     else:
                         pred = np.asarray(list(pred))
