@@ -872,6 +872,112 @@ def nn_split(pfl=None,mfl=None):
 
 ############################################################################
 ##
+## Purpose:   Trim the data using random field/cluster theory
+##
+############################################################################
+def nn_trim(dat=[],labels=0,label=1,order=False):
+    # devising a way using mathematics to limit the dominant class of an
+    # imbalanced data set so that models show greater sensitivity when
+    # predicting the label of an inferior class
+    #
+    # these methods only work if the data are ordered and assumed uniformly
+    # distributed, as that is the typical set up in a random field (special
+    # case of the random cluster model)
+    #
+    # order is certainly the case in a timeseries and with an imbalanced data
+    # set, we can model the data with a poisson distribution with parameter
+    # equal to the average frequency the inferior event appears in the overall
+    # data set
+    #
+    # furthermore, since the uniform distribution is the limiting distribution
+    # of a sequence of (poisson) distributed random variables, then an ordered
+    # timeseries fits into the assumptions of the set up
+    #
+    # likewise, in the case of a more generalized data set, we can make an
+    # appeal to the central limit theorem to make an assumption of normality
+    # of the originally unordered data set, after which we can apply an ordering
+    # by row with feature ordering unchanged ... with this ordering, we can assume
+    # the beta distribution and parameters requiring the new distribution to be
+    # uniform since the random field theory provides a canonical mapping into
+    # the 2-D plane with preservation of q spatially uniformly distributed clusters
+    #
+    # in both cases, we can assume the canonical mapping into 2-D space so that
+    # each higher dimensional row from the data set is represented by a 2-D vector
+    # with class representation maintained
+    #
+    # each mapped data row has a corresponding state represented by some real value
+    # but this is not our concern at the moment since the values figure into an
+    # energy function that forms the argument of an exponential function that models
+    # the density of the distribution, but this energy function will be learned by
+    # the deep learner after the data rows have been embedded into some finite dimensional
+    # euclidean space before the canonical projection is applied resulting in 2-D vectors
+    #
+    # rather, our concern at this point is to jump ahead in the process after embedding
+    # and configure the size of the 2-D space for the following reason that comes from
+    # random cluster theory
+    #
+    # we seek the smallest set of sites in 2-D space that encompass all positive values
+    # from the inferior class so that all other values outside the bounds of the inferior
+    # class are from the dominant class ... in such a case, it makes no difference if
+    # the values from outside the bounds are actually all from the dominant class label
+    # or the inferior class label, since the conditional distribution so defined in either
+    # case leads to the unique limiting distribution (which is what we seek) when the
+    # data set grows increasingly larger with the bound growing larger as well
+    #
+    # all 2-D vectors outside the bound can be discarded as a result of either label
+    # being sufficient, which comports with the 2-D Markov property where only
+    # rows mapped inside the bound are required to learn the limiting distribution
+    #
+    # as such, we can discard all rows from the original data set that correspond to
+    # vectors outside the bound
+    #
+    # first we devise the entire 2-D space required for all data rows after mapping
+    # which can be obtained by simply finding the smallest number whose square is not less
+    # than the number of rows in the data set
+    #
+    # to find the bound, we compute the row containing the first and last rows corresponding
+    # to the first and last labels from the inferior class
+    ret  = np.asarray(dat)
+    if type(ret) == type(np.asarray([])) and len(ret) > 0 and type(labels) == type(0) and labels >= 0 and labels <= len(ret[0]):
+        ret  = pd.DataFrame(ret)
+        # if the data should be sorted as requested
+        if order:
+            ret  = ret.sort_values(by=list(ret.columns))
+        # calculate the size of the NxN 2-D space
+        N    = sqrt(len(ret))
+        N    = int(N) if N - int(N) == 0.0 else int(N) + 1
+        # initial size of the bound unless it should be adjusted
+        Nlbls= len(ret)
+        # find the first and last label from the inferior class
+        albls= [j for j,x in enumerate(ret[labels]) if x == label]
+        lbls = [min(albls),max(albls)]
+        # adjust the size of the bound if this conditional is satisfied
+        if lbls[0] > 0 and lbls[1] < len(ret):
+            # once we have the first and last labels, we need to balance
+            # out the bound so that we have a square sub-region contained in the
+            # original NxN 2-D space
+            #
+            # due to invariance (shifting the bound horizontally or vertically), we
+            # don't need to be concerned whether the bound is centered in the 2-D space
+            #
+            # as such we can just calculate the number of rows obtained by the difference
+            # in lbls values and add 1 to the square root if the difference is not a
+            # perfect square
+            dlbls= lbls[1] - lbls[0]
+            Nlbls= sqrt(dlbls)
+            # the number of rows corresponding to vectors in our 2-D bound is the square of Nlbls
+            Nlbls= (int(Nlbls) if Nlbls - int(Nlbls) == 0.0 else int(Nlbls) + 1)**2
+            # make an adjustment to the label ranges to form our data set range of rows
+            #
+            # note ... by uniformity and translation invariance we can limit the size even further
+            # the ending labels corresponding rows that should be included in our data set
+            # reset the lbls start and end row numbers for creating the bound
+            lbls[1] = min(lbls[0]+Nlbls,len(ret))
+        ret  = ret.to_numpy()[lbls[0]:lbls[1],:]
+    return ret
+
+############################################################################
+##
 ## Purpose:   Return the subset of data rows that are full
 ##
 ############################################################################
