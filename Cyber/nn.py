@@ -1042,7 +1042,6 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
                         rmv.append(x)
         # for any values to be removed, then remove them and keep the rest
         lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
-        print([len(lbls),len(rng)])
         ret  = ret.to_numpy()[lbls,:]
     return ret
 
