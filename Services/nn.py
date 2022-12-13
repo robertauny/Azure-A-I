@@ -944,10 +944,24 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
         if order:
             ret  = ret.sort_values(by=list(ret.columns))
         # calculate the size of the NxN 2-D space
-        N    = sqrt(len(ret))
-        N    = int(N) if N - int(N) == 0.0 else int(N) + 1
-        # initial size of the bound unless it should be adjusted
-        Nlbls= len(ret)
+        #
+        # what allows us to take the 1-D series and make it into
+        # a 2-D NxN random field is the Markov property whereby
+        # the 1-D Markov chain is embeddable into a Brownian motion
+        # that amounts to a harmonic sum of sines and cosines with Fourier
+        # coefficients ... each term in the harmonic sum has a periodicity
+        #
+        # this actuality is borne out by the canonical map of the assumed
+        # gaussian distributed higher dimensional data set into the 2-D
+        # bounded region while preserving class membership
+        #
+        # in addition, the number of clusters and the map forces uniformity
+        # in the NxN range space of the canonical map
+        #
+        # calculate the size of the NxN 2-D space
+        N    = int(sqrt(len(ret)))
+        # perfect square
+        Nlbls= N**2
         # find the first and last label from the inferior class
         albls= [j for j,x in enumerate(ret[labels]) if x == label]
         lbls = [min(albls),max(albls)]
@@ -963,17 +977,73 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
             # as such we can just calculate the number of rows obtained by the difference
             # in lbls values and add 1 to the square root if the difference is not a
             # perfect square
-            dlbls= lbls[1] - lbls[0]
-            Nlbls= sqrt(dlbls)
+            N    = int(sqrt(lbls[1]-lbls[0]))
             # the number of rows corresponding to vectors in our 2-D bound is the square of Nlbls
-            Nlbls= (int(Nlbls) if Nlbls - int(Nlbls) == 0.0 else int(Nlbls) + 1)**2
+            Nlbls= N**2
             # make an adjustment to the label ranges to form our data set range of rows
             #
             # note ... by uniformity and translation invariance we can limit the size even further
             # the ending labels corresponding rows that should be included in our data set
             # reset the lbls start and end row numbers for creating the bound
             lbls[1] = min(lbls[0]+Nlbls,len(ret))
-        ret  = ret.to_numpy()[lbls[0]:lbls[1],:]
+        # now we will use random field theory to reduce the size of the data set
+        # in essence, we will find and remove all labels in the dominant class
+        # that are fully connected to each of its neighbors while paying close
+        # attention to those labels that exist in the boundary of the bounded region
+        #
+        # for each label not in the inferior class identified by "label", check its
+        # neighbors in the NxN bounded region to see if the same state exists on those
+        # neighboring sites ... if yes, then we can delete the row of data corresponding
+        # to this 2-D vector
+        #
+        # normally in the random field set up we are concerned with fully connected clusters
+        # but note that we have an abundance of data having labels not belonging to the inferior
+        # class and we want to limit this data set
+        #
+        # thus we will find connections amongst data rows with labels not in the inferior
+        # class and remove them, while keeping all rows with labels from the inferior class
+        # and any neighbors with labels from all other classes that form closed edges with
+        # its neighbors from the inferior class ... these will be "transitions" that we 
+        # want to maintain in our data set
+        #
+        # at the end of this process we will have separated clusters of common labeled rows
+        #
+        # another thing to notice in kind of a thought experiment is making the analogy of
+        # rows of data corresponding to the inferior class label as being visible matter
+        # with all other labels corresponding to other matter ... then as we make connections
+        # and eliminate fully connected rows of data as determined by its label and those of its
+        # neighbors we are actually drawing other areas of "space" together (kind of creating a
+        # singularity) whereby clusters of inferior labels are closer together with separation
+        # being provided by the remaining other labels in between
+        #
+        # start considering labels in the boundary of the NxN 2-D region then work to the interior
+        # we need to keep the labels in the boundary of the 2-D region contains information about
+        # all of the labels external to the bounded region ... this is by the Markov property
+        # thus we move on to interior labels
+        rmv  = []
+        rng  = list(range(lbls[0],lbls[1]))
+        for j,x in enumerate(rng):
+            # these are boundary elements to the left and right of the interior
+            if (j+1) % N in [0,1]:
+                continue
+            else:
+                # these are the boundary elements at the top and bottom
+                # not including those elements that are also to the left
+                # and right (in the corners)
+                if j in range(1,N-1) or j in range(Nlbls-N+1,Nlbls-1):
+                    continue
+                else:
+                    # the interior labels
+                    if ret[labels][x] == ret[labels][x+1] and \
+                       ret[labels][x] == ret[labels][x-1] and \
+                       ret[labels][x] == ret[labels][x+N] and \
+                       ret[labels][x] == ret[labels][x-N]:
+                        # completely connected site so remove the label
+                        rmv.append(x)
+        # for any values to be removed, then remove them and keep the rest
+        lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
+        print([len(lbls),len(rng)])
+        ret  = ret.to_numpy()[lbls,:]
     return ret
 
 ############################################################################
