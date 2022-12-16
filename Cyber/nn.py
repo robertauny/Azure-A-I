@@ -1030,7 +1030,7 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
                 # these are the boundary elements at the top and bottom
                 # not including those elements that are also to the left
                 # and right (in the corners)
-                if j in range(1,N-1) or j in range(Nlbls-N+1,Nlbls-1):
+                if j in range(0,N-1) or j in range(len(rng)-N,len(rng)):
                     continue
                 else:
                     # the interior labels
