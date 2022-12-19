@@ -27,7 +27,28 @@
 ##
 ############################################################################
 
+import sys
+
+ver  = sys.version.split()[0]
+
+if ver == "3.5.2":
+    import            keras.backend as K
+else:
+    import tensorflow.keras.backend as K
+
+import tensorflow as tf
+
 class constants():
+    def custom_loss(y_true,y_pred):
+        CSTFN= 0.85
+        CSTTP= 0.0
+        CSTFP= 0.15
+        CSTTN= 0.0
+        cost =    y_true  * K.log(  y_pred) * CSTFN \
+             +    y_true  * K.log(  y_pred) * CSTTP \
+             + (1-y_true) * K.log(1-y_pred) * CSTFP \
+             + (1-y_true) * K.log(1-y_pred) * CSTTN
+        return -K.mean(cost,axis=-1)
     # miscellaneous constants
     CONFIG         = "mrc.json"
     TEST           = "test.json"
@@ -65,35 +86,40 @@ class constants():
     VSIZE          = 8
     HOUN_OFFSET    = 10
     CPU_COUNT      = 1
-    PERMS          = [[0,1,2,3]]#2#11# either a constant used in range or the column numbers of the inputs (outputs found automatically)
+    #PERMS          = [[0,1,2,3]]#2#11# either a constant used in range or the column numbers of the inputs (outputs found automatically)
+    PERMS          = [[0,1,2]]#2#11# either a constant used in range or the column numbers of the inputs (outputs found automatically)
     COLUMNS        = [
                       "Fraud"
                      ,"ORIGIN_IP"
                      ,"DEST_IP"
                      ,"CLICKS"
-                     ,"dt"
+                     #,"dt"
                      ]
-    #DROP           = [
-                      #Fraud
-                     #,ORIGIN_IP
-                     #,DEST_IP
-                     #,CLICKS
-                     #,dt
-                     #]
+    DROP           = [
+                      "dt"
+                     #,"ORIGIN_IP"
+                     #,"DEST_IP"
+                     #,"CLICKS"
+                     #,"Fraud"
+                     ]
     XLABEL         = "Event Number"#"Storm Event Number"
     #TARGETS        = ["REASONCODE"]
-    DATES          = ["dt"]
+    #DATES          = ["dt"]
     #DTFORMAT       = "%Y-%m-%dT%H:%M:%SZ"
-    DTFORMAT       = "%s"
+    #DTFORMAT       = "%s"
     #MATCH_ON       = ["Id","PATIENT"]
     # neural network constants
     OUTP           = 1
     SHAPE          = 3
     SPLITS         = 3
     PROPS          = 3
-    LOSS           = "categorical_crossentropy"
-    OPTI           = "rmsprop"
+    #LOSS           = custom_loss
+    #LOSS           = "categorical_crossentropy"
+    LOSS           = "binary_crossentropy"
+    #OPTI           = "rmsprop"
+    OPTI           = "adam"
     RBMA           = "softmax"
+    #RBMA           = "relu"
     METRICS        = ["accuracy"]
     DBNA           = None
     DBNO           = 0

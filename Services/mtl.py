@@ -197,15 +197,15 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     # add some layers to the standard dbn for clustering to embed
                     # the integer values into the real numbers between 0 and 1
                     model= dbn(x.to_numpy()
-                              #,y
-                              ,fit
+                              ,y
+                              #,fit
                               ,sfl=sfl
                               ,encs=[Dense(len(xt[0]),input_shape=(len(cols ),),activation='relu')
                                     ,mdlr
                                     ,Dense(len(cols ),input_shape=(len(xt[0]),),activation='relu')]
-                              #,clust=clust)
-                              ,dbnact="sigmoid"
-                              ,dbnout=1)
+                              ,clust=clust)
+                              #,dbnact="sigmoid"
+                              #,dbnout=1)
                     # first model is a classifier that will be passed into the next model that will do the clustering
                     # then once centroids are known, any predictions will be relative to those centroids
                     #model= clustering(model,clust)
@@ -226,7 +226,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     pred = model.predict(sdat["test"][:,1:])
                     #pred = model.predict(x)
                     if len(np.asarray(pred).shape) > 1:
-                        upred= unique(sdat["test"][:,0].astype(np.int8))
+                        upred= np.sort(unique(sdat["test"][:,0].astype(np.int8)))
                         p    = []
                         for row in list(pred):
                             # start = 1 makes labels begin with 1, 2, ...
@@ -237,7 +237,9 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # the labels in this case are just the numeric values assigned in order
                             # and the data should be closest to this label
                             #p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                            p.extend(j for j,x in enumerate(upred,start=0) if abs(x-row) == min(abs(row-upred)))
+                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-upred)))
+                            # this one works with y replaced by fit and dbnout/dbnact turned off for clust instead
+                            #p.extend(j for j,x in enumerate(upred,start=0) if abs(x-row) == min(abs(row-upred)))
                         pred = np.asarray(p)
                     else:
                         pred = np.asarray(list(pred))
