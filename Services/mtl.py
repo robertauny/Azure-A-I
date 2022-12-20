@@ -133,6 +133,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
         dat  = pd.read_csv(fl,encoding="unicode_escape")
         # use other deep learning methods to cleanse the current data set
         cdat = nn_cleanse(inst,dat)
+        keep = cdat["dat"].copy()
         # use other deep learning methods to balance the current data set
         #
         # we will first make sure that the labels are the last column in the dataset
@@ -181,7 +182,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
-                    sdat = nn_split(pd.DataFrame(dat[:,cls].astype(np.single)))
+                    #sdat = nn_split(pd.DataFrame(dat[:,cls].astype(np.single)))
+                    sdat = nn_split(pd.DataFrame(keep[:,cls].astype(np.single)))
                     x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                     # random field theory to calculate the number of clusters to form (or classes)
                     #clust= calcN(len(dat))
@@ -237,9 +239,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # the labels in this case are just the numeric values assigned in order
                             # and the data should be closest to this label
                             #p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-upred)))
+                            #p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-upred)))
+                            #p.extend(list(abs(row-upred)).index(min(abs(row-upred))))
                             # this one works with y replaced by fit and dbnout/dbnact turned off for clust instead
-                            #p.extend(j for j,x in enumerate(upred,start=0) if abs(x-row) == min(abs(row-upred)))
+                            p.extend(j for j,x in enumerate(upred,start=0) if abs(x-row) == min(abs(row-upred)))
                         pred = np.asarray(p)
                     else:
                         pred = np.asarray(list(pred))
