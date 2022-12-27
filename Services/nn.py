@@ -963,8 +963,12 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
         # perfect square
         Nlbls= N**2
         # find the first and last label from the inferior class
+        #
+        # if label is provided as something that does not appear in
+        # the list of labels, then the entire data set will undergo
+        # this random field reduction
         albls= [j for j,x in enumerate(ret[labels]) if x == label]
-        lbls = [min(albls),max(albls)]
+        lbls = [min(albls),max(albls)] if not len(albls) == 0 else list(range(len(ret)))
         # adjust the size of the bound if this conditional is satisfied
         if lbls[0] > 0 and lbls[1] < len(ret):
             # once we have the first and last labels, we need to balance
@@ -1042,8 +1046,8 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
                         rmv.append(x)
         # for any values to be removed, then remove them and keep the rest
         lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
-        ret  = ret.to_numpy()[lbls,:]
-    return ret
+        #ret  = ret.to_numpy()[lbls if len(lbls) > 1 else rng,:]
+    return lbls#ret
 
 ############################################################################
 ##

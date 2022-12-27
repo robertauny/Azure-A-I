@@ -35,7 +35,7 @@ import constants as const
 
 from joblib                                         import Parallel,delayed
 from string                                         import punctuation
-from math                                           import ceil,log,exp,floor
+from math                                           import ceil,log,exp,floor,isnan
 from PIL                                            import ImageDraw,Image
 
 ver  = sys.version.split()[0]
@@ -97,34 +97,6 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
     # get the transfer learning data set ready for use
     tdat = pd.read_csv(flx,encoding="unicode_escape")
     cdat = nn_cleanse(inst,tdat)
-    tnhdr= cdat["nhdr"]
-    tdat = cdat["dat" ]
-    # define the inputs to the model
-    xt   = pd.DataFrame(tdat.astype(np.single),columns=np.asarray(tnhdr))
-    xt   = xt.to_numpy()
-    # pretrained model
-    #
-    # to keep the size of the model smaller while minimizing execution times
-    # the larger data set can be sampled to obtain a minimal representation
-    # of the underlying distribution while also capturing other nuances that
-    # may not be present in the data set at one source
-    #
-    # to accomplish this, we will assume that the data are normally distributed
-    # and apply an order statistic ... the result is a beta distributed data set
-    # about which we can argue that its parameters can be chosen such that the
-    # resulting beta distribution is actually uniform in nature ... this follows
-    # from the Markov property (sequence of dependent random variables, one for each
-    # data source, such that successive samples capture all information about all preceding
-    # samples, and the most recent sample only depends upon its most recent predecessor)
-    #
-    # after ordering, we assume uniformity of the distribution that was sampled accordingly
-    mdlr = dbn(xt
-              ,xt
-              ,loss="mean_squared_error"
-              ,optimizer="adam"
-              ,rbmact="relu"
-              ,dbnact='relu'
-              ,dbnout=len(xt[0]))
     # files containing more data that should be cleaned and prepared
     #
     # modify this file logic if the data is being read from a DB or other source
@@ -134,21 +106,44 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
         # use other deep learning methods to cleanse the current data set
         cdat = nn_cleanse(inst,dat)
         keep = cdat["dat"].copy()
-        # use other deep learning methods to balance the current data set
+        # idea here is to auto-encode the original data set after cleansing
+        # then use the random cluster model trim the data set down to rows
+        # with a label of interest and limited rows with all other labels
         #
-        # we will first make sure that the labels are the last column in the dataset
-        col          = cdat["dat"][:,cdat["nhdr"].index("Fraud")].copy()
-        dat          = pd.DataFrame(cdat["dat"],columns=cdat["nhdr"]).drop(columns="Fraud")
-        dat["Fraud"] = col.copy()
+        # this limiting is done by projecting this data set into 2-D and
+        # representing connected vectors by the center of a connected region
+        #
+        # keep track of the labels
+        col  = cdat["dat"][:,cdat["nhdr"].index("Fraud")]
+        # the input data
+        k    = pd.DataFrame(cdat["dat"],columns=cdat["nhdr"]).astype(np.float32)
         # now use the random cluster model to trim the dataset for best sensitivity
-        cdat["dat"]  = nn_trim(dat.to_numpy(),cdat["nhdr"].index("Fraud"),"1")
-        cdat["nhdr"] = list(dat.columns)
-        # the set of returns after the cleansing
-        #
-        # header of all columns remaining (some may have been configured to be left out see constants.py)
-        nhdr = cdat["nhdr"]
-        # the data corresponding to the columns that were cleansed
-        dat  = cdat["dat" ]
+        lbls = nn_trim(k.to_numpy(),list(k.columns).index("Fraud"),1)
+        # now model the input data after it's been limited using random fields
+        kl   = k.iloc[lbls,:].drop(columns="Fraud")
+        mkl  = dbn(kl.to_numpy()
+                  ,kl.to_numpy()
+                  ,loss="mean_squared_error"
+                  ,optimizer="adam"
+                  ,rbmact="relu"
+                  ,dbnact='relu'
+                  ,dbnout=len(kl.to_numpy()[0]))
+        # now auto-encode the input data if the model is not null
+        if mkl is None:
+            print("mkl model is null.")
+            continue
+        pred            = mkl.predict(kl.to_numpy())
+        klp             = pd.DataFrame(pred,columns=kl.columns)
+        # now we will alter the rows identified in lbls
+        kla             = [kl.to_numpy()[i,list(kl.columns).index("CLICKS")] + klp.to_numpy()[i,list(klp.columns).index("CLICKS")] for i in range(min(len(kl),len(klp)))]
+        kl["CLICKS"]    = kla
+        # we should make all of these modified rows to bave the label identified in creating lbls
+        #kl["Fraud"]     = [1] * len(lbls)
+        kl["Fraud"]     = k.iloc[lbls,list(k.columns).index("Fraud")].copy()
+        # now modify the original data set
+        k.iloc[lbls,:]  = kl
+        # the header should be redefined
+        nhdr            = list(k.columns)
         # the data types of the columns in question ... these should be auto-detected
         #
         # at present, we are only concerned with continuous (floating point) and categorical (strings converted to integer)
@@ -178,15 +173,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     fns1 = const.constants.SEP.join([nhdr[i].translate(str.maketrans("","",punctuation)).replace(" ",const.constants.SEP).lower() for i in cols])
                     fns  = nhdr[col] + const.constants.SEP + fns1
                     # just skip this permutation if unable to fix the data
-                    if type("") in utils.sif(dat[:,cls].astype(str).flatten()):
+                    if type("") in utils.sif(k.to_numpy()[:,cls].astype(str).flatten()):
                         print("Not enough clean data to fix other data issues.")
                         break
                     # define the inputs to the model
-                    #sdat = nn_split(pd.DataFrame(dat[:,cls].astype(np.single)))
-                    sdat = nn_split(pd.DataFrame(keep[:,cls].astype(np.single)))
+                    sdat = nn_split(k.iloc[:,cls])
                     x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                     # random field theory to calculate the number of clusters to form (or classes)
-                    #clust= calcN(len(dat))
                     clust= max(2,len(unique(sdat["train"][:,0])))
                     keys = {}
                     # define the outputs of the model
@@ -200,14 +193,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     # the integer values into the real numbers between 0 and 1
                     model= dbn(x.to_numpy()
                               ,y
-                              #,fit
                               ,sfl=sfl
-                              ,encs=[Dense(len(xt[0]),input_shape=(len(cols ),),activation='relu')
-                                    ,mdlr
-                                    ,Dense(len(cols ),input_shape=(len(xt[0]),),activation='relu')]
                               ,clust=clust)
-                              #,dbnact="sigmoid"
-                              #,dbnout=1)
                     # first model is a classifier that will be passed into the next model that will do the clustering
                     # then once centroids are known, any predictions will be relative to those centroids
                     #model= clustering(model,clust)
@@ -228,21 +215,14 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     pred = model.predict(sdat["test"][:,1:])
                     #pred = model.predict(x)
                     if len(np.asarray(pred).shape) > 1:
-                        upred= np.sort(unique(sdat["test"][:,0].astype(np.int8)))
+                        #upred= np.sort(unique(sdat["test"][:,0].astype(np.int8)))
                         p    = []
                         for row in list(pred):
                             # start = 1 makes labels begin with 1, 2, ...
-                            #p.extend(j for j,x in enumerate(row,start=1) if x == max(row))
-                            #p.extend(j for j,x in enumerate(row,start=0) if abs(x) == max(abs(row)))
-                            #p.extend(j for j,x in enumerate(row,start=0) if abs(x) == min(abs(row)))
                             # in clustering, we find the centroids furthest from the center of all data
                             # the labels in this case are just the numeric values assigned in order
                             # and the data should be closest to this label
-                            #p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                            #p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-upred)))
-                            #p.extend(list(abs(row-upred)).index(min(abs(row-upred))))
-                            # this one works with y replaced by fit and dbnout/dbnact turned off for clust instead
-                            p.extend(j for j,x in enumerate(upred,start=0) if abs(x-row) == min(abs(row-upred)))
+                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
                         pred = np.asarray(p)
                     else:
                         pred = np.asarray(list(pred))
