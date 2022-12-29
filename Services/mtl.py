@@ -106,44 +106,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
         # use other deep learning methods to cleanse the current data set
         cdat = nn_cleanse(inst,dat)
         keep = cdat["dat"].copy()
-        # idea here is to auto-encode the original data set after cleansing
-        # then use the random cluster model trim the data set down to rows
-        # with a label of interest and limited rows with all other labels
-        #
-        # this limiting is done by projecting this data set into 2-D and
-        # representing connected vectors by the center of a connected region
-        #
-        # keep track of the labels
-        col  = cdat["dat"][:,cdat["nhdr"].index("Fraud")]
         # the input data
         k    = pd.DataFrame(cdat["dat"],columns=cdat["nhdr"]).astype(np.float32)
-        # now use the random cluster model to trim the dataset for best sensitivity
-        lbls = nn_trim(k.to_numpy(),list(k.columns).index("Fraud"),1)
-        # now model the input data after it's been limited using random fields
-        kl   = k.iloc[lbls,:].drop(columns="Fraud")
-        mkl  = dbn(kl.to_numpy()
-                  ,kl.to_numpy()
-                  ,loss="mean_squared_error"
-                  ,optimizer="adam"
-                  ,rbmact="relu"
-                  ,dbnact='relu'
-                  ,dbnout=len(kl.to_numpy()[0]))
-        # now auto-encode the input data if the model is not null
-        if mkl is None:
-            print("mkl model is null.")
-            continue
-        pred            = mkl.predict(kl.to_numpy())
-        klp             = pd.DataFrame(pred,columns=kl.columns)
-        # now we will alter the rows identified in lbls
-        kla             = [kl.to_numpy()[i,list(kl.columns).index("CLICKS")] + klp.to_numpy()[i,list(klp.columns).index("CLICKS")] for i in range(min(len(kl),len(klp)))]
-        kl["CLICKS"]    = kla
-        # we should make all of these modified rows to bave the label identified in creating lbls
-        #kl["Fraud"]     = [1] * len(lbls)
-        kl["Fraud"]     = k.iloc[lbls,list(k.columns).index("Fraud")].copy()
-        # now modify the original data set
-        k.iloc[lbls,:]  = kl
         # the header should be redefined
-        nhdr            = list(k.columns)
+        nhdr = list(k.columns)
         # the data types of the columns in question ... these should be auto-detected
         #
         # at present, we are only concerned with continuous (floating point) and categorical (strings converted to integer)
@@ -178,112 +144,122 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
-                    # random field theory to calculate the number of clusters to form (or classes)
-                    clust= max(2,len(unique(sdat["train"][:,0])))
-                    keys = {}
-                    # define the outputs of the model
-                    fit  = sdat["train"][:,0].astype(np.int8)
-                    y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
-                    # main model
-                    #
-                    # categorical column and classification prediction
-                    #
-                    # add some layers to the standard dbn for clustering to embed
-                    # the integer values into the real numbers between 0 and 1
-                    model= dbn(x.to_numpy()
-                              ,y
-                              ,sfl=sfl
-                              ,clust=clust)
-                    # first model is a classifier that will be passed into the next model that will do the clustering
-                    # then once centroids are known, any predictions will be relative to those centroids
-                    #model= clustering(model,clust)
-                    if model is None:
-                        print("Model is null.")
+                    # now use the random cluster model to trim the dataset for best sensitivity
+                    lbls = nn_trim(sdat["train"],0,1)
+                    nlbls= [i for i in range(len(sdat["train"])) if i not in lbls]
+                    label= [nlbls,lbls]
+                    mdls = []
+                    for s in label:
+                        x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
+                        # random field theory to calculate the number of clusters to form (or classes)
+                        clust= max(2,len(unique(sdat["train"][s,0])))
+                        keys = {}
+                        # define the outputs of the model
+                        fit  = sdat["train"][s,0].astype(np.int8)
+                        y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
+                        # main model
+                        #
+                        # categorical column and classification prediction
+                        #
+                        # add some layers to the standard dbn for clustering to embed
+                        # the integer values into the real numbers between 0 and 1
+                        model= dbn(x.to_numpy()
+                                  ,y
+                                  ,sfl=sfl
+                                  ,clust=clust)
+                        # first model is a classifier that will be passed into the next model that will do the clustering
+                        # then once centroids are known, any predictions will be relative to those centroids
+                        #model= clustering(model,clust)
+                        if not model is None:
+                            mdls.append(model)
+                    if len(mdls) == 0:
+                        print("Models are null.")
                         break
-                    # save the model
-                    mdir = foldm + "/" + fns + "/"
-                    if not os.path.exists(mdir):
-                        os.makedirs(mdir,exist_ok=True)
-                    fnm  = mdir + fns + ".h5"
-                    model.save(fnm)
-                    # get some predictions using the same input data since this
-                    # is just for simulation to produce graphics
-                    #
-                    # yet note that for markov processes of time series, the last prediction
-                    # is the next value in the time series
-                    pred = model.predict(sdat["test"][:,1:])
-                    #pred = model.predict(x)
-                    if len(np.asarray(pred).shape) > 1:
-                        #upred= np.sort(unique(sdat["test"][:,0].astype(np.int8)))
-                        p    = []
-                        for row in list(pred):
-                            # start = 1 makes labels begin with 1, 2, ...
-                            # in clustering, we find the centroids furthest from the center of all data
-                            # the labels in this case are just the numeric values assigned in order
-                            # and the data should be closest to this label
-                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                        pred = np.asarray(p)
-                    else:
-                        pred = np.asarray(list(pred))
-                    # stack the recent predictions with the original inputs
-                    if len(pred) == len(sdat["test"]):
-                        preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"][:,1:]))
-                    else:
-                        print("Prediction length doesn't match input data length.")
-                        break
-                    # produce some output
-                    if len(preds) > 0:
-                        idir = foldi + "/" + fns + "/"
-                        if not os.path.exists(idir):
-                            os.makedirs(idir,exist_ok=True)
-                        fn   = idir + fns + const.constants.SEP 
-                        # we need a data frame for the paired and categorial plots
-                        df   = pd.DataFrame(preds,columns=np.asarray(nhdr)[cls])
-                        # get the paired plots and save them
-                        utils.utils._pair(             df,fn+"grid.png",nhdr[col])
-                        # x label
-                        if len(x.to_numpy()[0]) > 1:
-                            xlbl = "Enumeration of " + fns1 + " values"
+                    # now use the random cluster model to trim the dataset for best sensitivity
+                    lbls = nn_trim(sdat["test"],0,1)
+                    nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
+                    label= [nlbls,lbls]
+                    preds= None
+                    for i in range(len(label)):
+                        # get some predictions using the same input data since this
+                        # is just for simulation to produce graphics
+                        #
+                        # yet note that for markov processes of time series, the last prediction
+                        # is the next value in the time series
+                        pred = mdls[i].predict(sdat["test"][label[i],1:])
+                        if len(np.asarray(pred).shape) > 1:
+                            p    = []
+                            for row in list(pred):
+                                # start = 1 makes labels begin with 1, 2, ...
+                                # in clustering, we find the centroids furthest from the center of all data
+                                # the labels in this case are just the numeric values assigned in order
+                                # and the data should be closest to this label
+                                p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                            pred = np.asarray(p)
                         else:
-                            xlbl = x.columns[0]
-                        # forecast plot with an extra element to account for the
-                        # markov property allowing the element to be a prediction
-                        # based on the last set of inputs
-                        x11  = pd.Series(list(range(1,len(pred)+1+1)),name=xlbl)
-                        # add the markov prediction for the last element in the time series
-                        x2   = pd.Series(np.append(sdat["test"][:,0],pred[-1]),name=nhdr[col]+" Values")
-                        # get the swarm plots of the classification
-                        utils.utils._swarm(        x11,x2,fn+"class.png",nhdr[col])
-                        # these plots only work for binary classifications
-                        if clust == 2:
-                            # get the roc
-                            utils.utils._roc(      sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"roc.png")
-                            # get the precision vs recall
-                            utils.utils._pvr(      sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"pvr.png")
-                        # get the precision, recall, f-score
-                        utils.utils._prf(          sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"prf.txt")
-                        # get the confusion matrix
-                        utils.utils._confusion(    sdat["test"][:,0].astype(np.int8),pred.astype(np.int8),fn+"cnf.png")
-                        # regression plot
-                        utils.utils._joint(            x11,x2,[-10,2*len(pred)],[0.5*min(sdat["test"][:,0] ),1.5*max(sdat["test"][:,0] )],fn+"forecast.png",nhdr[col])
-                        # other plots to show that the built model is markovian
-                        # since it will (hopefully) be shown that the errors are
-                        # normally distributed
-                        #
-                        # recall that the typical linear model of an assumed normally
-                        # distributed sample (central limit theorem) is the sum of a
-                        # deterministic hyperplane (as a lower dimensional subspace of
-                        # the sample space) plus normally distributed noise ... it's this
-                        # noise that we will show graphically, lending credence to the
-                        # gaussian distributed sample
-                        #
-                        # in addition, recall that the simplest markov model is the sum of
-                        # a measured start point, plus gaussian white noise that accumulates
-                        # at each time step, requiring that each new measurement only depends
-                        # on the last measurement plus more additive noise
-                        #
-                        # residual errors (noise)
-                        res  = pred - np.asarray(list(sdat["test"][:,0]))
-                        # fit vs residuals plot
-                        utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")
+                            pred = np.asarray(list(pred))
+                        # stack the recent predictions with the original inputs
+                        if len(pred) == len(label[i]):
+                            prds = np.hstack((pred.reshape((len(pred),1)),sdat["test"][label[i],:]))
+                        else:
+                            print("Prediction length doesn't match input data length.")
+                            break
+                        preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
+                        # produce some output
+                        if len(preds) > 0:
+                            pred0= preds[:,0]
+                            pred1= preds[:,1]
+                            idir = foldi + "/" + fns + "/"
+                            if not os.path.exists(idir):
+                                os.makedirs(idir,exist_ok=True)
+                            fn   = idir + fns + const.constants.SEP 
+                            # we need a data frame for the paired and categorial plots
+                            df         = pd.DataFrame(preds).drop(columns=1)
+                            df.columns = np.asarray(nhdr)[cls]
+                            # get the paired plots and save them
+                            utils.utils._pair(             df,fn+"grid.png",nhdr[col])
+                            # x label
+                            if len(x.to_numpy()[0]) > 1:
+                                xlbl = "Enumeration of " + fns1 + " values"
+                            else:
+                                xlbl = x.columns[0]
+                            # forecast plot with an extra element to account for the
+                            # markov property allowing the element to be a prediction
+                            # based on the last set of inputs
+                            x11  = pd.Series(list(range(1,len(pred0)+1+1)),name=xlbl)
+                            # add the markov prediction for the last element in the time series
+                            x2   = pd.Series(np.append(pred1,pred0[-1]),name=nhdr[col]+" Values")
+                            # get the swarm plots of the classification
+                            utils.utils._swarm(        x11,x2,fn+"class.png",nhdr[col])
+                            # these plots only work for binary classifications
+                            if clust == 2:
+                                # get the roc
+                                utils.utils._roc(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"roc.png")
+                                # get the precision vs recall
+                                utils.utils._pvr(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"pvr.png")
+                            # get the precision, recall, f-score
+                            utils.utils._prf(          pred1.astype(np.int8),pred0.astype(np.int8),fn+"prf.txt")
+                            # get the confusion matrix
+                            utils.utils._confusion(    pred1.astype(np.int8),pred0.astype(np.int8),fn+"cnf.png")
+                            # regression plot
+                            utils.utils._joint(            x11,x2,[-10,2*len(pred0)],[0.5*min(pred1 ),1.5*max(pred1 )],fn+"forecast.png",nhdr[col])
+                            # other plots to show that the built model is markovian
+                            # since it will (hopefully) be shown that the errors are
+                            # normally distributed
+                            #
+                            # recall that the typical linear model of an assumed normally
+                            # distributed sample (central limit theorem) is the sum of a
+                            # deterministic hyperplane (as a lower dimensional subspace of
+                            # the sample space) plus normally distributed noise ... it's this
+                            # noise that we will show graphically, lending credence to the
+                            # gaussian distributed sample
+                            #
+                            # in addition, recall that the simplest markov model is the sum of
+                            # a measured start point, plus gaussian white noise that accumulates
+                            # at each time step, requiring that each new measurement only depends
+                            # on the last measurement plus more additive noise
+                            #
+                            # residual errors (noise)
+                            res  = pred0 - np.asarray(list(pred1))
+                            # fit vs residuals plot
+                            utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")

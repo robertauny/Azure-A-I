@@ -872,10 +872,81 @@ def nn_split(pfl=None,mfl=None):
 
 ############################################################################
 ##
+## Purpose:   Random field similarity measure for 2 vectors
+##
+############################################################################
+def nn_similarity(vec1=[],vec2=[]):
+    # at this point things get really interesting
+    #
+    # until now we have relied upon the states (labels) to
+    # determine which neighboring sites are correlated with each
+    # center was we proceed through the NxN bounded region but
+    # without those labels we still need a way to determine correlation
+    #
+    # recall that there is a canonical projection of the higher dimensional
+    # data into the 2-D bounded region, with each of the vectors at sites
+    # in the 2-D bounded region having an orientation and spin, which is what
+    # can be used to determine correlation
+    #
+    # given any 2 vectors, there's a plane containing those vectors and we
+    # can determine their relative correlation by measuring the angle between
+    # the 2 vectors
+    # 
+    # recall that the cosine of the angle between 2 vectors is proportional to
+    # the dot product ... thus we can compute their dot product and use it as the
+    # argument to the arccosine to get the angle between
+    #
+    # now the closer the angle is to being 0 or 180 degrees, the greater the correlation
+    # as such we will consider vectors to be correlated if the angle gebtween them is
+    # within 45 degrees of 0 or 180 ... i.e. between
+    #
+    # 0 and 45 ... 135 and 180 ... 180 and 225 ... 315 and 360
+    #
+    # now note also that in random field theory, the boundary of the 2-D region contains all
+    # of the information about sites external to the bounded region and even tho we have exactly
+    # one realizing distribution whenever all sites external to the bounded region have one state
+    # from the set of all possible states (without regard to which state open or closed is used)
+    # then in the case of a set of data with a dominant class where most sites external to the bounded
+    # region have states from the dominant class, then we likely have a realizing global distribution
+    # that can be found with a deep learner
+    #
+    # in addition, sites external to the bounded region have the same state but it is still
+    # worth while to learn its distribution since each row of data corresponding to a site
+    # has a spin and orientation that can be learned in association with a corresponding label
+    # for predicting what's external to the bounded region
+    #
+    # furthermore, when learning the conditional distribution of states in the bounded region
+    # given states on external sites, the bounded region is fully connected almost surely
+    # which is not to say that all sites in the bounded region have the same state, but we are
+    # able to find a path of connected sites such that we can traverse the bounded region almost surely
+    #
+    # as such, if all sites external to the bounded region have the same state almost surely (say 0 = closed)
+    # and the bounded region can be traversed, then the interior of the bounded region contains sites with
+    # states (1 = open) almost surely ... and this is what we modeled when finding the bounded region using labels
+    #
+    # it is now clear that to model a distribution of data with a dominant class and minority class then we
+    # require 2 models, one to recognize what spin and orientation constitutues a zero state and the other to model
+    # the interior of a bounded region that can contain any state (0 or 1, with predominantly 1) since we can traverse
+    # the bounded region almost surely
+    # the interior labels
+    ret  = False
+    if (type(vec1) in [type([]),type(np.asarray([]))] and len(vec1) > 0) and \
+       (type(vec2) in [type([]),type(np.asarray([]))] and len(vec2) > 0):
+        pi   = np.arccos(-1.0)
+        sim  = np.arccos(np.dot(vec1,vec2))
+        if (sim >= 0.0        and sim <      pi/4.0) or \
+           (sim >= 3.0*pi/4.0 and sim <      pi    ) or \
+           (sim >=     pi     and sim <  5.0*pi/4.0) or \
+           (sim >  7.0*pi/4.0 and sim <= 2.0*pi    ):
+            ret  = True
+    return ret
+
+############################################################################
+##
 ## Purpose:   Trim the data using random field/cluster theory
 ##
 ############################################################################
-def nn_trim(dat=[],labels=0,label=1,order=False):
+def nn_trim(dat=[],labels=None,label=None,order=False):
     # devising a way using mathematics to limit the dominant class of an
     # imbalanced data set so that models show greater sensitivity when
     # predicting the label of an inferior class
@@ -937,9 +1008,8 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
     #
     # to find the bound, we compute the row containing the first and last rows corresponding
     # to the first and last labels from the inferior class
-    ret  = np.asarray(dat)
-    if type(ret) == type(np.asarray([])) and len(ret) > 0 and type(labels) == type(0) and labels >= 0 and labels <= len(ret[0]):
-        ret  = pd.DataFrame(ret)
+    if type(dat) == type(np.asarray([])) and len(dat) > 0:
+        ret  = pd.DataFrame(dat)
         # if the data should be sorted as requested
         if order:
             ret  = ret.sort_values(by=list(ret.columns))
@@ -962,92 +1032,162 @@ def nn_trim(dat=[],labels=0,label=1,order=False):
         N    = int(sqrt(len(ret)))
         # perfect square
         Nlbls= N**2
-        # find the first and last label from the inferior class
-        #
-        # if label is provided as something that does not appear in
-        # the list of labels, then the entire data set will undergo
-        # this random field reduction
-        albls= [j for j,x in enumerate(ret[labels]) if x == label]
-        lbls = [min(albls),max(albls)] if not len(albls) == 0 else list(range(len(ret)))
-        # adjust the size of the bound if this conditional is satisfied
-        if lbls[0] > 0 and lbls[1] < len(ret):
-            # once we have the first and last labels, we need to balance
-            # out the bound so that we have a square sub-region contained in the
-            # original NxN 2-D space
+        if type(labels) == type(0) and labels >= 0 and labels <= len(ret[0]):
+            # find the first and last label from the inferior class
             #
-            # due to invariance (shifting the bound horizontally or vertically), we
-            # don't need to be concerned whether the bound is centered in the 2-D space
+            # if label is provided as something that does not appear in
+            # the list of labels, then the entire data set will undergo
+            # this random field reduction
+            albls= [j for j,x in enumerate(ret[labels]) if x == label]
+            lbls = [min(albls),max(albls)] if not len(albls) == 0 else [0,len(ret)]
+            # adjust the size of the bound if this conditional is satisfied
+            if lbls[0] > 0 and lbls[1] < len(ret):
+                # once we have the first and last labels, we need to balance
+                # out the bound so that we have a square sub-region contained in the
+                # original NxN 2-D space
+                #
+                # due to invariance (shifting the bound horizontally or vertically), we
+                # don't need to be concerned whether the bound is centered in the 2-D space
+                #
+                # as such we can just calculate the number of rows obtained by the difference
+                # in lbls values and add 1 to the square root if the difference is not a
+                # perfect square
+                N    = int(sqrt(lbls[1]-lbls[0]))
+                # the number of rows corresponding to vectors in our 2-D bound is the square of Nlbls
+                Nlbls= N**2
+                # make an adjustment to the label ranges to form our data set range of rows
+                #
+                # note ... by uniformity and translation invariance we can limit the size even further
+                # the ending labels corresponding rows that should be included in our data set
+                # reset the lbls start and end row numbers for creating the bound
+                lbls[1] = min(lbls[0]+Nlbls,len(ret))
+            # now we will use random field theory to reduce the size of the data set
+            # in essence, we will find and remove all labels in the dominant class
+            # that are fully connected to each of its neighbors while paying close
+            # attention to those labels that exist in the boundary of the bounded region
             #
-            # as such we can just calculate the number of rows obtained by the difference
-            # in lbls values and add 1 to the square root if the difference is not a
-            # perfect square
-            N    = int(sqrt(lbls[1]-lbls[0]))
-            # the number of rows corresponding to vectors in our 2-D bound is the square of Nlbls
-            Nlbls= N**2
-            # make an adjustment to the label ranges to form our data set range of rows
+            # for each label not in the inferior class identified by "label", check its
+            # neighbors in the NxN bounded region to see if the same state exists on those
+            # neighboring sites ... if yes, then we can delete the row of data corresponding
+            # to this 2-D vector
             #
-            # note ... by uniformity and translation invariance we can limit the size even further
-            # the ending labels corresponding rows that should be included in our data set
-            # reset the lbls start and end row numbers for creating the bound
-            lbls[1] = min(lbls[0]+Nlbls,len(ret))
-        # now we will use random field theory to reduce the size of the data set
-        # in essence, we will find and remove all labels in the dominant class
-        # that are fully connected to each of its neighbors while paying close
-        # attention to those labels that exist in the boundary of the bounded region
-        #
-        # for each label not in the inferior class identified by "label", check its
-        # neighbors in the NxN bounded region to see if the same state exists on those
-        # neighboring sites ... if yes, then we can delete the row of data corresponding
-        # to this 2-D vector
-        #
-        # normally in the random field set up we are concerned with fully connected clusters
-        # but note that we have an abundance of data having labels not belonging to the inferior
-        # class and we want to limit this data set
-        #
-        # thus we will find connections amongst data rows with labels not in the inferior
-        # class and remove them, while keeping all rows with labels from the inferior class
-        # and any neighbors with labels from all other classes that form closed edges with
-        # its neighbors from the inferior class ... these will be "transitions" that we 
-        # want to maintain in our data set
-        #
-        # at the end of this process we will have separated clusters of common labeled rows
-        #
-        # another thing to notice in kind of a thought experiment is making the analogy of
-        # rows of data corresponding to the inferior class label as being visible matter
-        # with all other labels corresponding to other matter ... then as we make connections
-        # and eliminate fully connected rows of data as determined by its label and those of its
-        # neighbors we are actually drawing other areas of "space" together (kind of creating a
-        # singularity) whereby clusters of inferior labels are closer together with separation
-        # being provided by the remaining other labels in between
-        #
-        # start considering labels in the boundary of the NxN 2-D region then work to the interior
-        # we need to keep the labels in the boundary of the 2-D region contains information about
-        # all of the labels external to the bounded region ... this is by the Markov property
-        # thus we move on to interior labels
-        rmv  = []
-        rng  = list(range(lbls[0],lbls[1]))
-        for j,x in enumerate(rng):
-            # these are boundary elements to the left and right of the interior
-            if (j+1) % N in [0,1]:
-                continue
-            else:
-                # these are the boundary elements at the top and bottom
-                # not including those elements that are also to the left
-                # and right (in the corners)
-                if j in range(0,N) or j in range(len(rng)-N,len(rng)):
+            # normally in the random field set up we are concerned with fully connected clusters
+            # but note that we have an abundance of data having labels not belonging to the inferior
+            # class and we want to limit this data set
+            #
+            # thus we will find connections amongst data rows with labels not in the inferior
+            # class and remove them, while keeping all rows with labels from the inferior class
+            # and any neighbors with labels from all other classes that form closed edges with
+            # its neighbors from the inferior class ... these will be "transitions" that we 
+            # want to maintain in our data set
+            #
+            # at the end of this process we will have separated clusters of common labeled rows
+            #
+            # another thing to notice in kind of a thought experiment is making the analogy of
+            # rows of data corresponding to the inferior class label as being visible matter
+            # with all other labels corresponding to other matter ... then as we make connections
+            # and eliminate fully connected rows of data as determined by its label and those of its
+            # neighbors we are actually drawing other areas of "space" together (kind of creating a
+            # singularity) whereby clusters of inferior labels are closer together with separation
+            # being provided by the remaining other labels in between
+            #
+            # start considering labels in the boundary of the NxN 2-D region then work to the interior
+            # we need to keep the labels in the boundary of the 2-D region contains information about
+            # all of the labels external to the bounded region ... this is by the Markov property
+            # thus we move on to interior labels
+            rmv  = []
+            rng  = list(range(lbls[0],lbls[1]))
+            for j,x in enumerate(rng):
+                # these are boundary elements to the left and right of the interior
+                if (j+1) % N in [0,1]:
                     continue
                 else:
-                    # the interior labels
-                    if ret[labels][x] == ret[labels][x+1] and \
-                       ret[labels][x] == ret[labels][x-1] and \
-                       ret[labels][x] == ret[labels][x+N] and \
-                       ret[labels][x] == ret[labels][x-N]:
-                        # completely connected site so remove the label
-                        rmv.append(x)
+                    # these are the boundary elements at the top and bottom
+                    # not including those elements that are also to the left
+                    # and right (in the corners)
+                    if j in range(0,N) or j in range(len(rng)-N,len(rng)):
+                        continue
+                    else:
+                        if type(label) is not type(None):
+                            # the interior labels
+                            if ret[labels][x] == ret[labels][x+1] and \
+                               ret[labels][x] == ret[labels][x-1] and \
+                               ret[labels][x] == ret[labels][x+N] and \
+                               ret[labels][x] == ret[labels][x-N]:
+                                # completely connected site so remove the label
+                                rmv.append(x)
+                        else:
+                            # similarity measure using the angel between vectors
+                            if nn_similarity(ret[-labels][x],ret[-labels][x+1]) and \
+                               nn_similarity(ret[-labels][x],ret[-labels][x-1]) and \
+                               nn_similarity(ret[-labels][x],ret[-labels][x+N]) and \
+                               nn_similarity(ret[-labels][x],ret[-labels][x-N]):
+                                # completely connected site so remove the label
+                                rmv.append(x)
+        else:
+            # find the first and last label from the inferior class
+            #
+            # if label is provided as something that does not appear in
+            # the list of labels, then the entire data set will undergo
+            # this random field reduction
+            lbls = [0,len(ret)]
+            # now we will use random field theory to reduce the size of the data set
+            # in essence, we will find and remove all labels in the dominant class
+            # that are fully connected to each of its neighbors while paying close
+            # attention to those labels that exist in the boundary of the bounded region
+            #
+            # for each label not in the inferior class identified by "label", check its
+            # neighbors in the NxN bounded region to see if the same state exists on those
+            # neighboring sites ... if yes, then we can delete the row of data corresponding
+            # to this 2-D vector
+            #
+            # normally in the random field set up we are concerned with fully connected clusters
+            # but note that we have an abundance of data having labels not belonging to the inferior
+            # class and we want to limit this data set
+            #
+            # thus we will find connections amongst data rows with labels not in the inferior
+            # class and remove them, while keeping all rows with labels from the inferior class
+            # and any neighbors with labels from all other classes that form closed edges with
+            # its neighbors from the inferior class ... these will be "transitions" that we 
+            # want to maintain in our data set
+            #
+            # at the end of this process we will have separated clusters of common labeled rows
+            #
+            # another thing to notice in kind of a thought experiment is making the analogy of
+            # rows of data corresponding to the inferior class label as being visible matter
+            # with all other labels corresponding to other matter ... then as we make connections
+            # and eliminate fully connected rows of data as determined by its label and those of its
+            # neighbors we are actually drawing other areas of "space" together (kind of creating a
+            # singularity) whereby clusters of inferior labels are closer together with separation
+            # being provided by the remaining other labels in between
+            #
+            # start considering labels in the boundary of the NxN 2-D region then work to the interior
+            # we need to keep the labels in the boundary of the 2-D region contains information about
+            # all of the labels external to the bounded region ... this is by the Markov property
+            # thus we move on to interior labels
+            rmv  = []
+            rng  = list(range(lbls[0],lbls[1]))
+            for j,x in enumerate(rng):
+                # these are boundary elements to the left and right of the interior
+                if (j+1) % N in [0,1]:
+                    continue
+                else:
+                    # these are the boundary elements at the top and bottom
+                    # not including those elements that are also to the left
+                    # and right (in the corners)
+                    if j in range(0,N) or j in range(len(rng)-N,len(rng)):
+                        continue
+                    else:
+                        # similarity measure using the angel between vectors
+                        if nn_similarity(ret.iloc[x,:],ret.iloc[x+1,:]) and \
+                           nn_similarity(ret.iloc[x,:],ret.iloc[x-1,:]) and \
+                           nn_similarity(ret.iloc[x,:],ret.iloc[x+N,:]) and \
+                           nn_similarity(ret.iloc[x,:],ret.iloc[x-N,:]):
+                            # completely connected site so remove the label
+                            rmv.append(x)
         # for any values to be removed, then remove them and keep the rest
         lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
-        #ret  = ret.to_numpy()[lbls if len(lbls) > 1 else rng,:]
-    return lbls#ret
+    return lbls
 
 ############################################################################
 ##
