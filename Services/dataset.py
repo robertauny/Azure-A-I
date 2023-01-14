@@ -1,6 +1,7 @@
 import pandas as pd
 import numpy  as np
 import datetime
+import random
 
 import constants as const
 
@@ -53,7 +54,14 @@ clicks                          = "CLICKS"
 
 dat0                            = pd.read_csv("/mnt/data/csv/airconditioningtest.csv")
 #dat0                            = pd.read_csv("/mnt/data/csv/airconditioning.csv")
-
+coils                           = np.unique(dat0["Condenser_Coil"])
+condenser                       = [["Condenser_Coil","dt","cost"]]
+dt                              = datetime.date.today().strftime(format="%m/%d/%Y")
+for coil in coils:
+    for i in range(365*5):
+        dtt  = (datetime.datetime.strptime(dt,"%m/%d/%Y")-datetime.timedelta(days=i)).strftime(format="%m/%d/%Y")
+        condenser.append([coil,dtt,random.randrange(1000,5000)])
+pd.DataFrame(condenser).to_csv("/mnt/data/csv/condenser.csv",header=False,index=False)
 dat1                            = dat0.copy()
 dat1[sku1  ]                    = list(range(1,len(dat1)+1))
 dat1[sku2  ]                    = list(range(256,len(dat1)+256))
