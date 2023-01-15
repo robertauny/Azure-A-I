@@ -50,7 +50,7 @@ class constants():
              + (1-y_true) * K.log(1-y_pred) * CSTTN
         return -K.mean(cost,axis=-1)
     # miscellaneous constants
-    CONFIG         = "mrc.json"
+    CONFIG         = "services.json"
     TEST           = "test.json"
     BVAL           = -1
     MAX_CLUSTERS   = 100#10

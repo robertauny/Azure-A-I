@@ -58,7 +58,7 @@ coils                           = np.unique(dat0["Condenser_Coil"])
 condenser                       = [["Condenser_Coil","dt","cost"]]
 dt                              = datetime.date.today().strftime(format="%m/%d/%Y")
 for coil in coils:
-    for i in range(365*5):
+    for i in range(365*2):
         dtt  = (datetime.datetime.strptime(dt,"%m/%d/%Y")-datetime.timedelta(days=i)).strftime(format="%m/%d/%Y")
         condenser.append([coil,dtt,random.randrange(1000,5000)])
 pd.DataFrame(condenser).to_csv("/mnt/data/csv/condenser.csv",header=False,index=False)
@@ -70,8 +70,8 @@ dat6                            = dat5.merge(dat1,how="cross")
 dat9                            = dates(dat6)
 dat6                            = dat6.append(dat9,ignore_index=True)
 dat1                            = dat6.rename(columns={"Condenser_Coil_x":"Part","cost":clicks})
-dat1                            = dat1.drop(["TOn","Noise_level(db)","STAR","Ratings","Price","Image_url","Condenser_Coil_y"],axis=1)
-dat1["Power_Consumption(Watts)"]= list(map(power,dat1["Power_Consumption(Watts)"].astype(np.float64)))
+dat1                            = dat1.drop(["TOn","Noise_level","STAR","Ratings","Price","Image_url","Condenser_Coil_y"],axis=1)
+dat1["Power_Consumption(Watts)"]= list(map(power,dat1["Power_Consumption"].astype(np.float64)))
 max_dat1_copper_SKU             = max(dat1[sku2])
 vals                            = [c for c,v in enumerate(dat1["Part"]) if not v == "copper_condenser_coil"]
 dat1[sku2  ][vals]              = dat1[sku2][vals] + max_dat1_copper_SKU
@@ -91,7 +91,7 @@ dat7[sku2  ]                    = dat7[sku2] + (12*max_dat1_copper_SKU)
 dat7[clicks]                    = np.int64(dat7[clicks].astype(np.float64)*np.random.sample(size=dat7[clicks].to_numpy().shape))
 dat7["Part"]                    = list(map(lambda x: x.replace("copper_condenser_coil","copper"),dat7["Part"]))
 dat7["Part"]                    = list(map(lambda x: x.replace("aluminum_alloy_condenser_coil","aluminum"),dat7["Part"]))
-dat8                            = dat1.copy()[[cols[c] for c in range(len(cols)) if c not in [cols.index("Power_Consumption(Watts)"),cols.index("RefrigeranT")]]]
+dat8                            = dat1.copy()[[cols[c] for c in range(len(cols)) if c not in [cols.index("Power_Consumption"),cols.index("RefrigeranT")]]]
 dat8[sku2  ]                    = dat8[sku2] + (16*max_dat1_copper_SKU)
 dat8[clicks]                    = np.int64(dat8[clicks].astype(np.float64)*np.random.sample(size=dat8[clicks].to_numpy().shape))
 dat8["Part"]                    = list(map(lambda x: x.replace("copper_condenser_coil","plastic"),dat8["Part"]))

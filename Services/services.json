@@ -1,0 +1,189 @@
+{
+	"instances" : [
+		{
+			"kg" : 0,
+			"wh" : 1,
+			"src": {
+				"index" : 2,
+				"types" : {
+					"mysql"      : 0,
+					"ocr"        : 1,
+					"keyPhrases" : 2,
+					"sentiment"  : 3,
+					"glove"      : 4,
+					"ocrf"       : 5,
+					"ocri"       : 6,
+					"objd"       : 7,
+					"objs"       : 7,
+					"pill"       : 8,
+					"wiki"       : 9,
+					"main"       : 10
+				}
+			},
+			"sources" : [
+				{
+					"connection" : {
+						"app"  : "gremlin",
+						"host" : "localhost",
+						"port" : "8182",
+						"key"  : null,
+						"api"  : "gremlin",
+						"home" : "/usr/local/apache-tinkerpop-gremlin-server-3.5.2",
+						"ext"  : ".xml"
+					},
+					"special" : null
+				},
+				{
+					"connection" : {
+						"host" : "rammanmysql.mysql.database.azure.com",
+						"port" : "3306",
+						"db"   : "costcodb",
+						"acc"  : "costco@rammanmysql",
+						"key"  : "account-key",
+						"app"  : "cyber",
+						"sec"  : "true",
+						"con"  : "container-name",
+						"dirn" : "directory-name",
+						"tbl"  : "PCTCOUPONS"
+					},
+					"special" : null
+				},
+				[
+					{
+						"connection" : {
+							"host" : "localhost",
+							"port" : "3306",
+							"db"   : "cosco",
+							"tbl"  : "PCTCOUPONS"
+						},
+						"special" : "custom"
+					},
+					{
+						"connection" : {
+							"app"  : "ocr",
+							"host" : "rammancog.cognitiveservices.azure.com",
+							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "account-key",
+							"dir"  : "dir"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "keyPhrases",
+							"host" : "westus.api.cognitive.microsoft.com",
+							"api"  : "text/analytics",
+							"ver"  : "v2.1",
+							"key"  : "account-key",
+							"dir"  : "dir"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "sentiment",
+							"host" : "rammansentiment.cognitiveservices.azure.com",
+							"api"  : "text/analytics",
+							"ver"  : "v3.0-preview.1",
+							"key"  : "account-key",
+							"dir"  : "dir"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "glove",
+							"file" : [
+                                                                  "/home/robert/data/glove.6B.50d.txt",
+                                                                  "/home/robert/data/nglove.6B.50d.txt",
+                                                                  "/home/robert/data/iglove.6B.50d.txt"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "ocrf",
+							"files": [
+                                                                  "/home/robert/data/files/kg.pdf"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "read/core/asyncBatchAnalyze",
+							"host" : "rammanimg.cognitiveservices.azure.com",
+							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "account-key",
+							"files": [
+                                                                  "/home/robert/data/files/IMG_0569.jpeg",
+                                                                  "/home/robert/data/files/zyrtec.png",
+                                                                  "/home/robert/data/files/watson-795.jpg",
+                                                                  "/home/robert/data/files/IMG_0570.jpg",
+                                                                  "/home/robert/data/files/nospa.png",
+                                                                  "/home/robert/data/files/venoruton.png",
+                                                                  "/home/robert/data/files/zyrtec.jpg"
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "analyze",
+							"host" : "rammanimg.cognitiveservices.azure.com",
+							"api"  : "vision",
+							"ver"  : "v2.1",
+							"key"  : "account-key",
+							"files": [
+                                                                  "/home/robert/data/files/IMG_0569.jpeg",
+                                                                  "/home/robert/data/files/zyrtec.png",
+                                                                  "/home/robert/data/files/watson-795.jpg",
+                                                                  "/home/robert/data/files/IMG_0570.jpg",
+                                                                  "/home/robert/data/files/nospa.png",
+                                                                  "/home/robert/data/files/venoruton.png",
+                                                                  "/home/robert/data/files/zyrtec.jpg"
+                                                                 ],
+                                                        "fold" : "/home/robert/data/files/images"
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "pill",
+							"host" : "datadiscovery.nlm.nih.gov",
+							"api"  : null,
+							"user" : "28wdq5b2fsqqmdrwk28l37708",
+							"pass" : "2kgwk4pw4xpkyljhfx2r67muy9vrq56pbgxasv3fsfyaidv4ok",
+							"db"   : "crzr-uvwg",
+                                                        "sel"  : {
+                                                                  "splshape_text":"shape",
+                                                                  "splimprint"   :"imprint",
+                                                                  "splcolor_text":"color",
+                                                                  "splcolor"     :"color2",
+                                                                  "rxstring"     :"script"
+                                                                 },
+                                                        "angs" : [
+                                                                  [90,45]
+                                                                 ]
+						}
+					},
+					{
+						"connection" : {
+							"app"  : "wiki",
+							"host" : "null",
+							"api"  : "null",
+							"ver"  : "null",
+							"key"  : "null",
+							"form" : "json"
+						}
+                                        },
+					{
+						"connection" : {
+							"app"   : "main",
+							"files" : ["/home/robert/data/csv/clicks.csv"],
+							"xfile" : "/home/robert/data/csv/clicks.csv",
+							"foldi" : "/home/robert/data/images",
+							"foldm" : "/home/robert/data/models"
+						}
+                                        }
+				]
+			]
+		}
+	]
+}
