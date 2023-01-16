@@ -55,6 +55,7 @@ else:
 
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
 from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim
+from sklearn.ensemble                               import RandomForestClassifier
 
 import config
 import utils
@@ -144,72 +145,92 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    # now use the random cluster model to trim the dataset for best sensitivity
-                    lbls = nn_trim(sdat["train"],0,1)
-                    nlbls= [i for i in range(len(sdat["train"])) if i not in lbls]
-                    label= [nlbls,lbls]
-                    mdls = []
-                    for s in label:
-                        x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
-                        # random field theory to calculate the number of clusters to form (or classes)
-                        clust= max(2,len(unique(sdat["train"][s,0])))
-                        keys = {}
-                        # define the outputs of the model
-                        fit  = sdat["train"][s,0].astype(np.int8)
-                        y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
-                        # main model
-                        #
-                        # categorical column and classification prediction
-                        #
-                        # add some layers to the standard dbn for clustering to embed
-                        # the integer values into the real numbers between 0 and 1
-                        model= dbn(x.to_numpy()
-                                  ,y
-                                  ,sfl=sfl
-                                  ,clust=clust)
-                        # first model is a classifier that will be passed into the next model that will do the clustering
-                        # then once centroids are known, any predictions will be relative to those centroids
-                        #model= clustering(model,clust)
-                        if not model is None:
-                            mdls.append(model)
-                    if len(mdls) == 0:
-                        print("Models are null.")
-                        break
-                    # now use the random cluster model to trim the dataset for best sensitivity
-                    lbls = nn_trim(sdat["test"],0,1)
-                    nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
-                    label= [nlbls,lbls]
-                    preds= None
-                    for i in range(len(label)):
-                        # get some predictions using the same input data since this
-                        # is just for simulation to produce graphics
-                        #
-                        # yet note that for markov processes of time series, the last prediction
-                        # is the next value in the time series
-                        pred = mdls[i].predict(sdat["test"][label[i],1:])
-                        if len(np.asarray(pred).shape) > 1:
-                            p    = []
-                            for row in list(pred):
-                                # start = 1 makes labels begin with 1, 2, ...
-                                # in clustering, we find the centroids furthest from the center of all data
-                                # the labels in this case are just the numeric values assigned in order
-                                # and the data should be closest to this label
-                                p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                            pred = np.asarray(p)
+                    for typ in ["nn","rf"]:
+                        if typ == "nn":
+                            # now use the random cluster model to trim the dataset for best sensitivity
+                            lbls = nn_trim(sdat["train"],0,1)
+                            nlbls= [i for i in range(len(sdat["train"])) if i not in lbls]
+                            label= [nlbls,lbls]
+                            mdls = []
+                            for s in label:
+                                x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
+                                # random field theory to calculate the number of clusters to form (or classes)
+                                clust= max(2,len(unique(sdat["train"][s,0])))
+                                keys = {}
+                                # define the outputs of the model
+                                fit  = sdat["train"][s,0].astype(np.int8)
+                                y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
+                                # main model
+                                #
+                                # categorical column and classification prediction
+                                #
+                                # add some layers to the standard dbn for clustering to embed
+                                # the integer values into the real numbers between 0 and 1
+                                model= dbn(x.to_numpy()
+                                          ,y
+                                          ,sfl=sfl
+                                          ,clust=clust)
+                                # first model is a classifier that will be passed into the next model that will do the clustering
+                                # then once centroids are known, any predictions will be relative to those centroids
+                                #model= clustering(model,clust)
+                                if not model is None:
+                                    mdls.append(model)
+                            if len(mdls) == 0:
+                                print("Models are null.")
+                                break
+                            # now use the random cluster model to trim the dataset for best sensitivity
+                            lbls = nn_trim(sdat["test"],0,1)
+                            nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
+                            label= [nlbls,lbls]
+                            preds= None
+                            for i in range(len(label)):
+                                # get some predictions using the same input data since this
+                                # is just for simulation to produce graphics
+                                #
+                                # yet note that for markov processes of time series, the last prediction
+                                # is the next value in the time series
+                                pred = mdls[i].predict(sdat["test"][label[i],1:])
+                                if len(np.asarray(pred).shape) > 1:
+                                    p    = []
+                                    for row in list(pred):
+                                        # start = 1 makes labels begin with 1, 2, ...
+                                        # in clustering, we find the centroids furthest from the center of all data
+                                        # the labels in this case are just the numeric values assigned in order
+                                        # and the data should be closest to this label
+                                        p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                                    pred = np.asarray(p)
+                                else:
+                                    pred = np.asarray(list(pred))
+                                # stack the recent predictions with the original inputs
+                                if len(pred) == len(label[i]):
+                                    prds = np.hstack((pred.reshape((len(pred),1)),sdat["test"][label[i],:]))
+                                else:
+                                    print("Prediction length doesn't match input data length.")
+                                    break
+                                preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
                         else:
-                            pred = np.asarray(list(pred))
-                        # stack the recent predictions with the original inputs
-                        if len(pred) == len(label[i]):
-                            prds = np.hstack((pred.reshape((len(pred),1)),sdat["test"][label[i],:]))
-                        else:
-                            print("Prediction length doesn't match input data length.")
-                            break
-                        preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
+                            x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
+                            # random field theory to calculate the number of clusters to form (or classes)
+                            clust= max(2,len(unique(sdat["train"][:,0])))
+                            keys = {}
+                            # define the outputs of the model
+                            fit  = sdat["train"][:,0].astype(np.int8)
+                            y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
+                            rf   = RandomForestClassifier(max_depth=2,random_state=0)
+                            rf.fit(x,y)
+                            preds= rf.predict(sdat["test"][:,1:].astype(np.int8))
+                            preds= np.hstack((preds,sdat["test"][:,1:]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
                             pred1= preds[:,1]
-                            idir = foldi + "/" + fns + "/"
+                            # estimate the probability of obtaining the positive class label
+                            upred= unique(pred1.astype(np.int8))
+                            probs= list(np.zeros(len(upred)))
+                            for j in upred:
+                                prob                  = [j for i in range(len(pred1)) if pred1[i] == j]
+                                probs[upred.index(j)] = 1.0 - len(prob)/len(pred1)
+                            idir = foldi + "/" + fns + "/" + typ + "/"
                             if not os.path.exists(idir):
                                 os.makedirs(idir,exist_ok=True)
                             fn   = idir + fns + const.constants.SEP 
@@ -236,7 +257,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # get the roc
                                 utils.utils._roc(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"roc.png")
                                 # get the precision vs recall
-                                utils.utils._pvr(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"pvr.png")
+                                #utils.utils._pvr(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"pvr.png")
+                                utils.utils._pvr(      pred1.astype(np.int8),np.asarray(list(map(lambda x: probs[upred.index(x.astype(np.int8))],pred0))),fn+"pvr.png")
                             # get the precision, recall, f-score
                             utils.utils._prf(          pred1.astype(np.int8),pred0.astype(np.int8),fn+"prf.txt")
                             # get the confusion matrix
