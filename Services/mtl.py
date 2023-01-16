@@ -145,7 +145,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    for typ in ["nn","rf"]:
+                    typs = {"nn":"Random Cluster + DBN","rf":"Random Forest"}
+                    for typ in typs:
                         if typ == "nn":
                             # now use the random cluster model to trim the dataset for best sensitivity
                             lbls = nn_trim(sdat["train"],0,1)
@@ -238,7 +239,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             df         = pd.DataFrame(preds).drop(columns=1)
                             df.columns = np.asarray(nhdr)[cls]
                             # get the paired plots and save them
-                            utils.utils._pair(             df,fn+"grid.png",nhdr[col])
+                            utils.utils._pair(             df,fn+"grid.png",typs[typ]+" Analysis of "+nhdr[col])
                             # x label
                             if len(x.to_numpy()[0]) > 1:
                                 xlbl = "Enumeration of " + fns1 + " values"
@@ -251,7 +252,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # add the markov prediction for the last element in the time series
                             x2   = pd.Series(np.append(pred1,pred0[-1]),name=nhdr[col]+" Values")
                             # get the swarm plots of the classification
-                            utils.utils._swarm(        x11,x2,fn+"class.png",nhdr[col])
+                            utils.utils._swarm(        x11,x2,fn+"class.png",nhdr[col]+" using "+typs[typ])
                             # these plots only work for binary classifications
                             if clust == 2:
                                 # get the roc
@@ -264,7 +265,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # get the confusion matrix
                             utils.utils._confusion(    pred1.astype(np.int8),pred0.astype(np.int8),fn+"cnf.png")
                             # regression plot
-                            utils.utils._joint(            x11,x2,[-10,2*len(pred0)],[0.5*min(pred1 ),1.5*max(pred1 )],fn+"forecast.png",nhdr[col])
+                            utils.utils._joint(            x11,x2,[-10,2*len(pred0)],[0.5*min(pred1 ),1.5*max(pred1 )],fn+"forecast.png",nhdr[col]+" using "+typs[typ])
                             # other plots to show that the built model is markovian
                             # since it will (hopefully) be shown that the errors are
                             # normally distributed
@@ -284,4 +285,4 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # residual errors (noise)
                             res  = pred0 - np.asarray(list(pred1))
                             # fit vs residuals plot
-                            utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")
+                            utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png",typs[typ])

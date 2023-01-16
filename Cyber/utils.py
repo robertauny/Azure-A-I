@@ -134,7 +134,7 @@ def clrs(num=0):
 ## Purpose:   Visual display of variance is plotted
 ##
 ############################################################################
-def pclrs(mat=[],fl=None):
+def pclrs(mat=[],fl=None,title=None):
     ret  = {}
     if (type(mat) == type([]) or type(mat) == type(np.asarray([]))):
         if not len(mat) == 0:
@@ -148,6 +148,8 @@ def pclrs(mat=[],fl=None):
             lm   = list(np.asarray(lm).reshape((dim,dim)))
             # now to map the variance indicators to colors
             disp = sns.heatmap(pd.DataFrame(lm))#,annot=True,annot_kws={"size":16})
+            if title is not None:
+                disp.ax_.set_title(title+": Variance")
             disp.plot()
             # save the image if requested
             if type(fl) == type(""):
@@ -264,10 +266,13 @@ def pvr(tgts=[],prds=[],fl=None):
 ############################################################################
 def pair(df=None,fl=None,title=None):
     if not type(df) == type(None):
+        hue  = [t for t in title.split() if t in df.columns] \
+               if title is not None                          \
+               else title
         # pair plot of marginals
-        g    = sns.pairplot(df,hue=title)
+        g    = sns.pairplot(df,hue=hue[0] if not (hue is None or len(hue) == 0) else None)
         if type(title) == type(""):
-            g.fig.suptitle(title+" Grid of Marginals")
+            g.fig.suptitle(title+": Grid of Marginals")
         # save the image if requested
         if type(fl) == type(""):
             plt.savefig(fl)
@@ -331,18 +336,18 @@ def joint(tgts=[],prds=[],xlim=[],ylim=[],fl=None,title=None):
 ## Purpose:   Plot of fit vs residuals
 ##
 ############################################################################
-def fitVres(tgts=[],prds=[],res=[],fl=None):
+def fitVres(tgts=[],prds=[],res=[],fl=None,title=None):
     if (not (type(tgts) == type(None) or type(tgts) == type(None)))   and \
        (type(res ) == type([]) or type(res ) == type(np.asarray([]))):
         # Two plots
         fig,(ax1,ax2) = plt.subplots(ncols=2,figsize=(12,6))
         # Histogram of residuals
         sns.distplot(res,ax=ax1)
-        ax1.set_title("Histogram of Residuals")
+        ax1.set_title(title+": Histogram of Residuals")
         # Fitted vs residuals
         sns.kdeplot(tgts,prds,ax=ax2,n_levels=40,xlim=[min(tgts)-1,max(tgts)+1])
         sns.regplot(x=tgts,y=prds,scatter=False,ax=ax2)
-        ax2.set_title("Fitted vs. Actual Values")
+        ax2.set_title(title+": Fitted vs. Actual Values")
         # save the image if requested
         if type(fl) == type(""):
             plt.savefig(fl)
@@ -429,8 +434,8 @@ class utils():
     def _clrs(num=0):
         return clrs(num)
     @staticmethod
-    def _pclrs(mat=[],fl=None):
-        return pclrs(mat,fl)
+    def _pclrs(mat=[],fl=None,title=None):
+        return pclrs(mat,fl,title)
     @staticmethod
     def _roc(tgts=[],scrs=[],fl=None):
         return roc(tgts,scrs,fl)
@@ -453,8 +458,8 @@ class utils():
     def _joint(tgts=[],prds=[],xlim=[],ylim=[],fl=None,title=None):
         return joint(tgts,prds,xlim,ylim,fl,title)
     @staticmethod
-    def _fitVres(tgts=[],prds=[],res=[],fl=None):
-        return fitVres(tgts,prds,res,fl)
+    def _fitVres(tgts=[],prds=[],res=[],fl=None,title=None):
+        return fitVres(tgts,prds,res,fl,title)
     @staticmethod
     def _r2(tgts=[],prds=[],fl=None):
         return r2(tgts,prds,fl)
