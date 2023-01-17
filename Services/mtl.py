@@ -145,9 +145,9 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    typs = {"nn":"Random Cluster + DBN","rf":"Random Forest"}
+                    typs = {"nnrf":"Random Cluster + DBN","nn":"DBN","rf":"Random Forest"}
                     for typ in typs:
-                        if typ == "nn":
+                        if typ == "nnrf":
                             # now use the random cluster model to trim the dataset for best sensitivity
                             lbls = nn_trim(sdat["train"],0,1)
                             nlbls= [i for i in range(len(sdat["train"])) if i not in lbls]
@@ -217,10 +217,41 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # define the outputs of the model
                             fit  = sdat["train"][:,0].astype(np.int8)
                             y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
-                            rf   = RandomForestClassifier(max_depth=2,random_state=0)
-                            rf.fit(x,y)
-                            preds= rf.predict(sdat["test"][:,1:].astype(np.int8))
-                            preds= np.hstack((np.asarray([list(preds[i]).index(1) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
+                            if typ == "nn":
+                                # main model
+                                #
+                                # categorical column and classification prediction
+                                #
+                                # add some layers to the standard dbn for clustering to embed
+                                # the integer values into the real numbers between 0 and 1
+                                model= dbn(x.to_numpy()
+                                          ,y
+                                          ,sfl=None
+                                          ,clust=clust)
+                                # get some predictions using the same input data since this
+                                # is just for simulation to produce graphics
+                                #
+                                # yet note that for markov processes of time series, the last prediction
+                                # is the next value in the time series
+                                pred = model.predict(sdat["test"][:,1:])
+                                if len(np.asarray(pred).shape) > 1:
+                                    p    = []
+                                    for row in list(pred):
+                                        # start = 1 makes labels begin with 1, 2, ...
+                                        # in clustering, we find the centroids furthest from the center of all data
+                                        # the labels in this case are just the numeric values assigned in order
+                                        # and the data should be closest to this label
+                                        p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                                    pred = np.asarray(p)
+                                else:
+                                    pred = np.asarray(list(pred))
+                                # stack the recent predictions with the original inputs
+                                preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
+                            else:
+                                model= RandomForestClassifier(max_depth=2,random_state=0)
+                                model.fit(x,y)
+                                preds= model.predict(sdat["test"][:,1:].astype(np.int8))
+                                preds= np.hstack((np.asarray([list(preds[i]).index(1) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]

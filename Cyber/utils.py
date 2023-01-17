@@ -42,6 +42,9 @@ import tensorflow                as tf
 
 import os
 
+# set the color palette
+sns.set_palette(['#000000','#005C29'])
+
 np.random.seed(const.constants.SEED)
 tf.random.set_seed(const.constants.SEED)
 
@@ -197,7 +200,7 @@ def confusion(tgts=[],prds=[],fl=None):
             # the false and true positve rate and the threshold
             cm   = confusion_matrix(tgts,prds)
             disp = ConfusionMatrixDisplay(confusion_matrix=cm)
-            disp.plot()
+            disp.plot(cmap='Greens')
             mn   = min(min(tgts),min(prds))
             mx   = max(max(tgts),max(prds))
             #plt.axis([mn,mx,mn,mx])
