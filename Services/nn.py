@@ -1032,7 +1032,8 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
         N    = int(sqrt(len(ret)))
         # perfect square
         Nlbls= N**2
-        if type(labels) == type(0) and labels >= 0 and labels <= len(ret[0]):
+        if (type(labels) == type(0) and labels >= 0 and labels <= len(ret[0])) and \
+           (type(label ) == type(0) and label  >= 0                          ):
             # find the first and last label from the inferior class
             #
             # if label is provided as something that does not appear in
@@ -1108,81 +1109,11 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
                     if j in range(0,N) or j in range(len(rng)-N,len(rng)):
                         continue
                     else:
-                        if type(label) is not type(None):
-                            # the interior labels
-                            if ret[labels][x] == ret[labels][x+1] and \
-                               ret[labels][x] == ret[labels][x-1] and \
-                               ret[labels][x] == ret[labels][x+N] and \
-                               ret[labels][x] == ret[labels][x-N]:
-                                # completely connected site so remove the label
-                                rmv.append(x)
-                        else:
-                            # similarity measure using the angel between vectors
-                            if nn_similarity(ret[-labels][x],ret[-labels][x+1]) and \
-                               nn_similarity(ret[-labels][x],ret[-labels][x-1]) and \
-                               nn_similarity(ret[-labels][x],ret[-labels][x+N]) and \
-                               nn_similarity(ret[-labels][x],ret[-labels][x-N]):
-                                # completely connected site so remove the label
-                                rmv.append(x)
-        else:
-            # find the first and last label from the inferior class
-            #
-            # if label is provided as something that does not appear in
-            # the list of labels, then the entire data set will undergo
-            # this random field reduction
-            lbls = [0,len(ret)]
-            # now we will use random field theory to reduce the size of the data set
-            # in essence, we will find and remove all labels in the dominant class
-            # that are fully connected to each of its neighbors while paying close
-            # attention to those labels that exist in the boundary of the bounded region
-            #
-            # for each label not in the inferior class identified by "label", check its
-            # neighbors in the NxN bounded region to see if the same state exists on those
-            # neighboring sites ... if yes, then we can delete the row of data corresponding
-            # to this 2-D vector
-            #
-            # normally in the random field set up we are concerned with fully connected clusters
-            # but note that we have an abundance of data having labels not belonging to the inferior
-            # class and we want to limit this data set
-            #
-            # thus we will find connections amongst data rows with labels not in the inferior
-            # class and remove them, while keeping all rows with labels from the inferior class
-            # and any neighbors with labels from all other classes that form closed edges with
-            # its neighbors from the inferior class ... these will be "transitions" that we 
-            # want to maintain in our data set
-            #
-            # at the end of this process we will have separated clusters of common labeled rows
-            #
-            # another thing to notice in kind of a thought experiment is making the analogy of
-            # rows of data corresponding to the inferior class label as being visible matter
-            # with all other labels corresponding to other matter ... then as we make connections
-            # and eliminate fully connected rows of data as determined by its label and those of its
-            # neighbors we are actually drawing other areas of "space" together (kind of creating a
-            # singularity) whereby clusters of inferior labels are closer together with separation
-            # being provided by the remaining other labels in between
-            #
-            # start considering labels in the boundary of the NxN 2-D region then work to the interior
-            # we need to keep the labels in the boundary of the 2-D region contains information about
-            # all of the labels external to the bounded region ... this is by the Markov property
-            # thus we move on to interior labels
-            rmv  = []
-            rng  = list(range(lbls[0],lbls[1]))
-            for j,x in enumerate(rng):
-                # these are boundary elements to the left and right of the interior
-                if (j+1) % N in [0,1]:
-                    continue
-                else:
-                    # these are the boundary elements at the top and bottom
-                    # not including those elements that are also to the left
-                    # and right (in the corners)
-                    if j in range(0,N) or j in range(len(rng)-N,len(rng)):
-                        continue
-                    else:
-                        # similarity measure using the angel between vectors
-                        if nn_similarity(ret.iloc[x,:],ret.iloc[x+1,:]) and \
-                           nn_similarity(ret.iloc[x,:],ret.iloc[x-1,:]) and \
-                           nn_similarity(ret.iloc[x,:],ret.iloc[x+N,:]) and \
-                           nn_similarity(ret.iloc[x,:],ret.iloc[x-N,:]):
+                        # the interior labels
+                        if ret[labels][x] == ret[labels][x+1] and \
+                           ret[labels][x] == ret[labels][x-1] and \
+                           ret[labels][x] == ret[labels][x+N] and \
+                           ret[labels][x] == ret[labels][x-N]:
                             # completely connected site so remove the label
                             rmv.append(x)
         # for any values to be removed, then remove them and keep the rest

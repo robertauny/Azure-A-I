@@ -103,9 +103,9 @@ for d in [dat3,dat4,dat7,dat8]:
     dat10.extend(d[[cols[c] for c in range(len(cols)) if c in [cols.index("Part"),cols.index("Brand_name"),cols.index("dt"),cols.index(clicks),cols.index(sku1),cols.index(sku2)]]].values.tolist())
 dat2                     = pd.DataFrame(dat10,columns=dat2.columns)
 dat2                     = dat2[[cols[c] for c in range(len(cols)) if c in [cols.index("dt"),cols.index(clicks),cols.index(sku1),cols.index(sku2)]]]
-dat2["Fraud"]            = list(map(lambda x: 1 if x < 0.01 else 0, np.random.sample(size=dat2[clicks].to_numpy().shape)))
-#dat2["Fraud"]            = list(map(lambda x: 1 if x < 0.01 else 0, np.random.poisson(0.01,size=dat2[clicks].to_numpy().shape)))
-#dat2["Fraud"]            = list(np.random.poisson(0.01,size=dat2[clicks].to_numpy().shape))
+dat2["Fraud"]            = list(map(lambda x: 1 if x < const.constants.POIS else 0, np.random.sample(size=dat2[clicks].to_numpy().shape)))
+#dat2["Fraud"]            = list(map(lambda x: 1 if x < const.constants.POIS else 0, np.random.poisson(const.constants.POIS,size=dat2[clicks].to_numpy().shape)))
+#dat2["Fraud"]            = list(np.random.poisson(const.constants.POIS,size=dat2[clicks].to_numpy().shape))
 cols                     = list(dat2.columns)
 dat2[clicks]             = list(map(click,dat2[[cols[c] for c in range(len(cols)) if c in [cols.index(clicks),cols.index("Fraud")]]].to_numpy()))
 dat2.to_csv("/mnt/data/csv/clicks.csv",index=False)

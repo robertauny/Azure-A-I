@@ -56,8 +56,8 @@ class constants():
     MAX_CLUSTERS   = 100#10
     MAX_FEATURES   = 100 #>= 3
     MAX_SPLITS     = 10#MAX_FEATURES
-    MAX_COLS       = 10#MAX_FEATURES
-    MAX_ROWS       = 10
+    MAX_COLS       = 100#MAX_FEATURES
+    MAX_ROWS       = 100
     MAX_DIM        = 81
     V              = "vertices"
     E              = "edges"
@@ -138,6 +138,7 @@ class constants():
     MAX_ITER       = 30000
     KFOLD          = 5
     THRESH         = 0.05
+    POIS           = 0.01
     # global stem variables for some NLP
     #
     # tokenization
