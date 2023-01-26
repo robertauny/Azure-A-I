@@ -255,6 +255,18 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # these values ... in the training case, we already have this label ... in
                                 # the testing case we need estimates of the labels to estimate the boundary
                                 # before attempting the predictions of the labels (set as one in the estimate)
+                                #
+                                # another phenomenon of note is that each of the 2 models for the binary
+                                # classifier don't determine one class or the other, as they both predict
+                                # elements of either label, even when only one label is used in training, as
+                                # is the case for the outer region's model ... this actually comports with theory
+                                # since 4 classes are predicted, and this is what's seen, since each model
+                                # acts as if it's predicting 2 classes separate from the other 2 classes being
+                                # predicted by the other model
+                                #
+                                # for the future, we will want to have an energy function to which clicks will
+                                # be passed so that we can gaug the energy in the clique of sites, after which
+                                # we can sort and do the rest that comes after
                                 cliks= sdat["test"][rng,nhdr.index("CLICKS")]
                                 inds = np.argsort(cliks)
                                 samps= np.unique(np.asarray(rng)[inds[range(len(rng)-pspr+1,len(rng))]])
