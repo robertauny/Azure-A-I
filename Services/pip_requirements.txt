@@ -1,0 +1,17 @@
+#tensorflow-2.8.0-cp39-cp39-linux_x86_64.whl 
+tensorflow==2.8.0
+pdf2image
+pytesseract
+#torch-1.13.1+cpu-cp39-cp39-linux_x86_64.whl 
+torch==1.13.1
+hdbscan
+bertopic
+spacy
+textblob
+eli5
+gremlinpython
+opencv-python-headless
+imutils
+tensorflow_model_optimization
+sodapy
+pandasql
