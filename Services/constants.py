@@ -31,11 +31,6 @@ import sys
 
 ver  = sys.version.split()[0]
 
-if ver == "3.5.2":
-    import            keras.backend as K
-else:
-    import tensorflow.keras.backend as K
-
 import tensorflow as tf
 
 class constants():
@@ -44,11 +39,11 @@ class constants():
         CSTTP= 0.0
         CSTFP= 0.15
         CSTTN= 0.0
-        cost =    y_true  * K.log(  y_pred) * CSTFN \
-             +    y_true  * K.log(  y_pred) * CSTTP \
-             + (1-y_true) * K.log(1-y_pred) * CSTFP \
-             + (1-y_true) * K.log(1-y_pred) * CSTTN
-        return -K.mean(cost,axis=-1)
+        cost =    y_true  * np.log(  y_pred) * CSTFN \
+             +    y_true  * np.log(  y_pred) * CSTTP \
+             + (1-y_true) * np.log(1-y_pred) * CSTFP \
+             + (1-y_true) * np.log(1-y_pred) * CSTTN
+        return -np.mean(cost,axis=-1)
     # miscellaneous constants
     CONFIG         = "services.json"
     TEST           = "test.json"
