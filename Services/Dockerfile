@@ -106,6 +106,8 @@ COPY Services/*.py Services/*.json .
 COPY pip_requirements.txt .
 # install python modules
 RUN pip install -r pip_requirements.txt
+# copy the data file from the host to the docker working directory
+COPY Services/data/csv/aircondition*.csv Services/data/csv/condenser.csv ./data/csv
 # execution of the python module in mtl.py
 CMD python ./dataset.py
 # copy the data file from the host to the docker working directory
