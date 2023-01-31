@@ -54,7 +54,7 @@ else:
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
-from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim
+from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim,nn_energy
 from sklearn.ensemble                               import RandomForestClassifier
 
 import config
@@ -163,10 +163,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     for typ in typs:
                         if typ == "nnrf":
                             # now use the random cluster model to trim the dataset for best sensitivity
-                            lbls = nn_trim(sdat["train"],0,1)
-                            nlbls= [i for i in range(len(sdat["train"])) if i not in lbls]
-                            label= [nlbls,lbls]
-                            mdls = []
+                            lbls,_= nn_trim(sdat["train"],0,1)
+                            nlbls = [i for i in range(len(sdat["train"])) if i not in lbls]
+                            label = [nlbls,lbls]
+                            mdls  = []
                             for s in label:
                                 x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
                                 # random field theory to calculate the number of clusters to form (or classes)
@@ -267,15 +267,16 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # for the future, we will want to have an energy function to which clicks will
                                 # be passed so that we can gaug the energy in the clique of sites, after which
                                 # we can sort and do the rest that comes after
+                                #cliks= nn_energy(sdat["test"][rng,nhdr.index("CLICKS")],0,1)
                                 cliks= sdat["test"][rng,nhdr.index("CLICKS")]
                                 inds = np.argsort(cliks)
                                 samps= np.unique(np.asarray(rng)[inds[range(len(rng)-pspr+1,len(rng))]])
                                 bound= np.zeros(len(rng))
                                 bound[samps-rng[0]] = np.ones(len(samps))
                                 # end assumption above
-                                lbls = nn_trim(np.hstack((bound.reshape((len(bound),1)),sdat["test"][rng,1:])),0,1)
-                                nlbls= [i for i in range(len(rng)) if i not in lbls]
-                                label= [nlbls,lbls]
+                                lbls,_= nn_trim(np.hstack((bound.reshape((len(bound),1)),sdat["test"][rng,1:])),0,1)
+                                nlbls = [i for i in range(len(rng)) if i not in lbls]
+                                label = [nlbls,lbls]
                                 for i in range(len(label)):
                                     # get some predictions using the same input data since this
                                     # is just for simulation to produce graphics

@@ -1096,17 +1096,20 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
             # we need to keep the labels in the boundary of the 2-D region contains information about
             # all of the labels external to the bounded region ... this is by the Markov property
             # thus we move on to interior labels
+            nrgs = []
             rmv  = []
             rng  = list(range(lbls[0],lbls[1]))
             for j,x in enumerate(rng):
                 # these are boundary elements to the left and right of the interior
                 if (j+1) % N in [0,1]:
+                    nrgs.append(0)
                     continue
                 else:
                     # these are the boundary elements at the top and bottom
                     # not including those elements that are also to the left
                     # and right (in the corners)
                     if j in range(0,N) or j in range(len(rng)-N,len(rng)):
+                        nrgs.append(0)
                         continue
                     else:
                         # the interior labels
@@ -1114,11 +1117,63 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
                            ret[labels][x] == ret[labels][x-1] and \
                            ret[labels][x] == ret[labels][x+N] and \
                            ret[labels][x] == ret[labels][x-N]:
+                            # computed energy in the clique of neighbors
+                            nrg  = 0
+                            notl = [i for i in range(len(ret.columns)) if not i == labels]
+                            for i in [-1,1,-N,N]:
+                                nrg  += np.dot(ret.to_numpy()[x,notl],ret.to_numpy()[x+i,notl])
+                            nrgs.append(nrg)
                             # completely connected site so remove the label
                             rmv.append(x)
         # for any values to be removed, then remove them and keep the rest
         lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
-    return lbls
+    return lbls,nrgs
+
+############################################################################
+##
+## Purpose:   Calculate an energy function for use with random field/cluster theory
+##
+############################################################################
+def nn_energy(dat=[],labels=None,label=None,order=False,seqn=True):
+    nrgs = None
+    if type(dat) == type(np.asarray([])) and len(dat) > 0:
+        nrgs = np.zeros(len(dat))
+        ret  = pd.DataFrame(dat)
+        # if the data should be sorted as requested
+        if order:
+            ret  = ret.sort_values(by=list(ret.columns))
+        if (type(labels) == type(0) and labels >= 0 and labels <= len(ret[0])) and \
+           (type(label ) == type(0) and label  >= 0                          ):
+            if seqn:
+                rng  = range(len(ret))
+                for j in rng:
+                    # range of values containing the jth row
+                    if j-2 in rng and j+2 in rng:
+                        b    = j-2
+                        e    = j+2
+                    else:
+                        if j-1 in rng and j+3 in rng:
+                            b    = j-1
+                            e    = j+3
+                        else:
+                            if j+4 in rng:
+                                b    = 0
+                                e    = j+4
+                            else:
+                                if j-3 in rng and j+1 in rng:
+                                    b    = j-3
+                                    e    = j+1
+                                else:
+                                    if j-4 in rng:
+                                        b    = j-4
+                                        e    = len(ret)-1
+                    # add the contribution of each projected neighboring vector
+                    notl = [i for i in range(len(ret.columns)) if not i == labels]
+                    for k in [i for i in range(b,e+1) if not i == j]:
+                        nrgs[j] += np.dot(ret.to_numpy()[j,notl],ret.to_numpy()[k,notl])
+            else:
+                _,nrgs = nn_trim(dat,labels,label,order)
+    return nrgs
 
 ############################################################################
 ##
