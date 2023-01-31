@@ -267,7 +267,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # for the future, we will want to have an energy function to which clicks will
                                 # be passed so that we can gaug the energy in the clique of sites, after which
                                 # we can sort and do the rest that comes after
-                                #cliks= nn_energy(sdat["test"][rng,nhdr.index("CLICKS")],0,1)
+                                #cliks= nn_energy(sdat["test"][rng,nhdr.index("CLICKS")],0,1,False,False)
                                 cliks= sdat["test"][rng,nhdr.index("CLICKS")]
                                 inds = np.argsort(cliks)
                                 samps= np.unique(np.asarray(rng)[inds[range(len(rng)-pspr+1,len(rng))]])

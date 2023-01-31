@@ -1096,20 +1096,18 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
             # we need to keep the labels in the boundary of the 2-D region contains information about
             # all of the labels external to the bounded region ... this is by the Markov property
             # thus we move on to interior labels
-            nrgs = []
+            nrgs = list(np.zeros(len(ret)))
             rmv  = []
             rng  = list(range(lbls[0],lbls[1]))
             for j,x in enumerate(rng):
                 # these are boundary elements to the left and right of the interior
                 if (j+1) % N in [0,1]:
-                    nrgs.append(0)
                     continue
                 else:
                     # these are the boundary elements at the top and bottom
                     # not including those elements that are also to the left
                     # and right (in the corners)
                     if j in range(0,N) or j in range(len(rng)-N,len(rng)):
-                        nrgs.append(0)
                         continue
                     else:
                         # the interior labels
