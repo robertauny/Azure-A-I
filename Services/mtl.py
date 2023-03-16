@@ -54,7 +54,7 @@ else:
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
-from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim,nn_energy
+from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim
 from sklearn.ensemble                               import RandomForestClassifier
 
 import config
@@ -87,20 +87,6 @@ fls  = cfg["instances"][inst]["sources"][src][typ]["connection"]["files"]
 flx  = cfg["instances"][inst]["sources"][src][typ]["connection"]["xfile"]
 foldi= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldi"]
 foldm= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldm"]
-
-def threshold(pred):
-    if len(np.asarray(pred).shape) > 1:
-        p    = []
-        for row in list(pred):
-            # start = 1 makes labels begin with 1, 2, ...
-            # in clustering, we find the centroids furthest from the center of all data
-            # the labels in this case are just the numeric values assigned in order
-            # and the data should be closest to this label
-            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-        ret  = np.asarray(p)
-    else:
-        ret  = np.asarray(list(pred))
-    return ret
 
 # we will get the subset of data rows/columns that are all non-null
 # and make a determination of string vs. numeric
@@ -163,11 +149,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     for typ in typs:
                         if typ == "nnrf":
                             # now use the random cluster model to trim the dataset for best sensitivity
-                            lbls,_= nn_trim(sdat["train"],0,1)
-                            nlbls = [i for i in range(len(sdat["train"])) if i not in lbls]
-                            label = [nlbls,lbls]
-                            mdls  = []
+                            lbls,_ = nn_trim(sdat["train"],0,1)
+                            nlbls  = [i for i in range(len(sdat["train"])) if i not in lbls]
+                            label  = [nlbls,lbls]
+                            mdls   = []
                             for s in label:
+                                if len(s) == 0:
+                                    continue
                                 x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
                                 # random field theory to calculate the number of clusters to form (or classes)
                                 clust= max(2,len(unique(sdat["train"][s,0])))
@@ -194,104 +182,35 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 print("Models are null.")
                                 break
                             # now use the random cluster model to trim the dataset for best sensitivity
-                            #
-                            # for testing and prediction we don't have labels but this is ok
-                            # we rely upon theory from Murphy detailing the uniform nature of the distribution
-                            # after projection of the higher dimensional data to the 2-D space to estimate the
-                            # labels which are only used for determination of the boundary separating the outer
-                            # region of constant labels from the interior where the real action occurs
-                            #
-                            # thinking of the projection as an image, the outer region is opaque background out
-                            # to infinity while the finite bounded region contains separable entities for segmentation
-                            # localization, etc.
-                            #
-                            # since we are only after an estimate of the boundary then we can tailor the number
-                            # of live data points in the data set that correspond to fraud when performing the estimation
-                            # by assigning the labels to the test data
-                            #
-                            # for the next 4 lines to be valid, random field theory requires the test data set to be
-                            # uniform, which can be accomplished by order a normally distributed data set, where
-                            # the normal distribution can be assumed by the central limit theorem
-                            #
-                            # recall from the setup in the theory, to calculate the number of classes to form, we
-                            # know that the data will be uniform since the number of colors guarantees uniformity
-                            # in addition to the assumption of normality of the data followed by an order statistic
-                            # being applied ... assuming also a square lattice, we calculate the critical probability
-                            # by using unformity and counting a ratio of bounded regions that sub-divide the overall
-                            # region and equate this ratio to the known value for the critical probability of 1/2
-                            # which allows us to solve for the mean number of classes given the number of data points
-                            # in the sample
-                            #
-                            # so we can use calcN to get the number of classes and use uniformity to sample a portion
-                            # of all of the positive data points in each smaller region ... then we will get a smaller
-                            # bounded region within the larger bounded region and apply each model to the sub-divides
-                            # this will be done for each of the smaller regions and we will collect them all
-                            #
-                            # random field theory to get the mean number of classes to form
-                            crows= calcN(len(sdat["test"]))
-                            # the number of positive samples
-                            rows = ceil(len(sdat["test"])*const.constants.POIS)
-                            # the number of positive samples per class region
-                            pspr = ceil(rows/crows)
-                            # the number of samples per class region
-                            spr  = ceil(len(sdat["test"])/crows)
-                            # processing predictions for each class region
-                            preds= None
-                            for j in range(crows):
-                                rng  = list(range(j*spr,min((j+1)*spr,len(sdat["test"]))))
-                                # the metroplis algorithm works to reduce entropy among data points
-                                # in a click as the equilibrium distribution is one of minimal energy
-                                # typically this low energy state would be found as the lowest energy
-                                # values of a function that serves as the input to a normalized
-                                # exponential distribution
+                            lbls,_ = nn_trim(sdat["test"],0,1)
+                            nlbls  = [i for i in range(len(sdat["test"])) if i not in lbls]
+                            label  = [nlbls,lbls]
+                            preds  = None
+                            for i in range(len(label)):
+                                # get some predictions using the same input data since this
+                                # is just for simulation to produce graphics
                                 #
-                                # however, since our data is comprised of IP addresses (origin and dest),
-                                # clicks, date of observed clicks count and a fraud label, then the only
-                                # input to the energy function in this case will only be the clicks count
-                                #
-                                # so we simply use the counts to determine highest energy states to indicate fraud
-                                #
-                                # note that we are only estimating the boundary of the inner region using
-                                # these values ... in the training case, we already have this label ... in
-                                # the testing case we need estimates of the labels to estimate the boundary
-                                # before attempting the predictions of the labels (set as one in the estimate)
-                                #
-                                # another phenomenon of note is that each of the 2 models for the binary
-                                # classifier don't determine one class or the other, as they both predict
-                                # elements of either label, even when only one label is used in training, as
-                                # is the case for the outer region's model ... this actually comports with theory
-                                # since 4 classes are predicted, and this is what's seen, since each model
-                                # acts as if it's predicting 2 classes separate from the other 2 classes being
-                                # predicted by the other model
-                                #
-                                # for the future, we will want to have an energy function to which clicks will
-                                # be passed so that we can gaug the energy in the clique of sites, after which
-                                # we can sort and do the rest that comes after
-                                #cliks= nn_energy(sdat["test"][rng,nhdr.index("CLICKS")],0,1,False,False)
-                                cliks= sdat["test"][rng,nhdr.index("CLICKS")]
-                                inds = np.argsort(cliks)
-                                samps= np.unique(np.asarray(rng)[inds[range(len(rng)-pspr+1,len(rng))]])
-                                bound= np.zeros(len(rng))
-                                bound[samps-rng[0]] = np.ones(len(samps))
-                                # end assumption above
-                                lbls,_= nn_trim(np.hstack((bound.reshape((len(bound),1)),sdat["test"][rng,1:])),0,1)
-                                nlbls = [i for i in range(len(rng)) if i not in lbls]
-                                label = [nlbls,lbls]
-                                for i in range(len(label)):
-                                    # get some predictions using the same input data since this
-                                    # is just for simulation to produce graphics
-                                    #
-                                    # yet note that for markov processes of time series, the last prediction
-                                    # is the next value in the time series
-                                    pred = mdls[i].predict(sdat["test"][label[i],1:])
-                                    pred = threshold(pred)
-                                    # stack the recent predictions with the original inputs
-                                    if len(pred) == len(label[i]):
-                                        prds = np.hstack((pred.reshape((len(pred),1)),sdat["test"][label[i],:]))
-                                    else:
-                                        print("Prediction length doesn't match input data length.")
-                                        break
-                                    preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
+                                # yet note that for markov processes of time series, the last prediction
+                                # is the next value in the time series
+                                pred = mdls[i].predict(sdat["test"][label[i],1:])
+                                if len(np.asarray(pred).shape) > 1:
+                                    p    = []
+                                    for row in list(pred):
+                                        # start = 1 makes labels begin with 1, 2, ...
+                                        # in clustering, we find the centroids furthest from the center of all data
+                                        # the labels in this case are just the numeric values assigned in order
+                                        # and the data should be closest to this label
+                                        p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                                    pred = np.asarray(p)
+                                else:
+                                    pred = np.asarray(list(pred))
+                                # stack the recent predictions with the original inputs
+                                if len(pred) == len(label[i]):
+                                    prds = np.hstack((pred.reshape((len(pred),1)),sdat["test"][label[i],:]))
+                                else:
+                                    print("Prediction length doesn't match input data length.")
+                                    break
+                                preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
                         else:
                             x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                             # random field theory to calculate the number of clusters to form (or classes)
@@ -307,17 +226,28 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 #
                                 # add some layers to the standard dbn for clustering to embed
                                 # the integer values into the real numbers between 0 and 1
-                                model= dbn(x.to_numpy()
-                                          ,y
-                                          ,sfl=None
-                                          ,clust=clust)
+                                model= Sequential()
+                                dbnlayers(model,sdat["train"].shape[1]-1,tuple((sdat["train"].shape[1]-1,)),const.constants.RBMA,False)
+                                dbnlayers(model,clust,sdat["train"].shape[1]-1,const.constants.RBMA,False)
+                                model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
+                                model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
                                 # get some predictions using the same input data since this
                                 # is just for simulation to produce graphics
                                 #
                                 # yet note that for markov processes of time series, the last prediction
                                 # is the next value in the time series
                                 pred = model.predict(sdat["test"][:,1:])
-                                pred = threshold(pred)
+                                if len(np.asarray(pred).shape) > 1:
+                                    p    = []
+                                    for row in list(pred):
+                                        # start = 1 makes labels begin with 1, 2, ...
+                                        # in clustering, we find the centroids furthest from the center of all data
+                                        # the labels in this case are just the numeric values assigned in order
+                                        # and the data should be closest to this label
+                                        p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                                    pred = np.asarray(p)
+                                else:
+                                    pred = np.asarray(list(pred))
                                 # stack the recent predictions with the original inputs
                                 preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
                             else:
