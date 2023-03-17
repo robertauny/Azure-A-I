@@ -192,7 +192,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 #
                                 # yet note that for markov processes of time series, the last prediction
                                 # is the next value in the time series
-                                pred = mdls[i].predict(sdat["test"][label[i],1:])
+                                if not len(label[i]) == 0:
+                                    pred = mdls[i].predict(sdat["test"][label[i],1:])
+                                else:
+                                    continue
                                 if len(np.asarray(pred).shape) > 1:
                                     p    = []
                                     for row in list(pred):
