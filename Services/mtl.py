@@ -231,7 +231,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # the integer values into the real numbers between 0 and 1
                                 model= Sequential()
                                 dbnlayers(model,sdat["train"].shape[1]-1,tuple((sdat["train"].shape[1]-1,)),const.constants.RBMA,False)
-                                dbnlayers(model,clust,sdat["train"].shape[1]-1,const.constants.RBMA,False)
+                                dbnlayers(model,sdat["train"].shape[1]-1,sdat["train"].shape[1]-1,const.constants.RBMA,False)
+                                dbnlayers(model,clust,sdat["train"].shape[1]-1,"sigmoid",False)
                                 model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
                                 model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
                                 # get some predictions using the same input data since this
@@ -257,7 +258,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 model= RandomForestClassifier(max_depth=2,random_state=0)
                                 model.fit(x,y)
                                 preds= model.predict(sdat["test"][:,1:].astype(np.int8))
-                                preds= np.hstack((np.asarray([list(preds[i]).index(1) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
+                                preds= np.hstack((np.asarray([list(preds[i]).index(1 if 1 in preds[i] else 0) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
