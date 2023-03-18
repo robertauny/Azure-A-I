@@ -258,7 +258,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 model= RandomForestClassifier(max_depth=2,random_state=0)
                                 model.fit(x,y)
                                 preds= model.predict(sdat["test"][:,1:].astype(np.int8))
-                                preds= np.hstack((np.asarray([list(preds[i]).index(1 if 1 in preds[i] else 0) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
+                                preds= np.hstack((np.asarray([list(preds[i]).index(max(preds[i])) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
