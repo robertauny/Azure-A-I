@@ -58,8 +58,10 @@ import constants       as const
 
 from nn                                             import dbn
 
-if "snowflake" in const.constants.INCLUDES and \
-   "snowflake-connector-python" in const.constants.INCLUDES or "snowflake-connector-python[pandas]" in const.constants.INCLUDES:
+if hasattr(const.constants,"INCLUDES")                              and \
+   "snowflake"                          in const.constants.INCLUDES and \
+  ("snowflake-connector-python"         in const.constants.INCLUDES  or \
+   "snowflake-connector-python[pandas]" in const.constants.INCLUDES):
     import snowflake.connector
     from   snowflake.connector.pandas_tools import pd_writer
 
@@ -582,7 +584,8 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                             v1   = ret[row1-1][1]
                             v2   = ret[row2-1][1]
                             # create the edge between the vertices in question
-                            g.V(v1).has("id",ids1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",lblk/lclus).next()
+                            #g.V(v1).has("id",ids1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",lblk/lclus).next()
+                            g.V(v1).has("id",ids1).addE(const.constants.E).to(v2).property("id",ids12).property("weight",lblk/lclus).toList()
                             # add the current row1 value to the list of rows in this cluster
                             crow.append(row1)
                     # write the graph to disk
