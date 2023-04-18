@@ -179,7 +179,7 @@ class ResLayer(Layer):
         self.enc = enc
 
     def call(self):
-        nenc = Dense(list(self.enc.shape)[1],input_shape=self.enc.shape,activation='tanh' if ver == const.constants.VER else 'selu')(self.enc)
+        nenc = Dense(list(self.enc.shape)[1],input_shape=self.enc.shape,activation='relu' if ver == const.constants.VER else 'selu')(self.enc)
         model= Model(inputs=self.enc,outputs=nenc)
         return model.layers[len(model.layers)-1]
 
@@ -240,7 +240,7 @@ def dbnlayers(model=None,outp=const.constants.OUTP,shape=None,act=None,useact=Fa
             # calculate the residuals
             inp1 = Subtract()([enc1.output,enc.output])
             # auto-encode the input data using the linear unit
-            enc1 = Dense(outp,input_shape=shp,activation='tanh' if ver == const.constants.VER else 'selu')
+            enc1 = Dense(outp,input_shape=shp,activation='relu' if ver == const.constants.VER else 'selu')
             # add the input layer to the model
             model.add(enc1)
             # add the residuals to the filtered output from before we started
@@ -342,7 +342,7 @@ def dbn(inputs=[]
         if embed:
             p    = min(const.constants.MAX_FEATURES,props)#if not op.any() else min(const.constants.MAX_FEATURES,min(props,op.shape[len(op.shape)-1]))
             if M > p:
-                dbnlayers(model,p,M,'tanh' if ver == const.constants.VER else 'selu',useact)
+                dbnlayers(model,p,M,'relu' if ver == const.constants.VER else 'selu',useact)
                 M    = min(max(1,int(ceil(log(p,S)/2.0))),p)
                 # project the outputs into the lower dimensional subspace
                 #op   = np.asarray(op)[:,:(S**(2*p))]
@@ -372,7 +372,7 @@ def dbn(inputs=[]
                 #dim  = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * dim > const.constants.MAX_DIM else S * dim
                 dim  = S * dim
             # next layers using the scaled exponential linear unit (Gibbs distribution) are siblings
-            dbnlayers(model,dim,odim,'tanh' if ver == const.constants.VER else 'selu',useact)
+            dbnlayers(model,dim,odim,'relu' if ver == const.constants.VER else 'selu',useact)
             # redefine the input and output dimensions for the binary layers
             #odim = const.constants.MAX_DIM if hasattr(const.constants,"MAX_DIM") and S * odim > const.constants.MAX_DIM else S * odim
             odim = S * odim
@@ -394,7 +394,7 @@ def dbn(inputs=[]
                 dbnlayers(model,odim,dim,rbmact,useact)
             else:
                 if not (type(dbnact) == type(None) or dbnout <= 0):
-                    dbnlayers(model,odim,dim,'sigmoid',useact)
+                    dbnlayers(model,odim,dim,'relu' if ver == const.constants.VER else 'selu',useact)
                 else:
                     # add another layer to change the structure of the network if needed based on clusters
                     if not (clust <= 0):
@@ -404,9 +404,9 @@ def dbn(inputs=[]
         # add another layer for a different kind of model, such as a regression model
         if not (type(dbnact) == type(None) or dbnout <= 0):
             # preceding layers plus this layer now perform auto encoding
-            dbnlayers(model,M,odim,'tanh' if ver == const.constants.VER else 'selu',useact)
+            dbnlayers(model,M,odim,'relu' if ver == const.constants.VER else 'selu',useact)
             # requested model at the output layer of this RBM
-            dbnlayers(model,dbnout,M,dbnact,useact)
+            dbnlayers(model,dbnout,M   ,dbnact   ,useact)
         # optimize using the typical categorical cross entropy loss function with root mean square optimizer to find weights
         model.compile(loss=loss,optimizer=optimizer)
         x    = ip.astype(np.single)
@@ -712,8 +712,8 @@ def nn_dat(dat=None,tgt=1):
                   ,props=p
                   ,loss=const.constants.LOSS
                   ,optimizer=const.constants.OPTI
-                  ,rbmact='tanh'
-                  ,dbnact='tanh' if ver == const.constants.VER else const.constants.RBMA
+                  ,rbmact='relu'
+                  ,dbnact='relu' if ver == const.constants.VER else const.constants.RBMA
                   ,dbnout=p)
         assert(type(model) != type(None))
         pvals= model.predict(np.asarray(nivals).astype(np.single))
@@ -1171,6 +1171,8 @@ def nn_energy(dat=[],labels=None,label=None,order=False,seqn=True):
                         nrgs[j] += np.dot(ret.to_numpy()[j,notl],ret.to_numpy()[k,notl])
             else:
                 _,nrgs = nn_trim(dat,labels,label,order)
+        else:
+            _,nrgs = nn_trim(dat,labels,label,order)
     return nrgs
 
 ############################################################################
@@ -1237,8 +1239,8 @@ def fixdata(inst=0,dat=[],coln={}):
                               ,sfl=None
                               ,loss="mean_squared_error"
                               ,optimizer="adam"
-                              ,rbmact="tanh"
-                              ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                              ,rbmact="relu"
+                              ,dbnact='relu' if ver == const.constants.VER else 'selu'
                               ,dbnout=len(cols))
                     if not (type(model) == type(None)):
                         ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
@@ -1271,8 +1273,8 @@ def fixdata(inst=0,dat=[],coln={}):
                                           ,sfl=None
                                           ,loss="mean_squared_error"
                                           ,optimizer="adam"
-                                          ,rbmact="tanh"
-                                          ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                          ,rbmact="relu"
+                                          ,dbnact='relu' if ver == const.constants.VER else 'selu'
                                           ,dbnout=1)
                                 if not (type(model) == type(None)):
                                     ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
@@ -1466,7 +1468,7 @@ def nn_testing(M=500,N=3,pfl="/home/robert/data/csv/patients.csv",mfl="/home/rob
                    ,props=p
                    ,loss='mean_squared_error'
                    ,optimizer='sgd'
-                   ,rbmact='tanh'
+                   ,rbmact='relu'
                    ,dbnact='linear'
                    ,dbnout=1)
     return [ret,model]
