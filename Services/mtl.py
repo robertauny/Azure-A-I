@@ -163,6 +163,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     for typ in typs:
                         if typ == "nnrf":
                             # now use the random cluster model to trim the dataset for best sensitivity
+                            #
+                            # the last argument to this function is a boolean dictating whether or not
+                            # the data set should be ordered ... recall
+                            #
+                            # the original data is assumed to be gaussian by the central limit theorem
+                            # thus, when ordered the data follows a beta distribution whose parameters
+                            # can be argued to be such that the ultimate distribution is uniform
                             lbls,_= nn_trim(sdat["train"],0,1)
                             nlbls = [i for i in range(len(sdat["train"])) if i not in lbls]
                             label = [nlbls,lbls]
@@ -181,6 +188,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 #
                                 # add some layers to the standard dbn for clustering to embed
                                 # the integer values into the real numbers between 0 and 1
+                                #
+                                # from above, if ordering the input data on a prediction
+                                # gives the best results then that is more evidence that the
+                                # model of the distribution of the input data is uniform
                                 model= dbn(x.to_numpy()
                                           ,y
                                           ,sfl=sfl
@@ -267,16 +278,12 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                 # for the future, we will want to have an energy function to which clicks will
                                 # be passed so that we can gaug the energy in the clique of sites, after which
                                 # we can sort and do the rest that comes after
-                                #cliks= nn_energy(sdat["test"],0,1,False,True)
-                                #cliks= nn_energy(sdat["test"],0,1,False,False)
-                                #cliks= sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")]
-                                #cliks= nn_energy(sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")],0,1,False,False)
-                                #cliks= nn_energy(sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")],0,1,False,False)
-                                #cliks= nn_energy(sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")],0,1,False,False)
-                                #cliks= nn_energy(sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")],0,1,False,True)
                                 #cliks= nn_energy(sdat["test"][rng,[0,list(np.asarray(nhdr)[cls]).index("CLICKS")]],0,1,False,False)
                                 cliks= nn_energy(sdat["test"][rng][:,[0,list(np.asarray(nhdr)[cls]).index("CLICKS")]],0,1,False,True)
-                                #cliks= sdat["test"][rng,list(np.asarray(nhdr)[cls]).index("CLICKS")]
+                                # we order the input data on a prediction because the model of the data is uniform
+                                # which agrees with mathematical results ... thus, the input data being assumed
+                                # uniform and ultimately ordered results in a beta distribution whose parameters
+                                # can be assumed to be such that the ordered distribution is uniform
                                 inds = np.argsort(cliks)
                                 samps= np.unique(np.asarray(rng)[inds[range(len(rng)-pspr+1,len(rng))]])
                                 bound= np.zeros(len(rng))
