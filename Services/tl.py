@@ -128,8 +128,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
     # don't want to retrain the layers of the pre-trained model
     #
     # if these layers are trainable, then an error will persist
-    for layer in mdlr.layers:
-        layer.trainable=False
+    #for layer in mdlr.layers:
+        #layer.trainable=False
     # files containing more data that should be cleaned and prepared
     #
     # modify this file logic if the data is being read from a DB or other source
@@ -325,4 +325,4 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         # residual errors (noise)
                         res  = pred - np.asarray(list(sdat["test"][:,0]))
                         # fit vs residuals plot
-                        utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png")
+                        utils.utils._fitVres(          x11,x2,res,fn+"fitVres.png","")

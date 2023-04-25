@@ -39,7 +39,7 @@ if ver == const.constants.VER:
     from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
     from            keras.models                            import Sequential,load_model,Model,clone_model
     from            keras.utils.np_utils                    import to_categorical
-    from            keras.callbacks                         import ModelCheckpoint
+    from            keras.callbacks                         import ModelCheckpoint,Callback
     from            keras.preprocessing.text                import Tokenizer
     from            keras                                   import backend
     from            keras.applications                      import DenseNet121
@@ -47,7 +47,7 @@ else:
     from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
     from tensorflow.keras.models                            import Sequential,load_model,Model,clone_model
     from tensorflow.keras.utils                             import to_categorical
-    from tensorflow.keras.callbacks                         import ModelCheckpoint
+    from tensorflow.keras.callbacks                         import ModelCheckpoint,Callback
     from tensorflow.keras.preprocessing.text                import Tokenizer
     from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
     from tensorflow.keras                                   import backend
@@ -269,7 +269,8 @@ def dbn(inputs=[]
        ,embed=const.constants.EMB
        ,encs=const.constants.ENCS
        ,useact=const.constants.USEA
-       ,verbose=const.constants.VERB):
+       ,verbose=const.constants.VERB
+       ,callbacks=None):
     model= None
     if inputs.any():
         # linear stack of layers in the neural network (NN)
@@ -445,10 +446,45 @@ def dbn(inputs=[]
             # we will allow for 100 iterations through the training data set to find the best sets of weights for the layers
             # fit the model using the flattened inputs and outputs
             if ver == const.constants.VER:
-                model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose)
+                model.fit(x=x,y=y,nb_epoch =epochs,verbose=verbose,callbacks=callbacks)
             else:
-                model.fit(x=x,y=y,   epochs=epochs,verbose=verbose)
+                model.fit(x=x,y=y,   epochs=epochs,verbose=verbose,callbacks=callbacks)
     # return the model to the caller
+    return model
+
+############################################################################
+##
+## Purpose:   Generative network composed of DBNs
+##
+############################################################################
+def gan(inputs=[]
+       ,outputs=[]
+       ,sfl=None#const.constants.SFL
+       ,splits=const.constants.SPLITS
+       ,props=const.constants.PROPS
+       ,clust=const.constants.BVAL
+       ,loss=const.constants.LOSS
+       ,optimizer=const.constants.OPTI
+       ,rbmact=const.constants.RBMA
+       ,dbnact=const.constants.DBNA
+       ,dbnout=const.constants.DBNO
+       ,epochs=const.constants.EPO
+       ,embed=const.constants.EMB
+       ,encs=const.constants.ENCS
+       ,useact=const.constants.USEA
+       ,verbose=const.constants.VERB):
+    class LossHistory(Callback):
+        def on_train_begin(self,logs={}):
+            self.losses = []
+        def on_batch_end(self,batch,logs={}):
+            self.losses.append(logs.get('loss'))
+    hist = LossHistory()
+    # placeholder for now until the methodology of the GAN is defined
+    model= dbn(inputs
+              ,outputs
+              ,sfl
+              ,clust=clust
+              ,callbacks=[hist])
     return model
 
 ############################################################################
@@ -1125,7 +1161,21 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
                             rmv.append(x)
         # for any values to be removed, then remove them and keep the rest
         lbls = [i for i in rng if i not in rmv] if not len(rmv) == 0 else rng
-    return lbls,nrgs
+        # get everything not in lbls for building the learner that will
+        # predict the boundary and interior elements for other data sets
+        nlbls= [i for i in range(len(dat)) if i not in lbls]
+        # everything in the boundary and the interior will be labeled 1
+        bint       = np.zeros(len(dat))
+        bint[lbls] = np.ones(len(lbls))
+        # build the model that will predict the boundary and interior
+        # elements for other data sets and add it to the return
+        #
+        # in the future this will be a generative model based on the base dbn
+        model= gan(dat[:,[i for i in range(len(dat[0])) if not i == labels]]
+                  ,bint
+                  ,sfl=None
+                  ,clust=2)
+    return lbls,nrgs,model
 
 ############################################################################
 ##
