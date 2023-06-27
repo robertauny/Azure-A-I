@@ -131,8 +131,10 @@ if type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0:
                                   ,sfl=sfl
                                   ,loss="mean_squared_error"
                                   ,optimizer="adam"
-                                  ,rbmact="tanh"
-                                  ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                  #,rbmact="tanh"
+                                  #,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                  ,rbmact="selu"
+                                  ,dbnact='linear'
                                   ,dbnout=1)
                     else:
                         # random field theory to calculate the number of clusters to form (or classes)

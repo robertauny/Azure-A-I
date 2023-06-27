@@ -600,7 +600,8 @@ def write_kg(stem=None,inst=const.constants.BVAL,coln=[],kgdat=[],g=None,drop=Tr
                                   ,loss="mean_squared_error"
                                   ,optimizer="sgd"
                                   ,rbmact="selu"
-                                  ,dbnact="tanh"
+                                  #,dbnact="tanh"
+                                  ,dbnact="linear"
                                   ,dbnout=1)
                         # identify the file and save the data from the current cluster
                         fl   = "models/" + ret[0][0] + ".h5"

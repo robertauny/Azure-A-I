@@ -748,8 +748,10 @@ def nn_dat(dat=None,tgt=1):
                   ,props=p
                   ,loss=const.constants.LOSS
                   ,optimizer=const.constants.OPTI
-                  ,rbmact='relu'
-                  ,dbnact='relu' if ver == const.constants.VER else const.constants.RBMA
+                  #,rbmact='relu'
+                  #,dbnact='relu' if ver == const.constants.VER else const.constants.RBMA
+                  ,rbmact='selu'
+                  ,dbnact='sigmoid'
                   ,dbnout=p)
         assert(type(model) != type(None))
         pvals= model.predict(np.asarray(nivals).astype(np.single))
@@ -1289,8 +1291,10 @@ def fixdata(inst=0,dat=[],coln={}):
                               ,sfl=None
                               ,loss="mean_squared_error"
                               ,optimizer="adam"
-                              ,rbmact="relu"
-                              ,dbnact='relu' if ver == const.constants.VER else 'selu'
+                              #,rbmact="relu"
+                              #,dbnact='relu' if ver == const.constants.VER else 'selu'
+                              ,rbmact="selu"
+                              ,dbnact='sigmoid'
                               ,dbnout=len(cols))
                     if not (type(model) == type(None)):
                         ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
@@ -1323,8 +1327,10 @@ def fixdata(inst=0,dat=[],coln={}):
                                           ,sfl=None
                                           ,loss="mean_squared_error"
                                           ,optimizer="adam"
-                                          ,rbmact="relu"
-                                          ,dbnact='relu' if ver == const.constants.VER else 'selu'
+                                          #,rbmact="relu"
+                                          #,dbnact='relu' if ver == const.constants.VER else 'selu'
+                                          ,rbmact="selu"
+                                          ,dbnact='linear'
                                           ,dbnout=1)
                                 if not (type(model) == type(None)):
                                     ip1  = dat[nrow ,    :] if not (len(nrow ) == 0                 ) else []
@@ -1518,7 +1524,8 @@ def nn_testing(M=500,N=3,pfl="/home/robert/data/csv/patients.csv",mfl="/home/rob
                    ,props=p
                    ,loss='mean_squared_error'
                    ,optimizer='sgd'
-                   ,rbmact='relu'
+                   #,rbmact='relu'
+                   ,rbmact='selu'
                    ,dbnact='linear'
                    ,dbnout=1)
     return [ret,model]

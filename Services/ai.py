@@ -333,7 +333,8 @@ def brain(dat=[],splits=2,permu=[]):
                           ,loss="mean_squared_error"
                           ,optimizer="sgd"
                           ,rbmact="selu"
-                          ,dbnact="tanh"
+                          #,dbnact="tanh"
+                          ,dbnact="sigmoid"
                           ,dbnout=p)
                 # regression model
                 rfl  = "models/" + "".join(lbl.split(const.constants.SEP)) + ".h5"
@@ -943,8 +944,10 @@ def correction(dat=[],mval=1000,pcnt=0.1,lo=2):
                   ,pydat[ind]
                   ,loss='mean_squared_error'
                   ,optimizer='sgd'
-                  ,rbmact='sigmoid'
-                  ,dbnact='sigmoid'
+                  #,rbmact='sigmoid'
+                  #,dbnact='sigmoid'
+                  ,rbmact='selu'
+                  ,dbnact='linear'
                   ,dbnout=1)
         for perm in perms:
             # we only want permutations of columns that are sorted correctly

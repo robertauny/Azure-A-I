@@ -122,8 +122,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
               ,xt
               ,loss="mean_squared_error"
               ,optimizer="adam"
-              ,rbmact="tanh"
-              ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+              #,rbmact="tanh"
+              #,dbnact='tanh' if ver == const.constants.VER else 'selu'
+              ,rbmact="selu"
+              ,dbnact='sigmoid'
               ,dbnout=len(xt[0]))
     # don't want to retrain the layers of the pre-trained model
     #
@@ -199,8 +201,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                         ,Dense(len(cols ),input_shape=(len(xt[0]),),activation='tanh' if ver == const.constants.VER else 'selu')]
                                   ,loss="mean_squared_error"
                                   ,optimizer="adam"
-                                  ,rbmact="tanh"
-                                  ,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                  #,rbmact="tanh"
+                                  #,dbnact='tanh' if ver == const.constants.VER else 'selu'
+                                  ,rbmact="selu"
+                                  ,dbnact='linear'
                                   ,dbnout=1)
                     else:
                         # random field theory to calculate the number of clusters to form (or classes)
