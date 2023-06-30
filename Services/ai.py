@@ -2128,7 +2128,7 @@ def ai_graph_testing(M=500,N=3):
     s    = p
     # uniformly sample values between 0 and 1
     #ivals= np.random.sample(size=(500,3))
-    ivals= np.random.sample(size=(m,p))
+    #ivals= np.random.sample(size=(m,p))
     # test ocr
     # set the default instance number
     inst = 0
@@ -2140,6 +2140,14 @@ def ai_graph_testing(M=500,N=3):
     # glove file
     gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
     print(gfl)
+    # get the data file
+    typ  = cfg["instances"][inst]["src"]["types"]["main"]
+    # clicks file
+    dfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["xfile"]
+    df   = pd.read_csv(dfl)
+    df["dt"] = list(map(lambda x: x.replace("/",""),df["dt"]))
+    print(df["dt"])
+    ivals= df.to_numpy()[:,[4,0,1]].astype(np.float64)
     # create the data for the sample knowledge graph
     #
     # create columns names (normally obtained by var.dtype.names)
@@ -2182,10 +2190,11 @@ def ai_graph_testing(M=500,N=3):
     nvals= np.hstack((nvs,nvs1))
     print(nvals[:,0])
     # create column names (normally obtained by var.dtype.names)
-    coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    #coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    coln = {df.columns[i-1]:(i-1) for i in range(1,len(ivals[0])+1)}
     print(coln); print(coln.items()); print(list(coln.items()))
     # create the data for the sample knowledge graph
-    kgdat= create_kg(0,ivals,s,limit=True)
+    kgdat= create_kg(0,ivals,s,limit=True,permu=[[0,1,2]])
     print(kgdat[0])
     # instantiate a JanusGraph object
     graph= Graph()
