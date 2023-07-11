@@ -2140,6 +2140,13 @@ def ai_graph_testing(M=500,N=3):
     # glove file
     gfl  = cfg["instances"][inst]["sources"][src][typ]["connection"]["file"]
     print(gfl)
+    # create the data for the sample knowledge graph
+    #
+    # create columns names (normally obtained by var.dtype.names)
+    f    = open(gfl[0])
+    nvals= np.asarray([row.split() for row in f.readlines()])
+    f.close()
+    vals = min(p,len(nvals[0]))
     # get the data file
     typ  = cfg["instances"][inst]["src"]["types"]["main"]
     # clicks file
@@ -2148,13 +2155,6 @@ def ai_graph_testing(M=500,N=3):
     df["dt"] = list(map(lambda x: x.replace("/",""),df["dt"]))
     print(df["dt"])
     ivals= df.to_numpy()[:,[4,0,1]].astype(np.float64)
-    # create the data for the sample knowledge graph
-    #
-    # create columns names (normally obtained by var.dtype.names)
-    f    = open(gfl[0])
-    nvals= np.asarray([row.split() for row in f.readlines()])
-    f.close()
-    vals = min(p,len(nvals[0]))
     # can't use categoricals for the labels here
     # throws an error for the list of things in the first column being longer than the number of labels
     # yet this is ok for this application since all words in our corpus
@@ -2189,19 +2189,24 @@ def ai_graph_testing(M=500,N=3):
     print(nvs); print(len(nvs)); print(nvals.shape)
     nvals= np.hstack((nvs,nvs1))
     print(nvals[:,0])
-    # create column names (normally obtained by var.dtype.names)
-    #coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
-    coln = {df.columns[i-1]:(i-1) for i in range(1,len(ivals[0])+1)}
-    print(coln); print(coln.items()); print(list(coln.items()))
-    # create the data for the sample knowledge graph
-    kgdat= create_kg(0,ivals,s,limit=True,permu=[[0,1,2]])
-    print(kgdat[0])
     # instantiate a JanusGraph object
     graph= Graph()
     # connection to the remote server
     conn = DriverRemoteConnection(data.url_kg(inst),'g')
     # get the remote graph traversal
     g    = graph.traversal().withRemote(conn)
+    # create column names (normally obtained by var.dtype.names)
+    #coln = {"col"+str(i):(i-1) for i in range(1,len(ivals[0])+1)}
+    coln = {df.columns[i-1]:(i-1) for i in range(1,len(ivals[0])+1)}
+    print(coln); print(coln.items()); print(list(coln.items()))
+    # test the knowledge graph by reading the data files into memory
+    print(thought(inst,list(coln.items())                                             ,g=g))
+    print(thought(inst,list(coln.items()),                                   res=False,g=g))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1))          ,g=g))
+    print(thought(inst,list(coln.items()),dat=np.random.normal(size=(2,p-1)),res=False,g=g))
+    # create the data for the sample knowledge graph
+    kgdat= create_kg(0,ivals,s,limit=True,permu=[[0,1,2]])
+    print(kgdat[0])
     # write the knowledge graph
     print([data.write_kg(const.constants.V,inst,list(coln.items()),k,g,False) for k in kgdat])
     #print([data.write_kg(const.constants.E,inst,list(coln.items()),k,g,True ) for k in kgdat])
