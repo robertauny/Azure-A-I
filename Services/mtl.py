@@ -160,6 +160,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
                     typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest"}
+                    x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
+                    # random field theory to calculate the number of clusters to form (or classes)
+                    clust= max(2,len(unique(sdat["train"][:,0])))
+                    keys = {}
+                    # define the outputs of the model
+                    fit  = sdat["train"][:,0].astype(np.int8)
+                    y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
                     for typ in typs:
                         if typ == "nnrf":
                             # now use the random cluster model to trim the dataset for best sensitivity
@@ -170,40 +177,11 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # the original data is assumed to be gaussian by the central limit theorem
                             # thus, when ordered the data follows a beta distribution whose parameters
                             # can be argued to be such that the ultimate distribution is uniform
-                            lbls,_,mdl = nn_trim(sdat["train"],0,1)
-                            nlbls      = [i for i in range(len(sdat["train"])) if i not in lbls]
-                            label      = [nlbls,lbls]
-                            mdls       = []
-                            for s in label:
-                                x    = pd.DataFrame( sdat["train"][s,1:],columns=np.asarray(nhdr)[cols])
-                                # random field theory to calculate the number of clusters to form (or classes)
-                                clust= max(2,len(unique(sdat["train"][s,0])))
-                                keys = {}
-                                # define the outputs of the model
-                                fit  = sdat["train"][s,0].astype(np.int8)
-                                y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
-                                # main model
-                                #
-                                # categorical column and classification prediction
-                                #
-                                # add some layers to the standard dbn for clustering to embed
-                                # the integer values into the real numbers between 0 and 1
-                                #
-                                # from above, if ordering the input data on a prediction
-                                # gives the best results then that is more evidence that the
-                                # model of the distribution of the input data is uniform
-                                model= dbn(x.to_numpy()
-                                          ,y
-                                          ,sfl=sfl
-                                          ,clust=clust)
-                                # first model is a classifier that will be passed into the next model that will do the clustering
-                                # then once centroids are known, any predictions will be relative to those centroids
-                                #model= clustering(model,clust)
-                                if not model is None:
-                                    mdls.append(model)
-                            if len(mdls) == 0:
-                                print("Models are null.")
-                                break
+                            #
+                            # we won't use the last 2 returns consisting of the energies for each clique
+                            # within the bounded region and the model for predicting binary values using
+                            # the energies of each clique
+                            lbls,_,_ = nn_trim(sdat["train"],0,1)
                             # now use the random cluster model to trim the dataset for best sensitivity
                             #
                             # for testing and prediction we don't have labels but this is ok
@@ -237,22 +215,11 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # of all of the positive data points in each smaller region ... then we will get a smaller
                             # bounded region within the larger bounded region and apply each model to the sub-divides
                             # this will be done for each of the smaller regions and we will collect them all
-                            #
-                            # use the model built during training that finds the boundary and interior elements
-                            p    = mdl.predict(sdat["test"][:,1:])
-                            if len(np.asarray(p).shape) > 1:
-                                p1   = []
-                                for row in list(p):
-                                    # start = 1 makes labels begin with 1, 2, ...
-                                    # in clustering, we find the centroids furthest from the center of all data
-                                    # the labels in this case are just the numeric values assigned in order
-                                    # and the data should be closest to this label
-                                    p1.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                                p    = np.asarray(p1)
-                            else:
-                                p    = np.asarray(list(p))
-                            lbls = [i for i in range(len(p)) if p[i] == 1]
-                            nlbls= [i for i in range(len(p)) if i not in lbls]
+                            pct  = len(lbls) / len(sdat["train"])
+                            beg  = floor(0.5*(1.0-pct)*len(sdat["test"]))
+                            # leave some values at beginning and end of range ... so use max(1,..) min(..,len-2)
+                            lbls = list(range(max(1,beg),min(beg+floor(pct*len(sdat["test"])),len(sdat["test"])-2)))
+                            nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
                             label= [nlbls,lbls]
                             preds= None
                             for i in range(len(label)):
@@ -262,7 +229,14 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                     #
                                     # yet note that for markov processes of time series, the last prediction
                                     # is the next value in the time series
-                                    pred = mdls[i].predict(sdat["test"][label[i],1:])
+                                    #
+                                    # the boundary of the enclosed region and everything exterior will leave
+                                    # the interior disconnected from any other fully-connected bounded region
+                                    # and we make the assumption that every node within the interior of the bounded
+                                    # region are completely connected to all other nodes in the interior so that
+                                    # we can simply assign zeros outside the bounded region and ones to every
+                                    # node within the bounded region
+                                    pred = np.zeros(len(label[i])) if i == 0 else np.ones(len(label[i]))
                                     if len(np.asarray(pred).shape) > 1:
                                         p    = []
                                         for row in list(pred):
@@ -282,13 +256,6 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                         break
                                     preds= prds if type(preds) == type(None) else np.vstack((preds,prds))
                         else:
-                            x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
-                            # random field theory to calculate the number of clusters to form (or classes)
-                            clust= max(2,len(unique(sdat["train"][:,0])))
-                            keys = {}
-                            # define the outputs of the model
-                            fit  = sdat["train"][:,0].astype(np.int8)
-                            y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
                             if typ == "nn1":
                                 # main model
                                 #

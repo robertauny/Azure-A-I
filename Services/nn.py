@@ -1078,7 +1078,7 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
             # the list of labels, then the entire data set will undergo
             # this random field reduction
             albls= [j for j,x in enumerate(ret[labels]) if x == label]
-            lbls = [min(albls),max(albls)] if not len(albls) == 0 else [0,len(ret)]
+            lbls = [min(albls),max(albls)] if not len(albls) == 0 else [0,len(ret)-1]
             # adjust the size of the bound if this conditional is satisfied
             if lbls[0] > 0 and lbls[1] < len(ret):
                 # once we have the first and last labels, we need to balance
@@ -1099,7 +1099,7 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
                 # note ... by uniformity and translation invariance we can limit the size even further
                 # the ending labels corresponding rows that should be included in our data set
                 # reset the lbls start and end row numbers for creating the bound
-                lbls[1] = min(lbls[0]+Nlbls,len(ret))
+                lbls[1] = min(lbls[0]+Nlbls,len(ret)-1)
             # now we will use random field theory to reduce the size of the data set
             # in essence, we will find and remove all labels in the dominant class
             # that are fully connected to each of its neighbors while paying close
@@ -1176,7 +1176,7 @@ def nn_trim(dat=[],labels=None,label=None,order=False):
         model= gan(dat[:,[i for i in range(len(dat[0])) if not i == labels]]
                   ,bint
                   ,sfl=None
-                  ,clust=2)
+                  ,clust=len(np.unique(bint)))
     return lbls,nrgs,model
 
 ############################################################################
