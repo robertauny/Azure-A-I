@@ -223,10 +223,10 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             outN = floor(sqrt(len(sdat["test"])))
                             innN = floor(sqrt(len(lbls        )))
                             half = int(0.5*(outN-innN))
-                            #rng  = range((outN+1)*innN+1,min((outN+1)*innN+2*innN*(innN-1)+innN**2,len(sdat["test"])))
                             rng  = range((outN+1)*half+1,min((outN+1)*half+1+innN**2+2*half,len(sdat["test"])))
                             lbls = []
-                            for i in rng:
+                            i    = rng[0]
+                            while i < rng[len(rng)-1]:
                                 lbls.extend(list(range(i,i+innN)))
                                 i = i + innN + 2*half
                             nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
