@@ -35,7 +35,7 @@ import constants as const
 
 from joblib                                         import Parallel,delayed
 from string                                         import punctuation
-from math                                           import ceil,log,exp,floor,isnan
+from math                                           import ceil,log,exp,floor,isnan,sqrt
 from PIL                                            import ImageDraw,Image
 
 ver  = sys.version.split()[0]
@@ -219,6 +219,16 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             beg  = floor(0.5*(1.0-pct)*len(sdat["test"]))
                             # leave some values at beginning and end of range ... so use max(1,..) min(..,len-2)
                             lbls = list(range(max(1,beg),min(beg+floor(pct*len(sdat["test"])),len(sdat["test"])-2)))
+                            # these next lines get the bounded interior fully connected sub-region of the bounded region
+                            outN = floor(sqrt(len(sdat["test"])))
+                            innN = floor(sqrt(len(lbls        )))
+                            half = int(0.5*(outN-innN))
+                            #rng  = range((outN+1)*innN+1,min((outN+1)*innN+2*innN*(innN-1)+innN**2,len(sdat["test"])))
+                            rng  = range((outN+1)*half+1,min((outN+1)*half+1+innN**2+2*half,len(sdat["test"])))
+                            lbls = []
+                            for i in rng:
+                                lbls.extend(list(range(i,i+innN)))
+                                i = i + innN + 2*half
                             nlbls= [i for i in range(len(sdat["test"])) if i not in lbls]
                             label= [nlbls,lbls]
                             preds= None
