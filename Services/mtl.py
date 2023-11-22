@@ -251,6 +251,13 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # while skipping the end and beginning of each row to isolate the inner bounded
                             # region from each side of the outer bounded region, which was not done with just the
                             # count of nodes in the center the bounded region in the first lbls count
+                            #
+                            # all told, the core of what's been done is to construct a maximum likelihood estimator
+                            # for the distribution of nodes carrying the state 1 at the center of one bounded region
+                            # since we start wuth an assumption of normally distributed data that's been ordered, with
+                            # the usual outcome proven in Murphy for the ordered data being uniform and the center (average)
+                            # being the best parameter that allows for estimating the distribution (finding the variance using
+                            # the average and the data to complete the estimate)
                             lbls = []
                             i    = rng[0]
                             while i < rng[len(rng)-1]:
