@@ -220,10 +220,37 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                             # leave some values at beginning and end of range ... so use max(1,..) min(..,len-2)
                             lbls = list(range(max(1,beg),min(beg+floor(pct*len(sdat["test"])),len(sdat["test"])-2)))
                             # these next lines get the bounded interior fully connected sub-region of the bounded region
+                            #
+                            # the length of a side of the outer bounded region
                             outN = floor(sqrt(len(sdat["test"])))
+                            # the length of a side of the inner bounded region
                             innN = floor(sqrt(len(lbls        )))
+                            # the distance from a side of the inner bounded region to the outer bounded region
                             half = int(0.5*(outN-innN))
+                            # when laying out the nodes comprising the inner bounded region, it starts with the
+                            # integer count of the node after 3 rows of length the same as the outer bounded region's
+                            # side at the top, plus the distance from a side of the inner bounded region to the outer
+                            # bounded region
+                            #
+                            # then the length of the inner bounded region as a count of nodes is the square of the
+                            # length of a side of the inner bounded region
+                            #
+                            # lastly, each of the rows in the square inner bounded region is followed by twice the length
+                            # of a side of the inner bounded region, one for the right side, then tracing back to the left side
+                            #
+                            # finally, to balance things out we add twice the distance of the inner to outer bounded regions
+                            # from right to left at the end of the inner bounded region
                             rng  = range((outN+1)*half+1,min((outN+1)*half+1+innN**2+2*half,len(sdat["test"])))
+                            # it doesn't matter that we over right the integer labels for the inner bounded region
+                            # whose states in the uniform list of nodes that will have state one ... the first lbls
+                            # was just so that we could obtain the final count of all nodes in the center of the 
+                            # entire bounded region
+                            #
+                            # in the loop we will uniformly (and evenly balanced) label those nodes that should be
+                            # of state 1 (or occupied) in the final assessment of the occupied center region
+                            # while skipping the end and beginning of each row to isolate the inner bounded
+                            # region from each side of the outer bounded region, which was not done with just the
+                            # count of nodes in the center the bounded region in the first lbls count
                             lbls = []
                             i    = rng[0]
                             while i < rng[len(rng)-1]:
