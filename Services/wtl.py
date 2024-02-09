@@ -540,8 +540,19 @@ for col in range(0,len(nhdr)):
                             model= RandomForestClassifier(max_depth=2,random_state=0)
                             model.fit(x,y)
                             pred = model.predict(sdat["test"][:,1:].astype(np.int8))
-                            preds= np.hstack((np.asarray([list(pred[i]).index(1) for i in range(len(pred))]).reshape((len(pred),1)),sdat["test"]))
-                            #preds= np.hstack((pred.reshape((len(preds),1)),sdat["test"]))
+                            if len(np.asarray(pred).shape) > 1:
+                                p    = []
+                                for row in list(pred):
+                                    # start = 1 makes labels begin with 1, 2, ...
+                                    # in clustering, we find the centroids furthest from the center of all data
+                                    # the labels in this case are just the numeric values assigned in order
+                                    # and the data should be closest to this label
+                                    p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+                                pred = np.asarray(p)
+                            else:
+                                pred = np.asarray(list(pred))
+                            #preds= np.hstack((np.asarray([list(pred[i]).index(1) for i in range(len(pred))]).reshape((len(pred),1)),sdat["test"]))
+                            preds= np.hstack((pred.reshape((len(preds),1)),sdat["test"]))
                 # produce some output
                 if len(preds) > 0:
                     pred0= preds[:,0]
