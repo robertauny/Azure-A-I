@@ -551,8 +551,11 @@ for col in range(0,len(nhdr)):
                                 pred = np.asarray(p)
                             else:
                                 pred = np.asarray(list(pred))
-                            #preds= np.hstack((np.asarray([list(pred[i]).index(1) for i in range(len(pred))]).reshape((len(pred),1)),sdat["test"]))
-                            preds= np.hstack((pred.reshape((len(preds),1)),sdat["test"]))
+                            print(pred); print(col); print(cls)
+                            if len(pred) > len(sdat["test"]):
+                                preds= np.hstack((np.asarray([1 for j in range(0,len(pred)) if pred[j] == 1]).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                            else:
+                                preds= np.hstack((pred.reshape((len(preds),-1)),sdat["test"]))
                 # produce some output
                 if len(preds) > 0:
                     pred0= preds[:,0]
