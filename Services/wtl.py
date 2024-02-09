@@ -60,6 +60,7 @@ from pyspark.sql                                    import SparkSession
 from datetime                                       import date,datetime,timedelta
 from pytz                                           import timezone,utc
 from time                                           import sleep
+from graphframes                                    import GraphFrame
 
 import config
 import utils
@@ -70,7 +71,6 @@ import pandas            as pd
 import multiprocessing   as mp
 import seaborn           as sns
 import matplotlib.pyplot as plt
-import graphframes       as gf
 
 import os
 import csv
@@ -213,7 +213,7 @@ def gmt(dt:type(date),tz:str):
 ## Purpose:   Modify the date fields of the data file
 ##
 ############################################################################
-def newtime(rows=100000):
+def newtime(rows=1000):
     # this function is hard-coded since it's specific to a particular data file
     fln  = pd.read_csv("/Workspace/Users/robert.a.murphy2@usps.gov/Airlines_orig.csv")
     fln  = fln.iloc[range(rows)]
@@ -248,8 +248,7 @@ def vertices(dat,num):
     d    = np.asarray(unique(dat.to_numpy()))
     ids  = np.asarray(list(range(num+1,num+1+len(d))))
     cols = ["id","property"]
-    ret  = pd.DataFrame(np.hstack((ids,d)).reshape((len(d),len(cols))),columns=cols)
-    print(ret)
+    ret  = pd.DataFrame(np.hstack((ids.reshape((len(ids),1)),d.reshape(len(d),1))),columns=cols)
     return ret
 
 # create spark session
@@ -267,14 +266,14 @@ newtime()
 cdat = pd.read_csv("/Workspace/Users/robert.a.murphy2@usps.gov/Airlines.csv")
 # save the original data set
 sdat = pd.DataFrame(cdat.to_numpy().copy(),columns=cdat.columns)
+# need the list of column names
+cn   = list(sdat.columns)
 # cleanse the data set before machine learning
 cdat = nn_cleanse(inst,cdat)
 # get the data to be used in building the models (parallelize on importance)
 #
 # the input data
 k    = pd.DataFrame(cdat["dat"],columns=cdat["nhdr"]).astype(np.float32)
-# need the list of column names
-cn   = list(k.columns)
 # build a knowledge graph from the data using GraphX
 #
 # airline data in the graph (reasons for delay will be implicit e.g. mechanical, weather, etc.)
@@ -296,17 +295,17 @@ verts= pd.concat(p)
 edges= []
 for j in range(0,len(p)-1):
     for i in range(0,len(sdat)):
-        edges.append([p[j  ]["id"][list(p[j  ][list(p[j  ].columns)[1]].to_numpy()).index(sdat[clns[j  ]][i])]
-                     ,p[j+1]["id"][list(p[j+1][list(p[j+1].columns)[1]].to_numpy()).index(sdat[clns[j+1]][i])]
-                     ,list(p[j+1].columns)[1]])
+        edges.append([str(p[j  ]["id"][list(p[j  ][list(p[j  ].columns)[1]].to_numpy()).index(sdat[clns[j  ]][i])])
+                     ,str(p[j+1]["id"][list(p[j+1][list(p[j+1].columns)[1]].to_numpy()).index(sdat[clns[j+1]][i])])
+                     ,clns[j+1]])
 # make the vertices and edges ready for the graph
 v    = ss.createDataFrame(verts)
-e    = ss.createDataFrame(edges,["source","destination","relationship"])
+e    = ss.createDataFrame(edges,["src","dst","relationship"])
 # create the knowledge graph
-g    = gf.GraphFrames(v,e)
+g    = GraphFrame(v,e)
 # Run PageRank algorithm, and show results.
-res  = g.pageRank(resetProbability=0.01,maxIter=20)
-res.vertices.select("id","pagerank").show()
+pager= g.pageRank(resetProbability=0.01,maxIter=20)
+pager.vertices.select("id","pagerank").show()
 # the header should be redefined
 nhdr = list(k.columns)
 # the data types of the columns in question ... these should be auto-detected
@@ -540,8 +539,9 @@ for col in range(0,len(nhdr)):
                         else:
                             model= RandomForestClassifier(max_depth=2,random_state=0)
                             model.fit(x,y)
-                            preds= model.predict(sdat["test"][:,1:].astype(np.int8))
-                            preds= np.hstack((np.asarray([list(preds[i]).index(1) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
+                            pred = model.predict(sdat["test"][:,1:].astype(np.int8))
+                            preds= np.hstack((np.asarray([list(pred[i]).index(1) for i in range(len(pred))]).reshape((len(pred),1)),sdat["test"]))
+                            #preds= np.hstack((pred.reshape((len(preds),1)),sdat["test"]))
                 # produce some output
                 if len(preds) > 0:
                     pred0= preds[:,0]
@@ -555,7 +555,7 @@ for col in range(0,len(nhdr)):
                     idir = foldi + "/" + fns + "/" + typ + "/"
                     if not os.path.exists(idir):
                         os.makedirs(idir,exist_ok=True)
-                    fn   = idir + fns + const.constants.SEP 
+                    fn   = idir + fns + const.constants.SEP
                     # we need a data frame for the paired and categorial plots
                     df         = pd.DataFrame(preds).drop(columns=1)
                     df.columns = np.asarray(nhdr)[cls]
