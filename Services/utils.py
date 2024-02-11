@@ -198,8 +198,9 @@ def confusion(tgts=[],prds=[],fl=None):
        (type(prds) == type([]) or type(prds) == type(np.asarray([]))):
         if not (len(tgts) == 0 or len(prds) == 0):
             # the false and true positve rate and the threshold
-            cm   = confusion_matrix(tgts,prds)
-            disp = ConfusionMatrixDisplay(confusion_matrix=cm)
+            lbls = list(np.unique(tgts))
+            cm   = confusion_matrix(tgts,prds,labels=lbls)
+            disp = ConfusionMatrixDisplay(confusion_matrix=cm,display_labels=lbls)
             disp.plot(cmap='Greens')
             mn   = min(min(tgts),min(prds))
             mx   = max(max(tgts),max(prds))
@@ -212,6 +213,24 @@ def confusion(tgts=[],prds=[],fl=None):
                 plt.show()
             plt.cla()
             plt.clf()
+    return
+
+############################################################################
+##
+## Purpose:   Print the pagerank
+##
+############################################################################
+def rank(dat=None,fl=None):
+    # save the image if requested
+    if type(dat) != type(None) and type(fl) == type(""):
+        try:
+            with open(fl,"w") as f:
+                f.write(dat)
+                f.close()
+        except:
+            print("Unable to write " + dat)
+    else:
+        print(dat)
     return
 
 ############################################################################
@@ -445,6 +464,9 @@ class utils():
     @staticmethod
     def _confusion(tgts=[],prds=[],fl=None):
         return confusion(tgts,prds,fl)
+    @staticmethod
+    def _rank(dat=None,fl=None):
+        return rank(dat,fl)
     @staticmethod
     def _prf(tgts=[],prds=[],fl=None):
         return prf(tgts,prds,fl)
