@@ -564,7 +564,7 @@ for col in range(0,len(nhdr)):
                         utils.utils._roc(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"roc.png")
                         # get the precision vs recall
                         #utils.utils._pvr(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"pvr.png")
-                        utils.utils._pvr(      pred1.astype(np.int8),np.asarray(list(map(lambda x: probs[upred.index(x.astype(np.int8))],pred0))),fn+"pvr.png")
+                        utils.utils._pvr(      pred1.astype(np.int8),np.asarray(list(map(lambda x: probs[upred.index(x.astype(np.int8))],pred1))),fn+"pvr.png")
                     # get the precision, recall, f-score
                     utils.utils._prf(          pred1.astype(np.int8),pred0.astype(np.int8),fn+"prf.txt")
                     # get the confusion matrix
