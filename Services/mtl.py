@@ -89,17 +89,9 @@ foldi= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldi"]
 foldm= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldm"]
 
 def threshold(pred):
+    ret  = 0
     if len(np.asarray(pred).shape) > 1:
-        p    = []
-        for row in list(pred):
-            # start = 1 makes labels begin with 1, 2, ...
-            # in clustering, we find the centroids furthest from the center of all data
-            # the labels in this case are just the numeric values assigned in order
-            # and the data should be closest to this label
-            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-        ret  = np.asarray(p)
-    else:
-        ret  = np.asarray(list(pred))
+        ret  = np.asarray([list(pred[j]).index(max(pred[j]))+beg for j in range(0,len(pred))])
     return ret
 
 # we will get the subset of data rows/columns that are all non-null
@@ -333,31 +325,24 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                     dbnlayers(model,sdat["train"].shape[1]-1,sdat["train"].shape[1]-1,const.constants.RBMA,False)
                                     dbnlayers(model,clust,sdat["train"].shape[1]-1,"sigmoid",False)
                                     model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
-                                    model.fit(x=x,y=y,epochs=const.constants.EPO,verbose=const.constants.VERB)
+                                    model.fit(x=x,y=sdat["train"][:,0].astype(np.int8),epochs=const.constants.EPO,verbose=const.constants.VERB)
                                     # get some predictions using the same input data since this
                                     # is just for simulation to produce graphics
                                     #
                                     # yet note that for markov processes of time series, the last prediction
                                     # is the next value in the time series
                                     pred = model.predict(sdat["test"][:,1:])
-                                    if len(np.asarray(pred).shape) > 1:
-                                        p    = []
-                                        for row in list(pred):
-                                            # start = 1 makes labels begin with 1, 2, ...
-                                            # in clustering, we find the centroids furthest from the center of all data
-                                            # the labels in this case are just the numeric values assigned in order
-                                            # and the data should be closest to this label
-                                            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
-                                        pred = np.asarray(p)
-                                    else:
-                                        pred = np.asarray(list(pred))
                                     # stack the recent predictions with the original inputs
+                                    pred = threshold(pred)
                                     preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
                                 else:
                                     model= RandomForestClassifier(max_depth=2,random_state=0)
-                                    model.fit(x,y)
+                                    model.fit(x,sdat["train"][:,0].astype(np.int8))
                                     preds= model.predict(sdat["test"][:,1:].astype(np.int8))
-                                    preds= np.hstack((np.asarray([list(preds[i]).index(1) for i in range(len(preds))]).reshape((len(preds),1)),sdat["test"]))
+                                    if len(np.asarray(pred).shape) > 1:
+                                        preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                    else:
+                                        preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
