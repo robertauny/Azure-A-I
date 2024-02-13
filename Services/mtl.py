@@ -91,7 +91,16 @@ foldm= cfg["instances"][inst]["sources"][src][typ]["connection"]["foldm"]
 def threshold(pred):
     ret  = 0
     if len(np.asarray(pred).shape) > 1:
-        ret  = np.asarray([list(pred[j]).index(max(pred[j]))+beg for j in range(0,len(pred))])
+        p    = []
+        for row in list(pred):
+            # start = 1 makes labels begin with 1, 2, ...
+            # in clustering, we find the centroids furthest from the center of all data
+            # the labels in this case are just the numeric values assigned in order
+            # and the data should be closest to this label
+            p.extend(j for j,x in enumerate(row,start=0) if abs(x-j) == min(abs(row-list(range(len(row))))))
+        ret  = np.asarray(p)
+    else:
+        ret  = np.asarray(list(pred))
     return ret
 
 # we will get the subset of data rows/columns that are all non-null
@@ -339,6 +348,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                     model= RandomForestClassifier(max_depth=2,random_state=0)
                                     model.fit(x,sdat["train"][:,0].astype(np.int8))
                                     preds= model.predict(sdat["test"][:,1:].astype(np.int8))
+                                    preds= threshold(preds)
                                     if len(np.asarray(pred).shape) > 1:
                                         preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
                                     else:
