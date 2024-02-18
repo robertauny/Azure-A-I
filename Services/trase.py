@@ -59,6 +59,10 @@ from datetime                                       import date,datetime,timedel
 from pytz                                           import timezone,utc
 from time                                           import sleep
 from graphframes                                    import GraphFrame
+from transformers                                   import AutoModelForCausalLM,AutoTokenizer
+from datasets                                       import load_dataset
+from trl                                            import SFTTrainer,trainer
+from trl.trainer                                    import ConstantLengthDataset
 
 import config
 import utils
@@ -216,7 +220,7 @@ acols= const.constants.COLUMNS if hasattr(const.constants,"COLUMNS") else cn
 
 # perms defines the number of different ways the analysis
 # can be run, with different independent feature variables vs. dependent
-perms= const.constants.PERMS if hasattr(const.constants,"PERMS") else list(range(0,len(cdat.columns)))
+perms= const.constants.PERMS if hasattr(const.constants,"PERMS") else list(range(0,len(cn)))
 
 # see what columns we are using during training and prediction
 print([cn,perms])
@@ -264,21 +268,21 @@ gd   = glove(tok,clust)
 ivals= np.asarray([np.sum([gd[word] for word in txts[j]],axis=0) for j in range(0,len(txts))])
 
 # for the model, we will use the magnitude of the vectors in ivals above
-ivals= np.asarray([np.sqrt(np.sum(np.prod([vals,vals],axis=0),axis=0)) for vals in ivals])
+svals= np.asarray([np.sqrt(np.sum(np.prod([vals,vals],axis=0),axis=0)) for vals in ivals])
 
 # cleanse the original data set before machine learning
-cdat = nn_cleanse(inst,cdat)
-nhdr = cdat["nhdr"]
+tdat = nn_cleanse(inst,cdat)
+
+nhdr = ["sentiment","reviewTextScore"]
 
 # after all of the work above, we can now build the data set for modeling
-k    = pd.DataFrame(np.hstack((cdat["dat"][:,list(nhdr).index("overall")].reshape((len(cdat["dat"][:,list(nhdr).index("overall")]),-1))
-                              ,ivals.reshape((len(ivals),-1))
+k    = pd.DataFrame(np.hstack((tdat["dat"][:,list(tdat["nhdr"]).index("overall")].reshape((len(tdat["dat"][:,list(tdat["nhdr"]).index("overall")]),-1))
+                              ,svals.reshape((len(svals),-1))
                               ))
-                   ,columns=["sentiment","reviewTextScore"]).astype(np.float32)
-
-nhdr = np.asarray(["sentiment","reviewTextScore"])
+                   ,columns=nhdr).astype(np.float32)
 
 # construct the relaxed data name for output file names and ledgers then build some models
+typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest","caus":"Causal LLM"}
 for col in range(0,len(nhdr)):
     for cols in perms:
         if nhdr[col].lower() in [a.lower() for a in acols] and col not in cols:
@@ -296,7 +300,6 @@ for col in range(0,len(nhdr)):
                 break
             # define the inputs to the model
             sdat = nn_split(k.iloc[:,cls])
-            typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest"}
             x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
             # random field theory to calculate the number of clusters to form (or classes)
             clust= max(2,len(unique(sdat["train"][:,0])))
@@ -482,15 +485,55 @@ for col in range(0,len(nhdr)):
                             # stack the recent predictions with the original inputs
                             preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
                         else:
-                            model= RandomForestClassifier(max_depth=2,random_state=0)
-                            #model.fit(x,y)
-                            model.fit(x,sdat["train"][:,0].astype(np.int8))
-                            pred = model.predict(sdat["test"][:,1:])
-                            #pred = threshold(pred)
-                            if len(np.asarray(pred).shape) > 1:
-                                preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                            if typ == "rf":
+                                model= RandomForestClassifier(max_depth=2,random_state=0)
+                                #model.fit(x,y)
+                                model.fit(x,sdat["train"][:,0].astype(np.int8))
+                                pred = model.predict(sdat["test"][:,1:])
+                                if len(np.asarray(pred).shape) > 1:
+                                    preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                else:
+                                    preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
                             else:
-                                preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                # prertrained model from facebook with 125m features
+                                ptmdl= AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
+                                # extract the original tokenizer used in the model
+                                toknz= AutoTokenizer.from_pretrained(ptmdl.config._name_or_path,trust_remote_code=True)
+                                # how to pad sequences
+                                if getattr(toknz,"pad_token",None) is None:
+                                    toknz.pad_token        = toknz.eos_token
+                                    tokenizer.padding_side = "right"
+                                # create the dataset for fine tuning
+                                dat  = nn_split(cdat)
+                                # attempt to do some more cleaning by dropping NaN
+                                #
+                                # to prevent from getting errors related to lists of string, we will
+                                # only pass the column of data that's to be used in the analysis
+                                # we need a dataframe because the column names will be searched when building the dataset
+                                datz = pd.DataFrame(dat["train"],columns=cn)["reviewText"].dropna()
+                                # this function is so finicky ... it will use the original model of 125m terms and align
+                                # it with our input dataset (like transfer learning / domain adaptation)
+                                # we can't use the default formatting func = lambda x: x[dataset_text_field] since the data
+                                # is being passed as-is, with all columns included (hence we only pass the column of interest)
+                                # and we specify the formatting func to just be lambda x: x with the original tokenizer
+                                td   = ConstantLengthDataset(toknz
+                                                            ,datz
+                                                            ,dataset_text_field="reviewText"
+                                                            ,formatting_func=lambda x: x)
+                                # model with supervised fine tuning on the input dataset of our choice
+                                # we use the original model and the transformed data set on the field in question
+                                #
+                                # right now 125m terms is to big to train in this VM, but it works otherwise
+                                model= SFTTrainer(ptmdl
+                                                 ,train_dataset=td
+                                                 ,dataset_text_field="reviewText"
+                                                 ,max_seq_length=1024)
+                                model.train()
+                                pred = model.predict(dat["test"][:,cn.index("reviewText")])
+                                if len(np.asarray(pred).shape) > 1:
+                                    preds= np.hstack((np.asarray(pred).reshape((len(dat["test"]),-1)),dat["test"]))
+                                else:
+                                    preds= np.hstack((pred.reshape((len(dat["test"]),-1)),dat["test"]))
                 # produce some output
                 if len(preds) > 0:
                     pred0= preds[:,0].astype(np.int8)
@@ -529,7 +572,7 @@ for col in range(0,len(nhdr)):
                         utils.utils._roc(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"roc.png")
                         # get the precision vs recall
                         #utils.utils._pvr(      pred1.astype(np.int8),pred0.astype(np.int8),fn+"pvr.png")
-                        utils.utils._pvr(      pred1.astype(np.int8),np.asarray(list(map(lambda x: probs[upred.index(x.astype(np.int8))],pred1))),fn+"pvr.png")
+                        utils.utils._pvr(      pred1.astype(np.int8),np.asarray(list(map(lambda x: probs[upred.index(x.astype(np.int8))],pred0))),fn+"pvr.png")
                     # get the precision, recall, f-score
                     utils.utils._prf(          pred1.astype(np.int8),pred0.astype(np.int8),fn+"prf.txt")
                     # get the confusion matrix

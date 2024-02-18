@@ -56,6 +56,15 @@ else:
 from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
 from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim,nn_energy
 from sklearn.ensemble                               import RandomForestClassifier
+from pyspark.sql                                    import SparkSession
+from datetime                                       import date,datetime,timedelta
+from pytz                                           import timezone,utc
+from time                                           import sleep
+from graphframes                                    import GraphFrame
+from transformers                                   import AutoModelForCausalLM,AutoTokenizer
+from datasets                                       import load_dataset
+from trl                                            import SFTTrainer,trainer
+from trl.trainer                                    import ConstantLengthDataset
 
 import config
 import utils
@@ -160,7 +169,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest"}
+                    typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest","caus":"Causal LLM"}
                     x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                     # random field theory to calculate the number of clusters to form (or classes)
                     clust= max(2,len(unique(sdat["train"][:,0])))
@@ -345,14 +354,18 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                     pred = threshold(pred)
                                     preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
                                 else:
-                                    model= RandomForestClassifier(max_depth=2,random_state=0)
-                                    model.fit(x,sdat["train"][:,0].astype(np.int8))
-                                    preds= model.predict(sdat["test"][:,1:].astype(np.int8))
-                                    preds= threshold(preds)
-                                    if len(np.asarray(pred).shape) > 1:
-                                        preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                    if type == "rf":
+                                        model= RandomForestClassifier(max_depth=2,random_state=0)
+                                        model.fit(x,sdat["train"][:,0].astype(np.int8))
+                                        preds= model.predict(sdat["test"][:,1:].astype(np.int8))
+                                        preds= threshold(preds)
+                                        if len(np.asarray(pred).shape) > 1:
+                                            preds= np.hstack((np.asarray(pred).reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                        else:
+                                            preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
                                     else:
-                                        preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
+                                        # nothing for now ... later
+                                        preds= []
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]

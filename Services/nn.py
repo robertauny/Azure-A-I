@@ -1367,6 +1367,7 @@ def nn_cleanse(inst=0,d=None):
     sifs = None
     keys = None
     if type(d) == type(pd.DataFrame()):
+        #dat  = d.copy().dropna()
         dat  = d.copy()
         # going to capture the header and data so it can be replaced
         hdr  = list(dat.columns)
@@ -1381,14 +1382,14 @@ def nn_cleanse(inst=0,d=None):
                 dhdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
                 nhdr = [i for i in  hdr if i not in dhdr]
         # drop any dates that have been configured to be dropped in constants.py
-        #if hasattr(const.constants,"DATES")                                                                  and \
-           #type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
-            #cols = [c for c in const.constants.DATES if c in nhdr]
-            #if not len(cols) == 0:
-                #dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
-                #dat  = dat.drop(columns=cols)
-                #thdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
-                #nhdr = [i for i in nhdr if i not in thdr]
+        if hasattr(const.constants,"DATES")                                                                  and \
+           type(const.constants.DATES) in [type([]),type(np.asarray([]))] and len(const.constants.DATES) > 0:
+            cols = [c for c in const.constants.DATES if c in nhdr]
+            if not len(cols) == 0:
+                dts  = dat.iloc[:,[hdr.index(i) for i in const.constants.DATES]].to_numpy().copy()
+                dat  = dat.drop(columns=cols)
+                thdr = list(np.asarray(hdr)[[hdr.index(i) for i in cols]])
+                nhdr = [i for i in nhdr if i not in thdr]
         # replace any NaNs
         dat  = np.asarray([[str(x).lower().replace("nan","") for x in row] for row in dat.to_numpy()])
         dat  = pd.DataFrame(dat,columns=nhdr)
