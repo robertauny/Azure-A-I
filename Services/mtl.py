@@ -61,7 +61,8 @@ from datetime                                       import date,datetime,timedel
 from pytz                                           import timezone,utc
 from time                                           import sleep
 from graphframes                                    import GraphFrame
-from transformers                                   import AutoModelForCausalLM,AutoTokenizer
+from transformers                                   import DistilBertTokenizer
+from transformers                                   import TFDistilBertForSequenceClassification
 from datasets                                       import load_dataset
 from trl                                            import SFTTrainer,trainer
 from trl.trainer                                    import ConstantLengthDataset
@@ -75,6 +76,7 @@ import pandas            as pd
 import multiprocessing   as mp
 import seaborn           as sns
 import matplotlib.pyplot as plt
+import tensorflow        as tf
 
 import os
 import csv
@@ -365,7 +367,44 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                             preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
                                     else:
                                         # nothing for now ... later
-                                        preds= []
+                                        MODEL= "distilbert-base-uncased-finetuned-sst-2-english"
+                                        # use the custom splitter to split into train and test datasets
+                                        dat  = nn_split(cdat)
+                                        # define a tokenizer object
+                                        toknz= DistilBertTokenizer.from_pretrained(MODEL)
+                                        # do some data cleansing
+                                        datrn= pd.DataFrame(dat["train"][:,cn.index("reviewText")],columns=["reviewText"])
+                                        indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
+                                        datrn= datrn.dropna()
+                                        datst= pd.DataFrame(dat["test" ][:,cn.index("reviewText")],columns=["reviewText"])
+                                        indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
+                                        datst= datst.dropna()
+                                        # tokenize the text and embed for use in the model
+                                        etrn = toknz(list(datrn.to_numpy().flatten()),truncation=True,padding=True)
+                                        etest= toknz(list(datst.to_numpy().flatten()),truncation=True,padding=True)
+                                        # now we will create train and test data sets by combining the embedded
+                                        # encodings with the labels ... this will be done with tensorflow
+                                        train= tf.data.Dataset.from_tensor_slices((dict(etrn ),list(dat["train"][[j for j in range(0,len(dat["train"])) if j not in indrn],0].astype(np.int8))))
+                                        test = tf.data.Dataset.from_tensor_slices((dict(etest),list(dat["test" ][[j for j in range(0,len(dat["test" ])) if j not in indst],0].astype(np.int8))))
+                                        # model with DistilBert on the input dataset of our choice
+                                        # we use the original model and the transformed data set on the field in question
+                                        model= TFDistilBertForSequenceClassification.from_pretrained(MODEL)
+                                        # choose the optimizer
+                                        optim= tf.keras.optimizers.Adam(learning_rate=5e-5)
+                                        # define the loss function
+                                        loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                                        # build the model
+                                        model.compile(optimizer=optim,loss=loss,metrics=['accuracy'])
+                                        # train the model
+                                        BATCH= 30#len(dat["train"]) - len(indrn)
+                                        EPOCH= 1
+                                        model.fit(train.shuffle(BATCH).batch(BATCH),epochs=EPOCH,batch_size=BATCH)
+                                        # make some predictions
+                                        pred = model.predict(test)
+                                        # transform the predictions into probabilities
+                                        pred = tf.nn.softmax(pred,axis=1).numpy()
+                                        # append the predictions to the original input data for later processing
+                                        preds= np.hstack((pred.reshape((len(dat["test"]),-1)),dat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
