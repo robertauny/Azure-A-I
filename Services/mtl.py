@@ -61,11 +61,11 @@ from datetime                                       import date,datetime,timedel
 from pytz                                           import timezone,utc
 from time                                           import sleep
 from graphframes                                    import GraphFrame
-from transformers                                   import DistilBertTokenizer
-from transformers                                   import TFDistilBertForSequenceClassification
+from transformers                                   import DistilBertTokenizer,AutoModelForCausalLM,AutoTokenizer,TFDistilBertForSequenceClassification,TrainingArguments
 from datasets                                       import load_dataset
 from trl                                            import SFTTrainer,trainer
 from trl.trainer                                    import ConstantLengthDataset
+from peft                                           import LoraConfig
 
 import config
 import utils
@@ -124,6 +124,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
     # get the transfer learning data set ready for use
     tdat = pd.read_csv(flx,encoding="unicode_escape")
     cdat = nn_cleanse(inst,tdat)
+    typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest","caus":"Causal LLM","bert":"DistilBERT LLM"}
     # files containing more data that should be cleaned and prepared
     #
     # modify this file logic if the data is being read from a DB or other source
@@ -171,7 +172,6 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                         break
                     # define the inputs to the model
                     sdat = nn_split(k.iloc[:,cls])
-                    typs = {"nnrf":"Random Cluster + DBN","nn1":"DBN (function)","nn2":"DBN (layered)","rf":"Random Forest","caus":"Causal LLM"}
                     x    = pd.DataFrame( sdat["train"][:,1:],columns=np.asarray(nhdr)[cols])
                     # random field theory to calculate the number of clusters to form (or classes)
                     clust= max(2,len(unique(sdat["train"][:,0])))
@@ -356,7 +356,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                     pred = threshold(pred)
                                     preds= np.hstack((pred.reshape((len(pred),1)),sdat["test"]))
                                 else:
-                                    if type == "rf":
+                                    if typ == "rf":
                                         model= RandomForestClassifier(max_depth=2,random_state=0)
                                         model.fit(x,sdat["train"][:,0].astype(np.int8))
                                         preds= model.predict(sdat["test"][:,1:].astype(np.int8))
@@ -366,45 +366,125 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                         else:
                                             preds= np.hstack((pred.reshape((len(sdat["test"]),-1)),sdat["test"]))
                                     else:
-                                        # nothing for now ... later
-                                        MODEL= "distilbert-base-uncased-finetuned-sst-2-english"
-                                        # use the custom splitter to split into train and test datasets
-                                        dat  = nn_split(cdat)
-                                        # define a tokenizer object
-                                        toknz= DistilBertTokenizer.from_pretrained(MODEL)
-                                        # do some data cleansing
-                                        datrn= pd.DataFrame(dat["train"][:,cn.index("reviewText")],columns=["reviewText"])
-                                        indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
-                                        datrn= datrn.dropna()
-                                        datst= pd.DataFrame(dat["test" ][:,cn.index("reviewText")],columns=["reviewText"])
-                                        indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
-                                        datst= datst.dropna()
-                                        # tokenize the text and embed for use in the model
-                                        etrn = toknz(list(datrn.to_numpy().flatten()),truncation=True,padding=True)
-                                        etest= toknz(list(datst.to_numpy().flatten()),truncation=True,padding=True)
-                                        # now we will create train and test data sets by combining the embedded
-                                        # encodings with the labels ... this will be done with tensorflow
-                                        train= tf.data.Dataset.from_tensor_slices((dict(etrn ),list(dat["train"][[j for j in range(0,len(dat["train"])) if j not in indrn],0].astype(np.int8))))
-                                        test = tf.data.Dataset.from_tensor_slices((dict(etest),list(dat["test" ][[j for j in range(0,len(dat["test" ])) if j not in indst],0].astype(np.int8))))
-                                        # model with DistilBert on the input dataset of our choice
-                                        # we use the original model and the transformed data set on the field in question
-                                        model= TFDistilBertForSequenceClassification.from_pretrained(MODEL)
-                                        # choose the optimizer
-                                        optim= tf.keras.optimizers.Adam(learning_rate=5e-5)
-                                        # define the loss function
-                                        loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
-                                        # build the model
-                                        model.compile(optimizer=optim,loss=loss,metrics=['accuracy'])
-                                        # train the model
-                                        BATCH= 30#len(dat["train"]) - len(indrn)
-                                        EPOCH= 1
-                                        model.fit(train.shuffle(BATCH).batch(BATCH),epochs=EPOCH,batch_size=BATCH)
-                                        # make some predictions
-                                        pred = model.predict(test)
-                                        # transform the predictions into probabilities
-                                        pred = tf.nn.softmax(pred,axis=1).numpy()
-                                        # append the predictions to the original input data for later processing
-                                        preds= np.hstack((pred.reshape((len(dat["test"]),-1)),dat["test"]))
+                                        # read the input data from json
+                                        #
+                                        # we could modify the overall sentiment to be binary
+                                        # by specifying 1-3 is 0 and 4-5 is 1, but we will keep
+                                        # the same values currently used in the dataset
+                                        mdat = pd.read_json("/home/robert/data/mags_small.json",lines=True)
+                                        mdat = pd.DataFrame(mdat[["overall","reviewText"]],columns=["overall","reviewText"])
+                                        # create the dataset for fine tuning and distilbert
+                                        #dat  = nn_split(mdat.dropna().to_numpy())
+                                        dat  = {'train': mdat.to_numpy()[0:100],'test': mdat.to_numpy()[101:150],'labels': {}}
+                                        if typ == "caus":
+                                            # prertrained model from facebook with 125m features
+                                            ptmdl= AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
+                                            # extract the original tokenizer used in the model
+                                            toknz= AutoTokenizer.from_pretrained(ptmdl.config._name_or_path,trust_remote_code=True)
+                                            # how to pad sequences
+                                            if getattr(toknz,"pad_token",None) is None:
+                                                toknz.pad_token    = toknz.eos_token
+                                                toknz.padding_side = "right"
+                                            # attempt to do some more cleaning by dropping NaN
+                                            #
+                                            # to prevent from getting errors related to lists of string, we will
+                                            # only pass the column of data that's to be used in the analysis
+                                            # we need a dataframe because the column names will be searched when building the dataset
+                                            datz = pd.DataFrame(dat["train"],columns=mdat.columns)["reviewText"].dropna()
+                                            # this function is so finicky ... it will use the original model of 125m terms and align
+                                            # it with our input dataset (like transfer learning / domain adaptation)
+                                            # we can't use the default formatting func = lambda x: x[dataset_text_field] since the data
+                                            # is being passed as-is, with all columns included (hence we only pass the column of interest)
+                                            # and we specify the formatting func to just be lambda x: x with the original tokenizer
+                                            td   = ConstantLengthDataset(toknz
+                                                                        ,datz
+                                                                        ,dataset_text_field="reviewText"
+                                                                        ,formatting_func=lambda x: x)
+                                            # model with supervised fine tuning on the input dataset of our choice
+                                            # we use the original model and the transformed data set on the field in question
+                                            #
+                                            # right now 125m terms is to big to train in this VM, but it works otherwise
+                                            #
+                                            # set up the environment to checkpoint to weights and biases
+                                            #
+                                            # name the W&B project
+                                            os.environ["WANDB_PROJECT"]   = "imdb_reviewText_sentiment"
+                                            # log all model checkpoints
+                                            os.environ["WANDB_LOG_MODEL"] = "checkpoint"
+                                            # going to set up some other parameters to change how training is done
+                                            # in an attempt to use less space, converge faster, checkpoint, etc.
+                                            training_args = TrainingArguments(
+                                                output_dir="./data/tmp/",
+                                                report_to="wandb", # enables logging to W&B 😎
+                                                per_device_train_batch_size=16,
+                                                learning_rate=2e-4,
+                                                lr_scheduler_type="cosine",
+                                                num_train_epochs=3,
+                                                gradient_accumulation_steps=2, # simulate larger batch sizes
+                                            )
+                                            # use parameter efficient fine tuning with low-rank adaptation (lora) to reduce
+                                            # the number of parameters in the model and hopefully get similar performance
+                                            # to the larger model
+                                            peft_config = LoraConfig(
+                                                r=16,  # the rank of the LoRA matrices (number of parameters of each sentence to keep)
+                                                lora_alpha=16, # the weight
+                                                lora_dropout=0.1, # dropout to add to the LoRA layers
+                                                bias="none", # add bias to the nn.Linear layers?
+                                                task_type="CAUSAL_LM",
+                                                target_modules=["q_proj","k_proj","v_proj","o_proj"], # the name of the layers to add LoRA
+                                                modules_to_save=None, # layers to unfreeze and train from the original pre-trained model
+                                            )
+                                            # now finally attemp to build the model
+                                            model= SFTTrainer(ptmdl
+                                                             ,train_dataset=td
+                                                             ,dataset_text_field="reviewText"
+                                                             ,args=training_args
+                                                             ,peft_config=peft_config
+                                                             ,max_seq_length=1024)
+                                            model.train()
+                                            pred = model.predict(dat["test"][:,list(mdat.columns).index("reviewText")])
+                                            if len(np.asarray(pred).shape) > 1:
+                                                preds= np.hstack((np.asarray(pred).reshape((len(dat["test"]),-1)),dat["test"]))
+                                            else:
+                                                preds= np.hstack((pred.reshape((len(dat["test"]),-1)),dat["test"]))
+                                        else:
+                                            # nothing for now ... later
+                                            MODEL= "distilbert-base-uncased-finetuned-sst-2-english"
+                                            # define a tokenizer object
+                                            toknz= DistilBertTokenizer.from_pretrained(MODEL)
+                                            # do some data cleansing
+                                            datrn= pd.DataFrame(dat["train"][:,list(mdat.columns).index("reviewText")],columns=["reviewText"])
+                                            indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
+                                            datrn= datrn.dropna()
+                                            datst= pd.DataFrame(dat["test" ][:,list(mdat.columns).index("reviewText")],columns=["reviewText"])
+                                            indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
+                                            datst= datst.dropna()
+                                            # tokenize the text and embed for use in the model
+                                            etrn = toknz(list(datrn.to_numpy().flatten()),truncation=True,padding=True)
+                                            etest= toknz(list(datst.to_numpy().flatten()),truncation=True,padding=True)
+                                            # now we will create train and test data sets by combining the embedded
+                                            # encodings with the labels ... this will be done with tensorflow
+                                            train= tf.data.Dataset.from_tensor_slices((dict(etrn ),list(dat["train"][[j for j in range(0,len(dat["train"])) if j not in indrn],0].astype(np.int8))))
+                                            test = tf.data.Dataset.from_tensor_slices((dict(etest),list(dat["test" ][[j for j in range(0,len(dat["test" ])) if j not in indst],0].astype(np.int8))))
+                                            # model with DistilBert on the input dataset of our choice
+                                            # we use the original model and the transformed data set on the field in question
+                                            model= TFDistilBertForSequenceClassification.from_pretrained(MODEL)
+                                            # choose the optimizer
+                                            optim= tf.keras.optimizers.Adam(learning_rate=5e-5)
+                                            # define the loss function
+                                            loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                                            # build the model
+                                            model.compile(optimizer=optim,loss=loss,metrics=['accuracy'])
+                                            # train the model
+                                            BATCH= 30#len(dat["train"]) - len(indrn)
+                                            EPOCH= 1
+                                            model.fit(train.shuffle(BATCH).batch(BATCH),epochs=EPOCH,batch_size=BATCH)
+                                            # make some predictions
+                                            pred = model.predict(test)
+                                            # transform the predictions into probabilities
+                                            pred = tf.nn.softmax(pred,axis=1).numpy()
+                                            # append the predictions to the original input data for later processing
+                                            preds= np.hstack((pred.reshape((len(dat["test"]),-1)),dat["test"]))
                         # produce some output
                         if len(preds) > 0:
                             pred0= preds[:,0]
