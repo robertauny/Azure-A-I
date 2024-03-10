@@ -82,6 +82,7 @@ import os
 import csv
 import glob
 import random
+import torch
 
 cfg  = config.cfg()
 
@@ -378,7 +379,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                         dat  = {'train': mdat.to_numpy()[0:100],'test': mdat.to_numpy()[101:150],'labels': {}}
                                         if typ == "caus":
                                             # prertrained model from facebook with 125m features
-                                            ptmdl= AutoModelForCausalLM.from_pretrained("facebook/opt-125m")
+                                            ptmdl= AutoModelForCausalLM.from_pretrained("facebook/opt-125m",low_cpu_mem_usage=True,torch_dtype=torch.bfloat16,use_cache=False)
                                             # extract the original tokenizer used in the model
                                             toknz= AutoTokenizer.from_pretrained(ptmdl.config._name_or_path,trust_remote_code=True)
                                             # how to pad sequences
