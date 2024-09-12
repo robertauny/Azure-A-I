@@ -36,7 +36,7 @@ import utils
 ver  = sys.version.split()[0]
 
 if ver == const.constants.VER:
-    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten,Linear
+    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten#,Linear
     from            keras.models                            import Sequential,load_model,Model,clone_model
     from            keras.utils.np_utils                    import to_categorical
     from            keras.callbacks                         import ModelCheckpoint,Callback
@@ -44,7 +44,7 @@ if ver == const.constants.VER:
     from            keras                                   import backend
     from            keras.applications                      import DenseNet121
 else:
-    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten,Linear
+    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten#,Linear
     from tensorflow.keras.models                            import Sequential,load_model,Model,clone_model
     from tensorflow.keras.utils                             import to_categorical
     from tensorflow.keras.callbacks                         import ModelCheckpoint,Callback
@@ -180,7 +180,8 @@ class Generator(Layer):
         # sequential model
         model= Sequential()
         # encode the layer
-        enc  = Linear(const.constants.MAX_DIM,128*8*8),
+        #enc  = Linear(const.constants.MAX_DIM,128*8*8),
+        enc  = Dense(const.constants.MAX_DIM,input_shape=128*8*8,activation="linear"),
         # add the layer to the model
         model.add(enc)
         # encode the layer
