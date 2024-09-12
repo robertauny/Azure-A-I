@@ -67,7 +67,7 @@ from textblob                     import TextBlob        as tb
 from nltk.corpus                  import stopwords       as sw
 
 # imports related to calculating importance of features
-from eli5.sklearn                import PermutationImportance
+#from eli5.sklearn                import PermutationImportance
 from sklearn.feature_selection   import SelectFromModel
 from sklearn.svm                 import SVC
 
@@ -2102,19 +2102,19 @@ def wikilabel(inst=0,dat=[],wik=False,rf=False):
 ## Purpose:   Permute data rows to introduce entropy then calc feature importance
 ##
 ############################################################################
-def importance(ip=[],op=[],model=None):
-    ret  = None
-    if type(model) == type(None):
-        if type(ip) in [type([]),type(np.asarray([]))] and len(ip) > 0 and \
-           type(op) in [type([]),type(np.asarray([]))] and len(op) > 0:
-            kfold= min(const.constants.KFOLD ,2) if hasattr(const.constants,"KFOLD" ) else 2
-            thold=     const.constants.THRESH    if hasattr(const.constants,"THRESH") else 0.05
-            # fit the model and gauge permutation importance
-            ret  = SelectFromModel(PermutationImportance(SVC(),cv=kfold),threshold=thold).fit(ip.astype(np.single),op.astype(np.single))
-    else:
-        # model is already fit so just compute permutation importance
-        ret  = SelectFromModel(PermutationImportance(model,cv="prefit"),threshold=thold,prefit=True)
-    return ret
+#def importance(ip=[],op=[],model=None):
+    #ret  = None
+    #if type(model) == type(None):
+        #if type(ip) in [type([]),type(np.asarray([]))] and len(ip) > 0 and \
+           #type(op) in [type([]),type(np.asarray([]))] and len(op) > 0:
+            #kfold= min(const.constants.KFOLD ,2) if hasattr(const.constants,"KFOLD" ) else 2
+            #thold=     const.constants.THRESH    if hasattr(const.constants,"THRESH") else 0.05
+            ## fit the model and gauge permutation importance
+            #ret  = SelectFromModel(PermutationImportance(SVC(),cv=kfold),threshold=thold).fit(ip.astype(np.single),op.astype(np.single))
+    #else:
+        ## model is already fit so just compute permutation importance
+        #ret  = SelectFromModel(PermutationImportance(model,cv="prefit"),threshold=thold,prefit=True)
+    #return ret
 
 # *************** TESTING *****************
 
