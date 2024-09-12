@@ -53,7 +53,7 @@ else:
     from tensorflow.keras.preprocessing.text                import Tokenizer
     from tensorflow.keras.preprocessing.sequence            import pad_sequences
 
-from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,importance,store,unique
+from ai                                             import create_kg,extendglove,thought,cognitive,img2txt,wikidocs,wikilabel,store,unique
 from nn                                             import dbn,calcC,nn_split,dbnlayers,calcN,clustering,nn_cleanse,nn_balance,nn_trim,nn_energy
 from sklearn.ensemble                               import RandomForestClassifier
 from pyspark.sql                                    import SparkSession
