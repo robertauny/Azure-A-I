@@ -239,7 +239,7 @@ class Generator(Layer):
 ## Purpose:   Discriminator between samples for the GAN
 ##
 ############################################################################
-class Discriminator():
+#class Discriminator():
 
 ############################################################################
 ##
