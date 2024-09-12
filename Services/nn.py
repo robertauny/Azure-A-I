@@ -174,7 +174,7 @@ def calcC(vals=None,clust=None,keys=None):
 ##
 ############################################################################
 class Generator(Layer):
-    def __init__(self,const.constants.MAX_DIM):
+    def __init__(self):
         super(Generator,self).__init__()
 
         # sequential model
