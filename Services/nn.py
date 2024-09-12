@@ -36,7 +36,7 @@ import utils
 ver  = sys.version.split()[0]
 
 if ver == const.constants.VER:
-    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
+    from            keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten,Linear
     from            keras.models                            import Sequential,load_model,Model,clone_model
     from            keras.utils.np_utils                    import to_categorical
     from            keras.callbacks                         import ModelCheckpoint,Callback
@@ -44,12 +44,12 @@ if ver == const.constants.VER:
     from            keras                                   import backend
     from            keras.applications                      import DenseNet121
 else:
-    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,Layer,Flatten
+    from tensorflow.keras.layers                            import Dense,BatchNormalization,Activation,Conv2D,Conv2DTranspose,Add,Input,Subtract,ReLU,LeakyReLU,Layer,Flatten,Linear
     from tensorflow.keras.models                            import Sequential,load_model,Model,clone_model
     from tensorflow.keras.utils                             import to_categorical
     from tensorflow.keras.callbacks                         import ModelCheckpoint,Callback
     from tensorflow.keras.preprocessing.text                import Tokenizer
-    from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
+    #from tensorflow.keras.layers.experimental.preprocessing import CategoryEncoding
     from tensorflow.keras                                   import backend
     from tensorflow.keras.applications                      import DenseNet121
 
@@ -167,6 +167,79 @@ def calcC(vals=None,clust=None,keys=None):
                 if vals[i] not in keys:
                     keys[vals[i]] = int(v[i][0])
     return ret
+
+############################################################################
+##
+## Purpose:   Generator of samples for the GAN
+##
+############################################################################
+class Generator(Layer):
+    def __init__(self,const.constants.MAX_DIM):
+        super(Generator,self).__init__()
+
+        # sequential model
+        model= Sequential()
+        # encode the layer
+        enc  = Linear(const.constants.MAX_DIM,128*8*8),
+        # add the layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = ReLU(),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Unflatten(1, (128, 8, 8)),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Upsample(scale_factor=2),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Conv2d(128, 128, kernel_size=3, padding=1),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = BatchNorm2d(128, momentum=0.78),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = ReLU(),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Upsample(scale_factor=2),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Conv2d(128, 64, kernel_size=3, padding=1),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = BatchNorm2d(64, momentum=0.78),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = ReLU(),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Conv2d(64, 3, kernel_size=3, padding=1),
+        # add the input layer to the model
+        model.add(enc)
+        # encode the layer
+        enc  = Tanh()
+        # add the input layer to the model
+        model.add(enc)
+        model.compile(loss=const.constants.LOSS,optimizer=const.constants.OPTI)
+        model.fit(x=x,y=sdat["train"][:,0].astype(np.int8),epochs=const.constants.EPO,verbose=const.constants.VERB)
+
+############################################################################
+##
+## Purpose:   Discriminator between samples for the GAN
+##
+############################################################################
+class Discriminator():
 
 ############################################################################
 ##
