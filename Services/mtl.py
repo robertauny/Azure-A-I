@@ -459,7 +459,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                             indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
                                             datrn= datrn.dropna()
                                             datst= pd.DataFrame(dat["test" ][:,list(mdat.columns).index("reviewText")],columns=["reviewText"])
-                                            indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
+                                            #indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
+                                            indst= pd.isnull(datst).any().to_numpy().nonzero()[0]
                                             datst= datst.dropna()
                                             # tokenize the text and embed for use in the model
                                             etrn = toknz(list(datrn.to_numpy().flatten()),truncation=True,padding=True)
