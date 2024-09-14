@@ -373,7 +373,7 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                         # we could modify the overall sentiment to be binary
                                         # by specifying 1-3 is 0 and 4-5 is 1, but we will keep
                                         # the same values currently used in the dataset
-                                        mdat = pd.read_json("/home/robert/data/mags_small.json",lines=True)
+                                        mdat = pd.read_json("./data/mags_small.json",lines=True)
                                         mdat = pd.DataFrame(mdat[["overall","reviewText"]],columns=["overall","reviewText"])
                                         # create the dataset for fine tuning and distilbert
                                         #dat  = nn_split(mdat.dropna().to_numpy())
