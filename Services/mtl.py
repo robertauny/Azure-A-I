@@ -456,7 +456,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                             toknz= DistilBertTokenizer.from_pretrained(MODEL)
                                             # do some data cleansing
                                             datrn= pd.DataFrame(dat["train"][:,list(mdat.columns).index("reviewText")],columns=["reviewText"])
-                                            indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
+                                            #indrn= pd.isnull(datrn).any(1).to_numpy().nonzero()[0]
+                                            indrn= pd.isnull(datrn).any().to_numpy().nonzero()[0]
                                             datrn= datrn.dropna()
                                             datst= pd.DataFrame(dat["test" ][:,list(mdat.columns).index("reviewText")],columns=["reviewText"])
                                             #indst= pd.isnull(datst).any(1).to_numpy().nonzero()[0]
