@@ -181,7 +181,8 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                     fit  = sdat["train"][:,0].astype(np.int8)
                     y    = to_categorical(calcC(fit,clust,keys).flatten(),num_classes=clust)
                     for typ in typs:
-                        if typ == "nnrf":
+                        #if typ == "nnrf":
+                        if typ == "nnrf1":
                             # now use the random cluster model to trim the dataset for best sensitivity
                             #
                             # the last argument to this function is a boolean dictating whether or not
