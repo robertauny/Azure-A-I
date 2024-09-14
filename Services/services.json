@@ -92,9 +92,9 @@
 						"connection" : {
 							"app"  : "glove",
 							"file" : [
-                                                                  "/home/robert/data/glove.6B.50d.txt",
-                                                                  "/home/robert/data/nglove.6B.50d.txt",
-                                                                  "/home/robert/data/iglove.6B.50d.txt"
+                                                                  "./data/glove.6B.50d.txt",
+                                                                  "./data/nglove.6B.50d.txt",
+                                                                  "./data/iglove.6B.50d.txt"
                                                                  ]
 						}
 					},
@@ -102,7 +102,7 @@
 						"connection" : {
 							"app"  : "ocrf",
 							"files": [
-                                                                  "/home/robert/data/files/kg.pdf"
+                                                                  "./data/files/kg.pdf"
                                                                  ]
 						}
 					},
@@ -114,13 +114,13 @@
 							"ver"  : "v2.1",
 							"key"  : "account-key",
 							"files": [
-                                                                  "/home/robert/data/files/IMG_0569.jpeg",
-                                                                  "/home/robert/data/files/zyrtec.png",
-                                                                  "/home/robert/data/files/watson-795.jpg",
-                                                                  "/home/robert/data/files/IMG_0570.jpg",
-                                                                  "/home/robert/data/files/nospa.png",
-                                                                  "/home/robert/data/files/venoruton.png",
-                                                                  "/home/robert/data/files/zyrtec.jpg"
+                                                                  "./data/files/IMG_0569.jpeg",
+                                                                  "./data/files/zyrtec.png",
+                                                                  "./data/files/watson-795.jpg",
+                                                                  "./data/files/IMG_0570.jpg",
+                                                                  "./data/files/nospa.png",
+                                                                  "./data/files/venoruton.png",
+                                                                  "./data/files/zyrtec.jpg"
                                                                  ]
 						}
 					},
@@ -132,15 +132,15 @@
 							"ver"  : "v2.1",
 							"key"  : "account-key",
 							"files": [
-                                                                  "/home/robert/data/files/IMG_0569.jpeg",
-                                                                  "/home/robert/data/files/zyrtec.png",
-                                                                  "/home/robert/data/files/watson-795.jpg",
-                                                                  "/home/robert/data/files/IMG_0570.jpg",
-                                                                  "/home/robert/data/files/nospa.png",
-                                                                  "/home/robert/data/files/venoruton.png",
-                                                                  "/home/robert/data/files/zyrtec.jpg"
+                                                                  "./data/files/IMG_0569.jpeg",
+                                                                  "./data/files/zyrtec.png",
+                                                                  "./data/files/watson-795.jpg",
+                                                                  "./data/files/IMG_0570.jpg",
+                                                                  "./data/files/nospa.png",
+                                                                  "./data/files/venoruton.png",
+                                                                  "./data/files/zyrtec.jpg"
                                                                  ],
-                                                        "fold" : "/home/robert/data/files/images"
+                                                        "fold" : "./data/files/images"
 						}
 					},
 					{
@@ -176,10 +176,10 @@
 					{
 						"connection" : {
 							"app"   : "main",
-							"files" : ["/home/robert/data/csv/clicks.csv"],
-							"xfile" : "/home/robert/data/csv/clicks.csv",
-							"foldi" : "/home/robert/data/images",
-							"foldm" : "/home/robert/data/models"
+							"files" : ["./data/csv/clicks.csv"],
+							"xfile" : "./data/csv/clicks.csv",
+							"foldi" : "./data/images",
+							"foldm" : "./models"
 						}
                                         }
 				]
