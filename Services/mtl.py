@@ -474,9 +474,11 @@ if (type(fls) in [type([]),type(np.asarray([]))] and len(fls) > 0) and \
                                             # we use the original model and the transformed data set on the field in question
                                             model= TFDistilBertForSequenceClassification.from_pretrained(MODEL)
                                             # choose the optimizer
-                                            optim= tf.keras.optimizers.Adam(learning_rate=5e-5)
+                                            #optim= tf.keras.optimizers.Adam(learning_rate=5e-5)
+                                            optim= "adam"
                                             # define the loss function
-                                            loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                                            #loss = tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True)
+                                            loss = "sparse_categorical_crossentropy"
                                             # build the model
                                             model.compile(optimizer=optim,loss=loss,metrics=['accuracy'])
                                             # train the model
